@@ -1,19 +1,20 @@
 package net.labyfy.gradle.minecraft.data.version;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import net.labyfy.gradle.maven.pom.MavenArtifact;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
 public class VersionedLibrary {
-    private VersionedLibraryName name;
+    private MavenArtifact name;
     private VersionedLibraryDownloads downloads;
     @JsonProperty("extract") private Map<String, List<String>> extractRules;
     private Map<String, String> natives;
     private List<VersionedRule> rules;
 
-    public VersionedLibraryName getName() {
+    public MavenArtifact getName() {
         return name;
     }
 
