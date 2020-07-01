@@ -4,7 +4,13 @@ import net.labyfy.gradle.environment.DeobfuscationEnvironment;
 import net.labyfy.gradle.environment.DeobfuscationException;
 import net.labyfy.gradle.environment.DeobfuscationUtilities;
 import net.labyfy.gradle.environment.EnvironmentCacheFileProvider;
+import net.labyfy.gradle.java.exec.JavaExecutionResult;
+import net.labyfy.gradle.maven.MavenArtifactDownloader;
+import net.labyfy.gradle.maven.MavenResolveException;
+import net.labyfy.gradle.maven.SimpleMavenRepository;
+import net.labyfy.gradle.maven.pom.MavenArtifact;
 import net.labyfy.gradle.maven.pom.MavenPom;
+import net.labyfy.gradle.minecraft.MinecraftRepository;
 import net.labyfy.gradle.minecraft.data.environment.ModCoderPackInput;
 import net.labyfy.gradle.util.Util;
 import org.apache.http.client.HttpClient;
@@ -12,12 +18,10 @@ import org.gradle.api.logging.Logger;
 import org.gradle.api.logging.Logging;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Implementation of the MCP as a deobfuscation environment.
@@ -84,31 +88,101 @@ public class ModCoderPackEnvironment implements DeobfuscationEnvironment {
         // Save all sides which should be executed
         List<String> sides = new ArrayList<>();
 
-        if(clientPom != null) {
+        if (clientPom != null) {
             // If the client exists, deobfuscate it
             sides.add("client");
         }
 
-        if(serverPom != null) {
+        if (serverPom != null) {
             // If the server exists, deobfuscate it
             sides.add("server");
         }
 
-        if(clientPom != null && serverPom != null) {
+        if (clientPom != null && serverPom != null) {
             // If client and server exist, create the joined/merged jars too
             sides.add("joined");
         }
 
-        for(String side : sides) {
+        // Try to retrieve the version
+        String version = null;
+        if (clientPom != null) {
+            version = clientPom.getVersion();
+        }
+
+        // If the client has not been set, try to retrieve the version
+        // from the server
+        if (version == null && serverPom != null) {
+            version = serverPom.getVersion();
+        } else if (serverPom != null && !version.equals(serverPom.getVersion())) {
+            throw new DeobfuscationException("Client/server version mismtach, client: " + clientPom.getVersion() +
+                    ", server: " + serverPom.getVersion());
+        }
+
+        for (String side : sides) {
             // Prepare all sides
             run.prepare(side);
         }
 
         Map<String, Path> outputs = new HashMap<>();
 
-        for(String side : sides) {
+        for (String side : sides) {
             // Execute all sides
             outputs.put(side, run.execute(side));
+        }
+
+        // Construct the CSV remapper
+        CsvRemapper remapper = new CsvRemapper();
+        try {
+            Files.walk(mappingsOutput)
+                    .filter(Files::isRegularFile)
+                    .filter((path) -> path.getFileName().toString().endsWith(".csv"))
+                    .forEach((path) -> {
+                        try {
+                            // Load all CSV files as mappings
+                            remapper.loadCsv(path);
+                        } catch (IOException e) {
+                            // Will be caught by the block later down, we need to rethrow as unchecked
+                            // as the lambda can't throw
+                            throw new UncheckedIOException(e);
+                        }
+                    });
+        } catch (UncheckedIOException | IOException e) {
+            throw new DeobfuscationException("Failed to initialize remapper", e);
+        }
+
+        // Retrieve utility classes
+        MinecraftRepository minecraftRepository = utilities.getMinecraftRepository();
+
+        for (Map.Entry<String, Path> output : outputs.entrySet()) {
+            // Extract every side and the associated jar
+            String side = output.getKey();
+            Path srgArtifactPath = output.getValue();
+
+            // Generate output artifact
+            MavenArtifact outputArtifact = new MavenArtifact(
+                    "net.minecraft",
+                    side,
+                    version,
+                    "mcp-sources"
+            );
+
+            // Retrieve the path the artifact should be written to
+            Path targetArtifactPath = minecraftRepository.getArtifactPath(outputArtifact);
+            if (!Files.isDirectory(targetArtifactPath.getParent())) {
+                // Make sure we can write the artifact
+                try {
+                    Files.createDirectories(targetArtifactPath.getParent());
+                } catch (IOException e) {
+                    throw new DeobfuscationException("Failed to create parent directory for target artifact", e);
+                }
+            }
+
+            try {
+                LOGGER.lifecycle("Remapping SRG to deobfuscated for {} {}", side, version);
+                remapper.remapSourceJar(srgArtifactPath, targetArtifactPath);
+            } catch (IOException e) {
+                throw new DeobfuscationException("Failed to remap " + side + " " + version, e);
+            }
         }
     }
 
@@ -116,11 +190,10 @@ public class ModCoderPackEnvironment implements DeobfuscationEnvironment {
      * Downloads and extracts a ZIP if the output does not exist already.
      *
      * @param cacheFileProvider The provider to use for file caching
-     * @param httpClient The HTTP client to use for downloading
-     * @param url The URL to retrieve the file from
-     * @param outputName The name of the output file
+     * @param httpClient        The HTTP client to use for downloading
+     * @param url               The URL to retrieve the file from
+     * @param outputName        The name of the output file
      * @return The path to the extracted directory
-     *
      * @throws DeobfuscationException If the file fails to download or extract
      */
     private Path downloadAndExtractZip(
