@@ -2,6 +2,10 @@ package net.labyfy.gradle.minecraft;
 
 import net.labyfy.gradle.LabyfyGradleException;
 import net.labyfy.gradle.environment.DeobfuscationEnvironment;
+import net.labyfy.gradle.environment.DeobfuscationException;
+import net.labyfy.gradle.environment.DeobfuscationUtilities;
+import net.labyfy.gradle.environment.EnvironmentCacheFileProvider;
+import net.labyfy.gradle.java.exec.JavaExecutionHelper;
 import net.labyfy.gradle.json.JsonConverter;
 import net.labyfy.gradle.json.JsonConverterException;
 import net.labyfy.gradle.maven.MavenArtifactDownloader;
@@ -22,7 +26,7 @@ import net.labyfy.gradle.util.RuleChainResolver;
 import net.labyfy.gradle.util.TimeStampedFile;
 import net.labyfy.gradle.util.Util;
 import org.apache.http.client.HttpClient;
-import org.gradle.api.invocation.Gradle;
+import org.gradle.api.Project;
 import org.gradle.api.logging.Logger;
 import org.gradle.api.logging.Logging;
 
@@ -46,6 +50,7 @@ public class MinecraftRepository extends SimpleMavenRepository {
     private final TimeStampedFile versionManifestFile;
     private final TimeStampedFile mappingsDefinitionFile;
 
+    private final Path environmentBasePath;
     private final Path versionsDir;
     private final VersionsManifest manifest;
     private final Map<String, EnvironmentInput> versionedEnvironments;
@@ -64,6 +69,8 @@ public class MinecraftRepository extends SimpleMavenRepository {
 
         this.versionManifestFile = new TimeStampedFile(cacheDir.resolve("version-manifest.json"));
         this.mappingsDefinitionFile = new TimeStampedFile(cacheDir.resolve("mappings.json"));
+
+        this.environmentBasePath = cacheDir.resolve("environments");
         this.versionsDir = cacheDir.resolve("versions");
 
         if (!Files.isDirectory(versionsDir)) {
@@ -123,35 +130,43 @@ public class MinecraftRepository extends SimpleMavenRepository {
      * Installs the given minecraft version by automatically detecting the available
      * deobfuscation environments.
      *
-     * @param version The version to install
+     * @param version            The version to install
      * @param internalRepository The repository to use for storing artifacts required while installing
-     * @param downloader The downloader to use for installing internal artifacts
+     * @param downloader         The downloader to use for installing internal artifacts
+     * @param project            The project to use for utility function basics
      * @throws IllegalArgumentException If no default deobfuscation environments are available for the given version
      * @throws IllegalArgumentException If the given minecraft version does not exist
      * @throws IOException              If an I/O error occurs
      */
-    public void install(String version, SimpleMavenRepository internalRepository, MavenArtifactDownloader downloader)
-            throws IOException {
-        install(version, new ArrayList<>(), internalRepository, downloader);
+    public void install(
+            String version,
+            SimpleMavenRepository internalRepository,
+            MavenArtifactDownloader downloader,
+            Project project
+    ) throws IOException {
+        install(version, null, internalRepository, downloader, project);
     }
 
     /**
      * Installs the given minecraft version using the given deobfuscation environments or by automatically detecting
      * them if not given
      *
-     * @param version      The version to install
-     * @param environments The environments to use, or {@code null} for auto detection
+     * @param version            The version to install
+     * @param environment        The environment to use for deobfuscation, or {@code null} for auto detection
      * @param internalRepository The repository to use for storing artifacts required while installing
-     * @param downloader The downloader to use for installing internal artifacts
+     * @param downloader         The downloader to use for installing internal artifacts
+     * @param project            The project to use for utility function basics
      * @throws IllegalArgumentException If no default deobfuscation environments are available for the given version and
      *                                  no environments are given
      * @throws IllegalArgumentException If the given minecraft version does not exist
      * @throws IOException              If an I/O error occurs
      */
-    public void install(String version,
-                        List<DeobfuscationEnvironment> environments,
-                        SimpleMavenRepository internalRepository,
-                        MavenArtifactDownloader downloader
+    public void install(
+            String version,
+            DeobfuscationEnvironment environment,
+            SimpleMavenRepository internalRepository,
+            MavenArtifactDownloader downloader,
+            Project project
     ) throws IOException {
         MinecraftManifestVersion manifestVersion = null;
 
@@ -167,11 +182,11 @@ public class MinecraftRepository extends SimpleMavenRepository {
             throw new IllegalArgumentException("No such minecraft " + version);
         }
 
-        if (environments.isEmpty() && !hasDefaultEnvironmentFor(version)) {
-            throw new IllegalArgumentException("No default deobfuscation environments available for " + version);
-        } else if (environments.isEmpty()) {
-            // Construct default deobfuscation environments
-            environments = DeobfuscationEnvironment.createFor(versionedEnvironments.get(version));
+        if (environment == null && !hasDefaultEnvironmentFor(version)) {
+            throw new IllegalArgumentException("No default deobfuscation environment available for " + version);
+        } else if (environment == null) {
+            // Construct default deobfuscation environment
+            environment = DeobfuscationEnvironment.createFor(versionedEnvironments.get(version));
         }
 
         TimeStampedFile clientVersionJson = new TimeStampedFile(versionsDir.resolve(version + ".json"));
@@ -197,6 +212,24 @@ public class MinecraftRepository extends SimpleMavenRepository {
                 versionManifest, "client", true, internalRepository, downloader);
         MavenPom serverJar = installVariantIfExist(
                 versionManifest, "server", false, null, null);
+
+        if (clientJar == null && serverJar == null) {
+            // We can't continue if the version contains none of the known artifacts
+            throw new LabyfyGradleException("Could not download client nor server jar");
+        }
+
+        try {
+            environment.runDeobfuscation(clientJar, serverJar, new DeobfuscationUtilities(
+                    downloader,
+                    this,
+                    internalRepository,
+                    httpClient,
+                    new EnvironmentCacheFileProvider(environmentBasePath.resolve(environment.name())),
+                    new JavaExecutionHelper(project)
+            ));
+        } catch (DeobfuscationException e) {
+            throw new LabyfyGradleException("Failed to deobfuscate " + version, e);
+        }
     }
 
     private MavenPom installVariantIfExist(
@@ -221,7 +254,7 @@ public class MinecraftRepository extends SimpleMavenRepository {
         MavenPom pom = createPom(manifest, variant, includeDependencies);
 
         // If dependencies should be included install them into the internal repository
-        if(includeDependencies) {
+        if (includeDependencies) {
             try {
                 downloader.installAll(pom, internalRepository, false);
             } catch (MavenResolveException e) {

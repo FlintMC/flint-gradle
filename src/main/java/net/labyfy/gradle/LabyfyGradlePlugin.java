@@ -19,6 +19,8 @@ import java.io.UncheckedIOException;
 import java.nio.file.Path;
 
 public class LabyfyGradlePlugin implements Plugin<Project> {
+    private Project project;
+
     private HttpClient httpClient;
     private MavenArtifactDownloader downloader;
 
@@ -29,6 +31,8 @@ public class LabyfyGradlePlugin implements Plugin<Project> {
 
     @Override
     public void apply(@Nonnull Project project) {
+        this.project = project;
+
         Gradle gradle = project.getGradle();
         httpClient = gradle.getStartParameter().isOffline() ? null :
                 HttpClientBuilder.create().useSystemProperties().build();
@@ -65,7 +69,7 @@ public class LabyfyGradlePlugin implements Plugin<Project> {
 
         for(String version : extension.getMinecraftVersions()) {
             try {
-                minecraftRepository.install(version, internalRepository, downloader);
+                minecraftRepository.install(version, internalRepository, downloader, project);
             } catch (IOException e) {
                 throw new GradleException("Failed to install minecraft version " + version, e);
             }

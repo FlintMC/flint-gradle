@@ -5,21 +5,21 @@ import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.JsonNode;
-import net.labyfy.gradle.minecraft.data.version.VersionedRule;
-import net.labyfy.gradle.minecraft.data.version.VersionedRuleAction;
 import org.apache.http.HttpResponse;
 import org.apache.http.StatusLine;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.CopyOption;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Collections;
+import java.util.ArrayList;
+import java.util.Enumeration;
 import java.util.List;
-import java.util.Map;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
 public class Util {
     /**
@@ -103,6 +103,98 @@ public class Util {
 
         try (InputStream stream = response.getEntity().getContent()) {
             Files.copy(stream, output, options);
+        }
+    }
+
+    /**
+     * Extracts the given zip file to the given directory.
+     *
+     * @param zip       The path to the zip file to extract
+     * @param targetDir The directory to extract the zip file into
+     * @param options   Options to pass to {@link Files#copy(InputStream, Path, CopyOption...)}
+     * @throws IOException If an I/O error occurs while reading or writing files
+     */
+    public static void extractZip(Path zip, Path targetDir, CopyOption... options) throws IOException {
+        try (ZipFile zipFile = new ZipFile(zip.toFile())) {
+            // Get a list of all entries
+            Enumeration<? extends ZipEntry> entries = zipFile.entries();
+            while (entries.hasMoreElements()) {
+                ZipEntry entry = entries.nextElement();
+                if (entry.isDirectory()) {
+                    // Required directories will be created automatically
+                    continue;
+                }
+
+                String name = entry.getName();
+                if (name.startsWith("/")) {
+                    // Make sure that the entry does not start with a /, else it will corrupt
+                    // the Path#resolve result
+                    name = name.substring(1);
+                }
+
+                Path targetFile = targetDir.resolve(name);
+                if (!Files.exists(targetFile.getParent())) {
+                    // Make sure the parent directories exist
+                    Files.createDirectories(targetFile.getParent());
+                }
+
+                try (InputStream entryStream = zipFile.getInputStream(entry)) {
+                    // Copy the entire entry to the target file
+                    Files.copy(entryStream, targetFile, options);
+                }
+            }
+        }
+    }
+
+    /**
+     * Copies the given input stream to the given output stream.
+     *
+     * @param in  The input stream to copy from
+     * @param out The output stream to copy to
+     * @throws IOException If an I/O error occurs while copying
+     */
+    public static void copyStream(InputStream in, OutputStream out) throws IOException {
+        byte[] buffer = new byte[4096];
+
+        int count;
+        while ((count = in.read(buffer)) != -1) {
+            out.write(buffer, 0, count);
+        }
+    }
+
+    /**
+     * Reads all lines from the given input stream without closing it.
+     *
+     * @param in The stream to read all lines from
+     * @return A list of all read lines
+     * @throws IOException If an I/O error occurs while reading from the stream
+     */
+    public static List<String> readAllLines(InputStream in) throws IOException {
+        List<String> lines = new ArrayList<>();
+
+        // Get a buffered reader for the stream
+        BufferedReader reader = new BufferedReader(new InputStreamReader(in));
+        String line;
+
+        // Read all lines until we reach the EOS
+        while ((line = reader.readLine()) != null) {
+            lines.add(line);
+        }
+
+        return lines;
+    }
+
+    /**
+     * Writes the given lines to the given output stream.
+     *
+     * @param lines The lines to write
+     * @param out   The stream to write the lines to
+     * @throws IOException If an I/O exception occurs while writing to the stream
+     */
+    public static void writeAllLines(List<String> lines, OutputStream out) throws IOException {
+        for (String line : lines) {
+            out.write(line.getBytes(StandardCharsets.UTF_8));
+            out.write('\n');
         }
     }
 }

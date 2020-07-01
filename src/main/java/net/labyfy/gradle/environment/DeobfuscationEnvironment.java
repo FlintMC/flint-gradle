@@ -1,6 +1,7 @@
 package net.labyfy.gradle.environment;
 
 import net.labyfy.gradle.environment.mcp.ModCoderPackEnvironment;
+import net.labyfy.gradle.maven.pom.MavenPom;
 import net.labyfy.gradle.minecraft.data.environment.EnvironmentInput;
 
 import java.util.Collections;
@@ -18,13 +19,17 @@ public interface DeobfuscationEnvironment {
     String name();
 
     /**
-     * Retrieves the classifier base name for jars produced by this environment.
+     * Runs the deobfuscation on the given client and server artifacts. One of the 2 artifacts may
+     * be null, but never both at the same time.
      *
-     * @return The classifier base name
+     * @param clientPom The client artifact, may be null if serverPom is not null
+     * @param serverPom The client artifact, may be null if clientPom is not null
+     * @param utilities Various utilities useful during deobfuscation
      */
-    String classifierName();
+    void runDeobfuscation(MavenPom clientPom, MavenPom serverPom, DeobfuscationUtilities utilities)
+            throws DeobfuscationException;
 
-    static List<DeobfuscationEnvironment> createFor(EnvironmentInput input) {
-        return Collections.singletonList(new ModCoderPackEnvironment(input.getModCoderPack()));
+    static DeobfuscationEnvironment createFor(EnvironmentInput input) {
+        return new ModCoderPackEnvironment(input.getModCoderPack());
     }
 }

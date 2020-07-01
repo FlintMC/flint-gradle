@@ -40,6 +40,25 @@ public class MavenArtifactDownloader {
     }
 
     /**
+     * Tests if this downloader has the given repository set as a source.
+     *
+     * @param source The repository to check if it exists as a source
+     * @return {@code true} if this downloader has the give repository as a source, {@code false} otherwise
+     */
+    public boolean hasSource(ReadableMavenRepository source) {
+        return this.sources.contains(source);
+    }
+
+    /**
+     * Removes the given repository as a source.
+     *
+     * @param source The repository to remove
+     */
+    public void removeSource(ReadableMavenRepository source) {
+        this.sources.remove(source);
+    }
+
+    /**
      * Installs the given artifact with all dependencies into the given repository.
      *
      * @param artifact The artifact to install
