@@ -1,5 +1,6 @@
 package net.labyfy.gradle.environment;
 
+import net.labyfy.gradle.java.compile.JavaCompileHelper;
 import net.labyfy.gradle.java.exec.JavaExecutionHelper;
 import net.labyfy.gradle.maven.MavenArtifactDownloader;
 import net.labyfy.gradle.maven.SimpleMavenRepository;
@@ -16,6 +17,7 @@ public class DeobfuscationUtilities {
     private final HttpClient httpClient;
     private final EnvironmentCacheFileProvider cacheFileProvider;
     private final JavaExecutionHelper javaExecutionHelper;
+    private final JavaCompileHelper javaCompileHelper;
 
     /**
      * Constructs a new pack of deobfuscation utilities.
@@ -28,6 +30,7 @@ public class DeobfuscationUtilities {
      *                   when operating in offline mode
      * @param cacheFileProvider The cache file provider to make available to the deobfuscation environment
      * @param javaExecutionHelper The execution helper to use for invoking java processes
+     * @param javaCompileHelper The compile helper to use for compiling and packaging java archives
      */
     public DeobfuscationUtilities(
             MavenArtifactDownloader downloader,
@@ -35,7 +38,8 @@ public class DeobfuscationUtilities {
             SimpleMavenRepository internalRepository,
             HttpClient httpClient,
             EnvironmentCacheFileProvider cacheFileProvider,
-            JavaExecutionHelper javaExecutionHelper
+            JavaExecutionHelper javaExecutionHelper,
+            JavaCompileHelper javaCompileHelper
     ) {
         this.downloader = downloader;
         this.minecraftRepository = minecraftRepository;
@@ -43,6 +47,7 @@ public class DeobfuscationUtilities {
         this.httpClient = httpClient;
         this.cacheFileProvider = cacheFileProvider;
         this.javaExecutionHelper = javaExecutionHelper;
+        this.javaCompileHelper = javaCompileHelper;
     }
 
     /**
@@ -97,5 +102,14 @@ public class DeobfuscationUtilities {
      */
     public JavaExecutionHelper getJavaExecutionHelper() {
         return javaExecutionHelper;
+    }
+
+    /**
+     * Retrieves the helper for compiling and packaging java archives.
+     *
+     * @return The helper for compiling and packaging java archives
+     */
+    public JavaCompileHelper getJavaCompileHelper() {
+        return javaCompileHelper;
     }
 }

@@ -1,14 +1,13 @@
 package net.labyfy.gradle.java.exec;
 
 import org.gradle.api.Project;
-import org.gradle.api.tasks.JavaExec;
+import org.gradle.process.ExecResult;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.UUID;
 import java.util.jar.Attributes;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
@@ -38,7 +37,6 @@ public class JavaExecutionHelper {
      * @return The result of the execution
      * @throws IOException If an I/O error occurs executing the jar
      */
-    @SuppressWarnings("UnstableApiUsage")
     public JavaExecutionResult execute(Path jar, Path workingDir, List<String> programArgs, List<String> jvmArgs)
             throws IOException {
         String mainClass = determineMainClass(jar);
@@ -48,42 +46,35 @@ public class JavaExecutionHelper {
             Files.createDirectories(workingDir);
         }
 
-        // Use the project to create a java exec task. This will preserve the JVM gradle was invoked with
-        JavaExec task = project.getTasks().create("javaExec" + UUID.randomUUID(), JavaExec.class);
-
         try (
                 // Capture the output
                 ByteArrayOutputStream standardOutput = new ByteArrayOutputStream();
                 ByteArrayOutputStream standardError = new ByteArrayOutputStream()
         ) {
-            // Configure output capturing
-            task.setStandardOutput(standardOutput);
-            task.setErrorOutput(standardError);
+            ExecResult result = project.javaexec((execution) -> {
+                // Configure output capturing
+                execution.setStandardOutput(standardOutput);
+                execution.setErrorOutput(standardError);
 
-            // Give the arguments to gradle
-            task.setJvmArgs(jvmArgs);
-            task.setArgs(programArgs);
+                // Give the arguments to gradle
+                execution.setJvmArgs(jvmArgs);
+                execution.setArgs(programArgs);
 
-            // Configure the execution parameters
-            task.setClasspath(project.files(jar));
-            task.setMain(mainClass);
-            task.setWorkingDir(project.file(workingDir));
+                // Configure the execution parameters
+                execution.setClasspath(project.files(jar));
+                execution.setMain(mainClass);
+                execution.setWorkingDir(project.file(workingDir));
 
-            // Don't error if the exit value is not 0
-            task.setIgnoreExitValue(true);
-
-            // Invoke the execution
-            task.exec();
+                // Don't error if the exit value is not 0
+                execution.setIgnoreExitValue(true);
+            });
 
             // Collect results and return them to the caller
-            int exitValue = task.getExecutionResult().get().getExitValue();
             return new JavaExecutionResult(
-                    exitValue,
+                    result.getExitValue(),
                     new String(standardOutput.toByteArray()),
                     new String(standardError.toByteArray())
             );
-        } finally {
-           task.setEnabled(false);
         }
     }
 

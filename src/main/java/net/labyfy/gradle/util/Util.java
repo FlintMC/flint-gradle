@@ -16,8 +16,10 @@ import java.nio.file.CopyOption;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Enumeration;
 import java.util.List;
+import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -195,6 +197,47 @@ public class Util {
         for (String line : lines) {
             out.write(line.getBytes(StandardCharsets.UTF_8));
             out.write('\n');
+        }
+    }
+
+    /**
+     * Creates a new temporary directory.
+     *
+     * @return The path of the created directory
+     * @throws IOException If an I/O error occurs while creating the directory
+     */
+    public static Path temporaryDir() throws IOException {
+        return Files.createTempDirectory("java_compile");
+    }
+
+    /**
+     * Recursively deletes the given directory.
+     *
+     * @param toNuke         The directory to delete
+     * @param ignoreFailures If {@code true}, failures of deleting single files are ignored, exceptions
+     *                       when closing the stream are still thrown
+     * @throws IOException If an I/O error occurs while closing the stream, or while deleting files
+     *                     if ignoreFailures is false
+     */
+    public static void nukeDirectory(Path toNuke, boolean ignoreFailures) throws IOException {
+        // Walk all files in the given dir
+        try(Stream<Path> allFiles = Files.walk(toNuke)) {
+            // Sort them so the files come before the directories
+            allFiles.sorted(Comparator.reverseOrder()).forEach((path) -> {
+                try {
+                    // Delete the single file
+                    Files.delete(path);
+                } catch (IOException e) {
+                    if(!ignoreFailures) {
+                        // If failures should not be ignore, throw an unchecked IO exception which will
+                        // be caught by the block later down
+                        throw new UncheckedIOException(e);
+                    }
+                }
+            });
+        } catch (UncheckedIOException e) {
+            // Rethrow the cause of the exception which has been thrown above
+            throw e.getCause();
         }
     }
 }

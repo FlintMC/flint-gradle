@@ -1,14 +1,10 @@
 package net.labyfy.gradle.environment.mcp;
 
-import net.labyfy.gradle.environment.DeobfuscationEnvironment;
-import net.labyfy.gradle.environment.DeobfuscationException;
-import net.labyfy.gradle.environment.DeobfuscationUtilities;
-import net.labyfy.gradle.environment.EnvironmentCacheFileProvider;
+import net.labyfy.gradle.environment.*;
 import net.labyfy.gradle.java.exec.JavaExecutionResult;
-import net.labyfy.gradle.maven.MavenArtifactDownloader;
-import net.labyfy.gradle.maven.MavenResolveException;
 import net.labyfy.gradle.maven.SimpleMavenRepository;
 import net.labyfy.gradle.maven.pom.MavenArtifact;
+import net.labyfy.gradle.maven.pom.MavenDependency;
 import net.labyfy.gradle.maven.pom.MavenPom;
 import net.labyfy.gradle.minecraft.MinecraftRepository;
 import net.labyfy.gradle.minecraft.data.environment.ModCoderPackInput;
@@ -114,8 +110,25 @@ public class ModCoderPackEnvironment implements DeobfuscationEnvironment {
         if (version == null && serverPom != null) {
             version = serverPom.getVersion();
         } else if (serverPom != null && !version.equals(serverPom.getVersion())) {
-            throw new DeobfuscationException("Client/server version mismtach, client: " + clientPom.getVersion() +
+            throw new DeobfuscationException("Client/server version mismatch, client: " + clientPom.getVersion() +
                     ", server: " + serverPom.getVersion());
+        }
+
+        List<Path> clientLibraries = null;
+        if(clientPom != null) {
+            SimpleMavenRepository internalRepository = utilities.getInternalRepository();
+
+            // Collect the client libraries if the client POM is available
+            clientLibraries = new ArrayList<>();
+
+            for(MavenDependency dependency : clientPom.getDependencies()) {
+                if(!internalRepository.isInstalled(dependency)) {
+                    throw new IllegalStateException("The minecraft dependency " + dependency + " is not installed");
+                }
+
+                // Add the path of the artifact to the libraries
+                clientLibraries.add(internalRepository.getArtifactPath(dependency));
+            }
         }
 
         for (String side : sides) {
@@ -129,6 +142,9 @@ public class ModCoderPackEnvironment implements DeobfuscationEnvironment {
             // Execute all sides
             outputs.put(side, run.execute(side));
         }
+
+        // Construct the source jar processor
+        SourceJarProcessor processor = new SourceJarProcessor();
 
         // Construct the CSV remapper
         CsvRemapper remapper = new CsvRemapper();
@@ -150,6 +166,10 @@ public class ModCoderPackEnvironment implements DeobfuscationEnvironment {
             throw new DeobfuscationException("Failed to initialize remapper", e);
         }
 
+        // Index the actions
+        processor.addAction(remapper);
+        processor.addAction(new ForgeAdditionStripper());
+
         // Retrieve utility classes
         MinecraftRepository minecraftRepository = utilities.getMinecraftRepository();
 
@@ -159,29 +179,91 @@ public class ModCoderPackEnvironment implements DeobfuscationEnvironment {
             Path srgArtifactPath = output.getValue();
 
             // Generate output artifact
-            MavenArtifact outputArtifact = new MavenArtifact(
+            MavenArtifact sourcesArtifact = new MavenArtifact(
                     "net.minecraft",
                     side,
                     version,
-                    "mcp-sources"
+                    getClassifier(true)
             );
 
             // Retrieve the path the artifact should be written to
-            Path targetArtifactPath = minecraftRepository.getArtifactPath(outputArtifact);
-            if (!Files.isDirectory(targetArtifactPath.getParent())) {
+            Path sourcesTargetArtifactPath = minecraftRepository.getArtifactPath(sourcesArtifact);
+            if (!Files.isDirectory(sourcesTargetArtifactPath.getParent())) {
                 // Make sure we can write the artifact
                 try {
-                    Files.createDirectories(targetArtifactPath.getParent());
+                    Files.createDirectories(sourcesTargetArtifactPath.getParent());
                 } catch (IOException e) {
                     throw new DeobfuscationException("Failed to create parent directory for target artifact", e);
                 }
             }
 
             try {
-                LOGGER.lifecycle("Remapping SRG to deobfuscated for {} {}", side, version);
-                remapper.remapSourceJar(srgArtifactPath, targetArtifactPath);
+                // Remap the SRG source jar to deobfuscated jar
+                LOGGER.lifecycle("Processing SRG to deobfuscated for {} {}", side, version);
+                processor.process(srgArtifactPath, sourcesTargetArtifactPath);
             } catch (IOException e) {
-                throw new DeobfuscationException("Failed to remap " + side + " " + version, e);
+                throw new DeobfuscationException("Failed to process " + side + " " + version, e);
+            }
+
+            if(clientLibraries != null) {
+                // Recompilation can only be done if the client libraries are known
+                Path sourceDir = null;
+
+                // Generate output artifact
+                MavenArtifact outputArtifact = new MavenArtifact(
+                        "net.minecraft",
+                        side,
+                        version,
+                        getClassifier(false)
+                );
+
+                try {
+                    // Extract the sources jar for recompilation
+                    sourceDir = Util.temporaryDir();
+                    Util.extractZip(sourcesTargetArtifactPath, sourceDir);
+
+                    LOGGER.lifecycle("Recompiling {} {}", side, version);
+
+                    // Set up the compilation
+                    JavaExecutionResult compilationResult = utilities.getJavaCompileHelper().compile(
+                            sourceDir,
+                            clientLibraries,
+                            minecraftRepository.getArtifactPath(outputArtifact)
+                    );
+
+                    if(compilationResult.getExitCode() != 0) {
+                        // Compilation failed, bail out
+                        LOGGER.error("Minecraft {} {} failed to recompile", side, version);
+                        LOGGER.error("javac output:");
+                        LOGGER.error(compilationResult.getStdout());
+                        LOGGER.error("javac error:");
+                        LOGGER.error(compilationResult.getStderr());
+                        throw new DeobfuscationException("Failed to recompile " + side + " " + version);
+                    } else {
+                        LOGGER.lifecycle("Done!");
+                    }
+
+                    Path pomPath = minecraftRepository.getPomPath(outputArtifact);
+                    if(!Files.exists(pomPath)) {
+                        // There is no POM for the given artifact, generate one
+                        MavenPom pom = new MavenPom(outputArtifact);
+                        pom.addDependencies(clientPom.getDependencies());
+                        minecraftRepository.addPom(pom);
+                    }
+                } catch (IOException e) {
+                    throw new DeobfuscationException("IO exception while deobfuscating " + side + " " + version, e);
+                } finally {
+                    if(sourceDir != null) {
+                        try {
+                            // Try to delete the temporary source directory
+                            Util.nukeDirectory(sourceDir, true);
+                        } catch (IOException e) {
+                            LOGGER.warn("Failed to delete temporary directory {}", sourceDir.toString());
+                        }
+                    }
+                }
+            } else {
+                LOGGER.warn("Can't recompile {} {}, missing client libraries", side, version);
             }
         }
     }
@@ -230,5 +312,15 @@ public class ModCoderPackEnvironment implements DeobfuscationEnvironment {
         }
 
         return outputDir;
+    }
+
+    /**
+     * Retrieves the classifier for the current configuration.
+     *
+     * @param sources If {@code true}, the returned classifier will be a sources classifier
+     * @return The generated classifier
+     */
+    private String getClassifier(boolean sources) {
+        return "mcp-" + input.getConfigVersion() + "_" + input.getMappingsVersion() + (sources ? "-sources" : "");
     }
 }

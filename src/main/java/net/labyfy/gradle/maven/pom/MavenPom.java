@@ -1,9 +1,6 @@
 package net.labyfy.gradle.maven.pom;
 
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 
 public class MavenPom extends MavenArtifact {
     private final Set<MavenDependency> dependencies;
@@ -16,6 +13,17 @@ public class MavenPom extends MavenArtifact {
     public MavenPom(MavenPom other) {
         super(other);
         this.dependencies = new HashSet<>(other.dependencies);
+    }
+
+    /**
+     * Constructs a new maven POM by copying from the given artifact.
+     * The dependencies will be initially empty.
+     *
+     * @param other The maven artifact to copy from
+     */
+    public MavenPom(MavenArtifact other) {
+        super(other);
+        this.dependencies = new HashSet<>();
     }
 
     /**
@@ -83,6 +91,15 @@ public class MavenPom extends MavenArtifact {
      */
     public void addDependency(MavenDependency artifact) {
         this.dependencies.add(artifact);
+    }
+
+    /**
+     * Adds the given dependencies to this POM.
+     *
+     * @param dependencies The dependencies to add
+     */
+    public void addDependencies(Collection<MavenDependency> dependencies) {
+        this.dependencies.addAll(dependencies);
     }
 
     /**

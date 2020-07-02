@@ -5,6 +5,7 @@ import net.labyfy.gradle.environment.DeobfuscationEnvironment;
 import net.labyfy.gradle.environment.DeobfuscationException;
 import net.labyfy.gradle.environment.DeobfuscationUtilities;
 import net.labyfy.gradle.environment.EnvironmentCacheFileProvider;
+import net.labyfy.gradle.java.compile.JavaCompileHelper;
 import net.labyfy.gradle.java.exec.JavaExecutionHelper;
 import net.labyfy.gradle.json.JsonConverter;
 import net.labyfy.gradle.json.JsonConverterException;
@@ -225,7 +226,8 @@ public class MinecraftRepository extends SimpleMavenRepository {
                     internalRepository,
                     httpClient,
                     new EnvironmentCacheFileProvider(environmentBasePath.resolve(environment.name())),
-                    new JavaExecutionHelper(project)
+                    new JavaExecutionHelper(project),
+                    new JavaCompileHelper(project)
             ));
         } catch (DeobfuscationException e) {
             throw new LabyfyGradleException("Failed to deobfuscate " + version, e);
