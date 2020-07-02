@@ -100,29 +100,17 @@ public class ModCoderPackEnvironment implements DeobfuscationEnvironment {
         }
 
         // Try to retrieve the version
-        String version = null;
-        if (clientPom != null) {
-            version = clientPom.getVersion();
-        }
-
-        // If the client has not been set, try to retrieve the version
-        // from the server
-        if (version == null && serverPom != null) {
-            version = serverPom.getVersion();
-        } else if (serverPom != null && !version.equals(serverPom.getVersion())) {
-            throw new DeobfuscationException("Client/server version mismatch, client: " + clientPom.getVersion() +
-                    ", server: " + serverPom.getVersion());
-        }
+        String version = getVersion(clientPom, serverPom);
 
         List<Path> clientLibraries = null;
-        if(clientPom != null) {
+        if (clientPom != null) {
             SimpleMavenRepository internalRepository = utilities.getInternalRepository();
 
             // Collect the client libraries if the client POM is available
             clientLibraries = new ArrayList<>();
 
-            for(MavenDependency dependency : clientPom.getDependencies()) {
-                if(!internalRepository.isInstalled(dependency)) {
+            for (MavenDependency dependency : clientPom.getDependencies()) {
+                if (!internalRepository.isInstalled(dependency)) {
                     throw new IllegalStateException("The minecraft dependency " + dependency + " is not installed");
                 }
 
@@ -205,7 +193,7 @@ public class ModCoderPackEnvironment implements DeobfuscationEnvironment {
                 throw new DeobfuscationException("Failed to process " + side + " " + version, e);
             }
 
-            if(clientLibraries != null) {
+            if (clientLibraries != null) {
                 // Recompilation can only be done if the client libraries are known
                 Path sourceDir = null;
 
@@ -231,7 +219,7 @@ public class ModCoderPackEnvironment implements DeobfuscationEnvironment {
                             minecraftRepository.getArtifactPath(outputArtifact)
                     );
 
-                    if(compilationResult.getExitCode() != 0) {
+                    if (compilationResult.getExitCode() != 0) {
                         // Compilation failed, bail out
                         LOGGER.error("Minecraft {} {} failed to recompile", side, version);
                         LOGGER.error("javac output:");
@@ -244,7 +232,7 @@ public class ModCoderPackEnvironment implements DeobfuscationEnvironment {
                     }
 
                     Path pomPath = minecraftRepository.getPomPath(outputArtifact);
-                    if(!Files.exists(pomPath)) {
+                    if (!Files.exists(pomPath)) {
                         // There is no POM for the given artifact, generate one
                         MavenPom pom = new MavenPom(outputArtifact);
                         pom.addDependencies(clientPom.getDependencies());
@@ -253,7 +241,7 @@ public class ModCoderPackEnvironment implements DeobfuscationEnvironment {
                 } catch (IOException e) {
                     throw new DeobfuscationException("IO exception while deobfuscating " + side + " " + version, e);
                 } finally {
-                    if(sourceDir != null) {
+                    if (sourceDir != null) {
                         try {
                             // Try to delete the temporary source directory
                             Util.nukeDirectory(sourceDir, true);
@@ -266,6 +254,33 @@ public class ModCoderPackEnvironment implements DeobfuscationEnvironment {
                 LOGGER.warn("Can't recompile {} {}, missing client libraries", side, version);
             }
         }
+    }
+
+    /**
+     * {@inheritDoc}
+     * @param client
+     * @param server
+     */
+    @Override
+    public Collection<MavenArtifact> getCompileArtifacts(MavenArtifact client, MavenArtifact server) {
+        String version = getVersion(client, server);
+
+        // We only need the client artifact for compilation, this might change at some point
+        // if we support servers
+        return Collections.singletonList(getClientArtifact(version));
+    }
+
+    /**
+     * {@inheritDoc}
+     * @param client
+     * @param server
+     */
+    @Override
+    public Collection<MavenArtifact> getRuntimeArtifacts(MavenArtifact client, MavenArtifact server) {
+        String version = getVersion(client, server);
+
+        // The runtime always requires the joined artifact
+        return Collections.singletonList(getJoinedArtifact(version));
     }
 
     /**
@@ -315,6 +330,42 @@ public class ModCoderPackEnvironment implements DeobfuscationEnvironment {
     }
 
     /**
+     * Retrieves the version of the client and server POM.
+     *
+     * @param clientPom The client artifact, may be null
+     * @param serverPom The server artifact, may be null
+     * @return The version of the client and server POM
+     * @throws IllegalArgumentException If the version of the client and server POM mismatch or both client and server
+     *                                  POM are null
+     */
+    private String getVersion(MavenArtifact clientPom, MavenArtifact serverPom) {
+        String version = null;
+        if(clientPom != null) {
+            // The client is given, retrieve its version
+            version = clientPom.getVersion();
+        }
+
+        if(serverPom != null) {
+            // The server is given
+            if(version != null && !serverPom.getVersion().equals(version)) {
+                // Client and server version are not equal, this is not allowed
+                throw new IllegalArgumentException("Client and server version mismatch, client = "
+                        + clientPom.getVersion() + ", server = " + serverPom.getVersion());
+            } else if(version == null) {
+                // If the client has not been set, use the server version
+                version = serverPom.getVersion();
+            }
+        }
+
+        if(version == null) {
+            // Received neither a server nor a client POM, this is not allowed
+            throw new IllegalArgumentException("Both client and server POM are null");
+        }
+
+        return version;
+    }
+
+    /**
      * Retrieves the classifier for the current configuration.
      *
      * @param sources If {@code true}, the returned classifier will be a sources classifier
@@ -322,5 +373,35 @@ public class ModCoderPackEnvironment implements DeobfuscationEnvironment {
      */
     private String getClassifier(boolean sources) {
         return "mcp-" + input.getConfigVersion() + "_" + input.getMappingsVersion() + (sources ? "-sources" : "");
+    }
+
+    /**
+     * Retrieves the client artifact of the current configuration.
+     *
+     * @param version The version of minecraft
+     * @return The client artifact with the given version
+     */
+    private MavenArtifact getClientArtifact(String version) {
+        return new MavenArtifact("net.minecraft", "client", version, getClassifier(false));
+    }
+
+    /**
+     * Retrieves the server artifact of the current configuration.
+     *
+     * @param version The version of minecraft
+     * @return The server artifact with the given version
+     */
+    private MavenArtifact getServerArtifact(String version) {
+        return new MavenArtifact("net.minecraft", "server", version, getClassifier(false));
+    }
+
+    /**
+     * Retrieves the joined artifact of the current configuration.
+     *
+     * @param version The version of minecraft
+     * @return The joined artifact with the given version
+     */
+    private MavenArtifact getJoinedArtifact(String version) {
+        return new MavenArtifact("net.minecraft", "joined", version, getClassifier(false));
     }
 }

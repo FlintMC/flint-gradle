@@ -184,6 +184,17 @@ public class MavenArtifact {
     }
 
     /**
+     * Retrieves the {@link String} representation of this artifact.
+     *
+     * @return The string representation of this artifact
+     */
+    public String toIdentifier() {
+        return groupId + ':' + artifactId + ':' + version +
+                (classifier != null ? ':' + classifier : "") +
+                (type != null ? '@' + type : "");
+    }
+
+    /**
      * {@inheritDoc}
      */
     @Override
@@ -211,8 +222,6 @@ public class MavenArtifact {
      */
     @Override
     public String toString() {
-        return groupId + ':' + artifactId + ':' + version +
-                (classifier != null ? ':' + classifier : "") +
-                (type != null ? '@' + type : "");
+        return toIdentifier();
     }
 }

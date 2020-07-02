@@ -114,7 +114,7 @@ public class JavaCompileHelper {
                 for (Map.Entry<Path, String> entry : jarContent.entrySet()) {
                     // Extract the values from the map
                     Path absolutePath = entry.getKey();
-                    String relativePath = entry.getValue();
+                    String relativePath = entry.getValue().replace('\\', '/');
 
                     // Write the entry
                     JarEntry jarEntry = new JarEntry(relativePath);

@@ -111,21 +111,7 @@ public class SimpleMavenRepository implements ReadableMavenRepository {
      * @return The path to the POM file
      */
     public Path getPomPath(String group, String name, String version) {
-        return getPomPath(group, name, version, null);
-    }
-
-    /**
-     * Retrieves the path for a POM file.
-     *
-     * @param group The group of the artifact the POM file describes
-     * @param name The name of the artifact the POM file describes
-     * @param version The version of the artifact the POM file describes
-     * @param classifier The classifier of the artifact the POM file describes
-     * @return The path to the POM file
-     */
-    public Path getPomPath(String group, String name, String version, String classifier) {
-        return getArtifactDirPath(group, name, version).resolve(name + '-' + version +
-                (classifier == null ? "" : "-" + classifier) + ".pom");
+        return getArtifactDirPath(group, name, version).resolve(name + '-' + version + ".pom");
     }
 
     /**
@@ -135,8 +121,7 @@ public class SimpleMavenRepository implements ReadableMavenRepository {
      * @return The path to the POM file
      */
     public Path getPomPath(MavenArtifact artifact) {
-        return getPomPath(
-                artifact.getGroupId(), artifact.getArtifactId(), artifact.getVersion(), artifact.getClassifier());
+        return getPomPath(artifact.getGroupId(), artifact.getArtifactId(), artifact.getVersion());
     }
 
     /**
@@ -158,6 +143,15 @@ public class SimpleMavenRepository implements ReadableMavenRepository {
      */
     public boolean isInstalled(MavenArtifact artifact) {
         return Files.isRegularFile(getArtifactPath(artifact));
+    }
+
+    /**
+     * Retrieves the base dir this repository is situated at.
+     *
+     * @return The base dir of this repository
+     */
+    public Path getBaseDir() {
+        return baseDir;
     }
 
     /**

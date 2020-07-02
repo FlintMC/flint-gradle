@@ -128,24 +128,18 @@ public class MinecraftRepository extends SimpleMavenRepository {
     }
 
     /**
-     * Installs the given minecraft version by automatically detecting the available
-     * deobfuscation environments.
+     * Retrieves the default environment for the given version.
      *
-     * @param version            The version to install
-     * @param internalRepository The repository to use for storing artifacts required while installing
-     * @param downloader         The downloader to use for installing internal artifacts
-     * @param project            The project to use for utility function basics
-     * @throws IllegalArgumentException If no default deobfuscation environments are available for the given version
-     * @throws IllegalArgumentException If the given minecraft version does not exist
-     * @throws IOException              If an I/O error occurs
+     * @param version The version to retrieve the environment for
+     * @return The default deobfuscation environment
+     * @throws IllegalArgumentException If there is no default environment available for the given version
      */
-    public void install(
-            String version,
-            SimpleMavenRepository internalRepository,
-            MavenArtifactDownloader downloader,
-            Project project
-    ) throws IOException {
-        install(version, null, internalRepository, downloader, project);
+    public DeobfuscationEnvironment defaultEnvironment(String version) {
+        if(!versionedEnvironments.containsKey(version)) {
+            throw new IllegalArgumentException("No default environment available for version " + version);
+        }
+
+        return DeobfuscationEnvironment.createFor(versionedEnvironments.get(version));
     }
 
     /**
@@ -153,7 +147,7 @@ public class MinecraftRepository extends SimpleMavenRepository {
      * them if not given
      *
      * @param version            The version to install
-     * @param environment        The environment to use for deobfuscation, or {@code null} for auto detection
+     * @param environment        The environment to use for deobfuscation
      * @param internalRepository The repository to use for storing artifacts required while installing
      * @param downloader         The downloader to use for installing internal artifacts
      * @param project            The project to use for utility function basics
@@ -181,13 +175,6 @@ public class MinecraftRepository extends SimpleMavenRepository {
         if (manifestVersion == null) {
             // Bail out if the given version does not exist
             throw new IllegalArgumentException("No such minecraft " + version);
-        }
-
-        if (environment == null && !hasDefaultEnvironmentFor(version)) {
-            throw new IllegalArgumentException("No default deobfuscation environment available for " + version);
-        } else if (environment == null) {
-            // Construct default deobfuscation environment
-            environment = DeobfuscationEnvironment.createFor(versionedEnvironments.get(version));
         }
 
         TimeStampedFile clientVersionJson = new TimeStampedFile(versionsDir.resolve(version + ".json"));

@@ -1,11 +1,11 @@
 package net.labyfy.gradle.environment;
 
 import net.labyfy.gradle.environment.mcp.ModCoderPackEnvironment;
+import net.labyfy.gradle.maven.pom.MavenArtifact;
 import net.labyfy.gradle.maven.pom.MavenPom;
 import net.labyfy.gradle.minecraft.data.environment.EnvironmentInput;
 
-import java.util.Collections;
-import java.util.List;
+import java.util.Collection;
 
 /**
  * Represents a deobfuscation environment which can be used to obtain the minecraft source.
@@ -28,6 +28,24 @@ public interface DeobfuscationEnvironment {
      */
     void runDeobfuscation(MavenPom clientPom, MavenPom serverPom, DeobfuscationUtilities utilities)
             throws DeobfuscationException;
+
+    /**
+     * Retrieves a collection of all artifacts which should be added to the compile classpath.
+     *
+     * @param client The client artifact, may be null
+     * @param server The server artifact, may be null
+     * @return A collection of artifacts which should be added to the compile classpath
+     */
+    Collection<MavenArtifact> getCompileArtifacts(MavenArtifact client, MavenArtifact server);
+
+    /**
+     * Retrieves a collection of all artifacts which should be added to the runtime classpath.
+     *
+     * @param client The client artifact, may be null
+     * @param server The server artifact, may be null
+     * @return A collection of artifacts which should be added to the runtime classpath
+     */
+    Collection<MavenArtifact> getRuntimeArtifacts(MavenArtifact client, MavenArtifact server);
 
     static DeobfuscationEnvironment createFor(EnvironmentInput input) {
         return new ModCoderPackEnvironment(input.getModCoderPack());
