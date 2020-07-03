@@ -1,18 +1,20 @@
 package net.labyfy.gradle.minecraft.data.version;
 
-import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.JavaType;
-import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.deser.std.StdNodeBasedDeserializer;
+import com.fasterxml.jackson.databind.type.CollectionType;
+import com.fasterxml.jackson.databind.type.SimpleType;
 import net.labyfy.gradle.util.Util;
+import org.gradle.internal.impldep.com.google.api.client.json.Json;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-@JsonDeserialize(using = ArgumentString.Deserializer.class)
 public class ArgumentString {
     private final String variableName;
     private final String value;
@@ -51,26 +53,7 @@ public class ArgumentString {
         return Objects.hash(variableName, value, rules);
     }
 
-    public static class Deserializer extends StdNodeBasedDeserializer<ArgumentString> {
-        protected Deserializer() {
-            super(ArgumentString.class);
-        }
-
-        @Override
-        public ArgumentString convert(JsonNode root, DeserializationContext ctxt) throws IOException {
-            if (root.isTextual()) {
-                String value = root.asText();
-                return new ArgumentString(getVariableName(value), getNonVariableText(value), null);
-            } else {
-                String value = root.get("value").requireNonNull().asText();
-                JavaType ruleListType =
-                        ctxt.getTypeFactory().constructCollectionType(ArrayList.class, VersionedRule.class);
-
-                return new ArgumentString(getVariableName(value), getNonVariableText(value),
-                        Util.readJsonValue(ruleListType, root.get("rules"), ctxt));
-            }
-        }
-
+    public static class ListDeserializer extends JsonDeserializer<List<ArgumentString>> {
         private String getNonVariableText(String text) {
             int indexOfVarStart = text.indexOf("${");
             if (indexOfVarStart == -1) {
@@ -88,6 +71,45 @@ public class ArgumentString {
 
             int indexOfVarEnd = text.indexOf('}', indexOfVarStart);
             return text.substring(indexOfVarStart + 2, indexOfVarEnd);
+        }
+
+        @Override
+        public List<ArgumentString> deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+            JsonNode root = p.getCodec().readTree(p);
+            if(!root.isArray()) {
+                throw JsonMappingException.from(p, "Arguments is not an array");
+            }
+            List<ArgumentString> outputs = new ArrayList<>();
+
+            for(int i = 0; i < root.size(); i++) {
+                JsonNode argument = root.get(i);
+
+                if (argument.isTextual()) {
+                    String value = argument.asText();
+                    outputs.add(new ArgumentString(getVariableName(value), getNonVariableText(value), null));
+                } else {
+                    JsonNode valueNode = argument.get("value").requireNonNull();
+                    JavaType ruleListType =
+                            ctxt.getTypeFactory().constructCollectionType(ArrayList.class, VersionedRule.class);
+
+                    if(valueNode.isTextual()) {
+                        String value = valueNode.asText();
+                        outputs.add(new ArgumentString(getVariableName(value), getNonVariableText(value),
+                                Util.readJsonValue(ruleListType, argument.get("rules"), ctxt)));
+                    } else if(valueNode.isArray()) {
+                        for(int j = 0; j < valueNode.size(); j++) {
+                            String value = valueNode.get(j).requireNonNull().asText();
+                            outputs.add(new ArgumentString(getVariableName(value), getNonVariableText(value),
+                                    Util.readJsonValue(ruleListType, argument.get("rules"), ctxt)));
+                        }
+                    } else {
+                        throw JsonMappingException.from(p,
+                                "Value of argument string with rules is neither a string nor an array");
+                    }
+                }
+            }
+
+            return outputs;
         }
     }
 }

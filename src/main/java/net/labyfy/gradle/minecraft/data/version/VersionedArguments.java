@@ -1,10 +1,15 @@
 package net.labyfy.gradle.minecraft.data.version;
 
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+
 import java.util.List;
 import java.util.Objects;
 
 public class VersionedArguments {
+    @JsonDeserialize(using = ArgumentString.ListDeserializer.class)
     private List<ArgumentString> game;
+
+    @JsonDeserialize(using = ArgumentString.ListDeserializer.class)
     private List<ArgumentString> jvm;
 
     public List<ArgumentString> getGame() {
