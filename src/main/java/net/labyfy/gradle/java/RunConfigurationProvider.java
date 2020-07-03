@@ -157,7 +157,7 @@ public class RunConfigurationProvider {
         }
 
         // Retrieve the assets store path
-        Path assetsPath = runCacheDir.resolve("assets").resolve(manifest.getAssetIndex().getId());
+        Path assetsPath = runCacheDir.resolve("assets-store");
         String assetTaskName = "download" + manifest.getAssetIndex().getId() + "Assets";
         MinecraftAssetsTask assetsTask = (MinecraftAssetsTask) project.getTasks().findByName(assetTaskName);
         if(assetsTask == null) {
@@ -198,6 +198,9 @@ public class RunConfigurationProvider {
         // Give context to gradle
         task.setGroup(LabyfyGradlePlugin.MINECRAFT_TASK_GROUP);
         task.setDescription("Runs the minecraft version " + version);
+
+        // Make sure the run task depends on the corresponding assets download task
+        task.dependsOn(assetsTask);
 
         return task;
     }

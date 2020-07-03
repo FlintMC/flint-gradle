@@ -34,7 +34,6 @@ public class MinecraftAssetsTask extends DefaultTask {
      *
      * @param manifest The manifest to retrieve the assets index from
      */
-    @Input
     public void setVersionManifest(VersionManifest manifest) {
         this.manifest = manifest;
     }
@@ -44,7 +43,6 @@ public class MinecraftAssetsTask extends DefaultTask {
      *
      * @param directory The directory to write assets into
      */
-    @OutputDirectory
     public void setOutputDirectory(Path directory) {
         this.directory = directory;
     }
@@ -82,8 +80,8 @@ public class MinecraftAssetsTask extends DefaultTask {
             root = JsonConverter.OBJECT_MAPPER.readTree(stream);
         }
 
-        // Resolve the assets dir within the asset store
-        Path assetsDir = directory.resolve("assets");
+        // Resolve the objects dir within the asset store
+        Path objectsDir = directory.resolve("objects");
 
         // Get the object describing all assets
         JsonNode objects = root.get("objects").requireNonNull();
@@ -98,7 +96,7 @@ public class MinecraftAssetsTask extends DefaultTask {
             // Calculate the download and store path
             String assetPath = hash.substring(0, 2) + "/" + hash;
 
-            Path assetTargetPath = assetsDir.resolve(assetPath);
+            Path assetTargetPath = objectsDir.resolve(assetPath);
             if(!Files.isRegularFile(assetTargetPath)) {
                 // The asset does not exist yet, download it
                 getLogger().lifecycle("Downloading asset {} ({})", objectName, assetPath);

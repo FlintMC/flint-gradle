@@ -20,6 +20,9 @@ import java.util.Map;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 /**
  * Utility class for compiling Java source code using the Gradle configured compiler.
@@ -48,7 +51,7 @@ public class JavaCompileHelper {
      */
     public JavaExecutionResult compile(Path source, List<Path> classpath, Path outputJar) throws IOException {
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
-        if(compiler == null) {
+        if (compiler == null) {
             throw new IOException("A JDK is required in order to use the compiler");
         }
 
@@ -105,16 +108,16 @@ public class JavaCompileHelper {
             }
 
             // Collect all files to package into the jar
-            Map<Path, String> jarContent = new HashMap<>();
+            Map<String, Path> jarContent = new HashMap<>();
             jarContent.putAll(relativeChildren(source));
             jarContent.putAll(relativeChildren(compileOutputDir));
 
             try (JarOutputStream outputStream = new JarOutputStream(Files.newOutputStream(outputJar))) {
                 // Iterate all files that should be put into the jar
-                for (Map.Entry<Path, String> entry : jarContent.entrySet()) {
+                for (Map.Entry<String, Path> entry : jarContent.entrySet()) {
                     // Extract the values from the map
-                    Path absolutePath = entry.getKey();
-                    String relativePath = entry.getValue().replace('\\', '/');
+                    String relativePath = entry.getKey().replace('\\', '/');
+                    Path absolutePath = entry.getValue();
 
                     // Write the entry
                     JarEntry jarEntry = new JarEntry(relativePath);
@@ -143,15 +146,18 @@ public class JavaCompileHelper {
      *
      * @param root The root path to search for files
      * @return A map of all files in the root recursively mapped to their absolute and relative paths
+     * @throws IOException If an I/O error occurs while walking the file tree
      */
-    private Map<Path, String> relativeChildren(Path root) {
-        return project
-                .fileTree(root)
-                .getFiles()
-                .stream()
-                .filter(file -> !file.getName().endsWith(".java"))
-                .map(File::toPath)
-                // Use the path as the key and the path relative to the root as the value
-                .collect(Collectors.toMap((path) -> path, path -> root.relativize(path).toString()));
+    private Map<String, Path> relativeChildren(Path root) throws IOException {
+        Map<String, Path> output = new HashMap<>();
+
+        try (Stream<Path> stream = Files.walk(root)) {
+            stream.filter(file -> !file.getFileName().toString().endsWith(".java"))
+                    .filter(Files::isRegularFile)
+                    // Use the path as the key and the path relative to the root as the value
+                    .forEach((path) -> output.put(root.relativize(path).toString(), path));
+        }
+
+        return output;
     }
 }

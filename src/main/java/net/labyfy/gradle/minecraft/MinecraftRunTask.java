@@ -4,6 +4,7 @@ import net.labyfy.gradle.minecraft.data.version.ArgumentString;
 import net.labyfy.gradle.minecraft.data.version.VersionedArguments;
 import net.labyfy.gradle.util.RuleChainResolver;
 import org.gradle.api.file.FileCollection;
+import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.JavaExec;
 import org.gradle.api.tasks.SourceSet;
 import org.gradle.api.tasks.TaskAction;
@@ -79,6 +80,7 @@ public class MinecraftRunTask extends JavaExec {
      *
      * @return The potential classpath
      */
+    @Input
     public Set<SourceSet> getPotentialClasspath() {
         return potentialClasspath;
     }

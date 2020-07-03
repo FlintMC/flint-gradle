@@ -17,7 +17,12 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.*;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
+import java.util.jar.JarInputStream;
+import java.util.jar.JarOutputStream;
 
 /**
  * Implementation of the MCP as a deobfuscation environment.
@@ -205,6 +210,9 @@ public class ModCoderPackEnvironment implements DeobfuscationEnvironment {
                         getClassifier(false)
                 );
 
+                // Get the path of the output artifact
+                Path outputPath = minecraftRepository.getArtifactPath(outputArtifact);
+
                 try {
                     // Extract the sources jar for recompilation
                     sourceDir = Util.temporaryDir();
@@ -216,7 +224,7 @@ public class ModCoderPackEnvironment implements DeobfuscationEnvironment {
                     JavaExecutionResult compilationResult = utilities.getJavaCompileHelper().compile(
                             sourceDir,
                             clientLibraries,
-                            minecraftRepository.getArtifactPath(outputArtifact)
+                            outputPath
                     );
 
                     if (compilationResult.getExitCode() != 0) {
@@ -238,6 +246,18 @@ public class ModCoderPackEnvironment implements DeobfuscationEnvironment {
                         pom.addDependencies(clientPom.getDependencies());
                         minecraftRepository.addPom(pom);
                     }
+
+                    if (side.equals("joined")) {
+                        LOGGER.lifecycle("Copying over resources to joined jar");
+
+                        // Copy over the resources to the joined jar
+                        addResources(minecraftRepository.getArtifactPath(clientPom), outputPath);
+
+                        if (serverPom != null) {
+                            // Also copy server resources
+                            addResources(minecraftRepository.getArtifactPath(serverPom), outputPath);
+                        }
+                    }
                 } catch (IOException e) {
                     throw new DeobfuscationException("IO exception while deobfuscating " + side + " " + version, e);
                 } finally {
@@ -258,6 +278,7 @@ public class ModCoderPackEnvironment implements DeobfuscationEnvironment {
 
     /**
      * {@inheritDoc}
+     *
      * @param client
      * @param server
      */
@@ -272,6 +293,7 @@ public class ModCoderPackEnvironment implements DeobfuscationEnvironment {
 
     /**
      * {@inheritDoc}
+     *
      * @param client
      * @param server
      */
@@ -340,24 +362,24 @@ public class ModCoderPackEnvironment implements DeobfuscationEnvironment {
      */
     private String getVersion(MavenArtifact clientPom, MavenArtifact serverPom) {
         String version = null;
-        if(clientPom != null) {
+        if (clientPom != null) {
             // The client is given, retrieve its version
             version = clientPom.getVersion();
         }
 
-        if(serverPom != null) {
+        if (serverPom != null) {
             // The server is given
-            if(version != null && !serverPom.getVersion().equals(version)) {
+            if (version != null && !serverPom.getVersion().equals(version)) {
                 // Client and server version are not equal, this is not allowed
                 throw new IllegalArgumentException("Client and server version mismatch, client = "
                         + clientPom.getVersion() + ", server = " + serverPom.getVersion());
-            } else if(version == null) {
+            } else if (version == null) {
                 // If the client has not been set, use the server version
                 version = serverPom.getVersion();
             }
         }
 
-        if(version == null) {
+        if (version == null) {
             // Received neither a server nor a client POM, this is not allowed
             throw new IllegalArgumentException("Both client and server POM are null");
         }
@@ -403,5 +425,84 @@ public class ModCoderPackEnvironment implements DeobfuscationEnvironment {
      */
     private MavenArtifact getJoinedArtifact(String version) {
         return new MavenArtifact("net.minecraft", "joined", version, getClassifier(false));
+    }
+
+    /**
+     * Copies resource entries into the given jar from a source jar.
+     *
+     * @param sourceJar The jar to use as source jar for resources
+     * @param jar       The target jar to copy assets into
+     * @throws IOException If an I/O error occurs while copying
+     */
+    private void addResources(Path sourceJar, Path jar) throws IOException {
+        Set<String> existingResources = new HashSet<>();
+
+        // Open the initial jar file to check which assets exist already
+        try (JarFile jarFile = new JarFile(jar.toFile())) {
+            Enumeration<JarEntry> entries = jarFile.entries();
+
+            // Iterate all jar entries
+            while (entries.hasMoreElements()) {
+                JarEntry entry = entries.nextElement();
+                if (entry.getName().startsWith("assets/") || entry.getName().startsWith("/data")) {
+                    // Found an assets entry, index it
+                    existingResources.add(entry.getName());
+                }
+            }
+        }
+
+        // Create a temporary jar to read from
+        Path temporaryJar = Files.createTempFile("mcp_resource_fix", ".jar");
+
+        try {
+            // Copy the original jar to the temporary one
+            Files.copy(jar, temporaryJar, StandardCopyOption.REPLACE_EXISTING);
+
+            try (
+                    // Open the required streams, 2 for reading from the original and resources jar,
+                    // one for writing to the output
+                    JarInputStream originalSource = new JarInputStream(Files.newInputStream(temporaryJar));
+                    JarInputStream resourcesSource = new JarInputStream(Files.newInputStream(sourceJar));
+                    JarOutputStream output = new JarOutputStream(Files.newOutputStream(jar))
+            ) {
+                JarEntry originalEntry;
+
+                // Copy all of the original jar entries
+                while ((originalEntry = originalSource.getNextJarEntry()) != null) {
+                    output.putNextEntry(originalEntry);
+                    Util.copyStream(originalSource, output);
+                    output.closeEntry();
+
+                    // Avoid adding duplicates
+                    existingResources.add(originalEntry.getName());
+                }
+
+                JarEntry resourcesEntry;
+
+                // Iterate all resource jar entries
+                while ((resourcesEntry = resourcesSource.getNextJarEntry()) != null) {
+                    if (
+                            (!resourcesEntry.getName().startsWith("assets/") &&
+                                    !resourcesEntry.getName().startsWith("data/") &&
+                                    !resourcesEntry.getName().equals("pack.png")) ||
+                                    existingResources.contains(resourcesEntry.getName())
+                    ) {
+                        // The entry is not a resource or exists already in the other jar, skip it
+                        continue;
+                    }
+
+                    // Copy the resource entry
+                    output.putNextEntry(resourcesEntry);
+                    Util.copyStream(resourcesSource, output);
+                    output.closeEntry();
+
+                    // Avoid adding duplicates
+                    existingResources.add(resourcesEntry.getName());
+                }
+            }
+        } finally {
+            // Make sure to delete the temporary file
+            Files.delete(temporaryJar);
+        }
     }
 }
