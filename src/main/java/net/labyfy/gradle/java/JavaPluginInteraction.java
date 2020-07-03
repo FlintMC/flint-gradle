@@ -2,7 +2,6 @@ package net.labyfy.gradle.java;
 
 import net.labyfy.gradle.extension.LabyfyGradleExtension;
 import net.labyfy.gradle.maven.pom.MavenArtifact;
-import net.labyfy.gradle.minecraft.MinecraftRepository;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.artifacts.dsl.DependencyHandler;
@@ -11,17 +10,14 @@ import org.gradle.api.plugins.JavaPlugin;
 import org.gradle.api.tasks.SourceSet;
 import org.gradle.api.tasks.SourceSetContainer;
 
-import javax.xml.transform.Source;
 import java.util.Collection;
 
 public class JavaPluginInteraction {
     private final Project project;
-    private final JavaPlugin javaPlugin;
 
     public JavaPluginInteraction(Project project) {
         this.project = project;
         project.getPluginManager().apply(JavaPlugin.class);
-        this.javaPlugin = project.getPlugins().getPlugin(JavaPlugin.class);
     }
 
     /**
@@ -86,6 +82,7 @@ public class JavaPluginInteraction {
 
         // Create the versioned source set by prepending 'v' and replacing all '.' with '_' in the version string
         SourceSet versionedSourceSet = sourceSets.maybeCreate("v" + version.replace('.', '_'));
+        versionedSourceSet.getExtensions().add("minecraftVersion", version);
 
         // Make the implementation source set available to the versioned source set
         extendSourceSet(versionedSourceSet, implementationSourceSet);

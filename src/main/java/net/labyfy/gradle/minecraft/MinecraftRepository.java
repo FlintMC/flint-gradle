@@ -80,7 +80,7 @@ public class MinecraftRepository extends SimpleMavenRepository {
 
         if (httpClient != null) {
             this.versionManifestFile.update(httpClient, VERSION_MANIFEST_URL, DATE_TIME_FORMATTER);
-            // this.mappingsDefinitionFile.update(httpClient, MAPPINGS_URL, DATE_TIME_FORMATTER);
+            this.mappingsDefinitionFile.update(httpClient, MAPPINGS_URL, DATE_TIME_FORMATTER);
         } else {
             if (!Files.isRegularFile(versionManifestFile.toPath())) {
                 throw new LabyfyGradleException("Versions manifest does not exist, but cant be downloaded due to " +
@@ -174,7 +174,7 @@ public class MinecraftRepository extends SimpleMavenRepository {
 
         if (manifestVersion == null) {
             // Bail out if the given version does not exist
-            throw new IllegalArgumentException("No such minecraft " + version);
+            throw new IllegalArgumentException("No such minecraft version " + version);
         }
 
         TimeStampedFile clientVersionJson = new TimeStampedFile(versionsDir.resolve(version + ".json"));
@@ -187,13 +187,7 @@ public class MinecraftRepository extends SimpleMavenRepository {
                     "due to gradle working in offline mode");
         }
 
-        VersionManifest versionManifest;
-
-        try (InputStream stream = Files.newInputStream(clientVersionJson.toPath())) {
-            versionManifest = JsonConverter.streamToObject(stream, VersionManifest.class);
-        } catch (JsonConverterException e) {
-            throw new IOException("Failed to convert version manifest from json", e);
-        }
+        VersionManifest versionManifest = getVersionManifest(version);
 
         // Install client and server jar into the repository if available
         MavenPom clientJar = installVariantIfExist(
@@ -300,5 +294,28 @@ public class MinecraftRepository extends SimpleMavenRepository {
         // Write the generated POM
         addPom(pom);
         return pom;
+    }
+
+    /**
+     * Retrieves the version manifest for the given version.
+     *
+     * @param version The version to retrieve the manifest for
+     * @return The manifest of the given version
+     * @throws IOException If an I/O error occurs while reading the version file
+     * @throws IllegalArgumentException If the given version is not installed
+     */
+    public VersionManifest getVersionManifest(String version) throws IOException {
+        Path versionsFile = versionsDir.resolve(version + ".json");
+        if(!Files.exists(versionsFile)) {
+            // We don't have the version installed at all
+            throw new IllegalArgumentException("Minecraft version " + version + " is not installed");
+        }
+
+        try (InputStream stream = Files.newInputStream(versionsFile)) {
+            return JsonConverter.streamToObject(stream, VersionManifest.class);
+        } catch (JsonConverterException e) {
+            // Probably a corrupted file
+            throw new IOException("Failed to convert version manifest from json", e);
+        }
     }
 }

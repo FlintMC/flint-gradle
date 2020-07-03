@@ -14,22 +14,22 @@ import java.util.Objects;
 
 @JsonDeserialize(using = ArgumentString.Deserializer.class)
 public class ArgumentString {
-    private String value;
-    private boolean isVariable;
-    private List<VersionedRule> rules;
+    private final String variableName;
+    private final String value;
+    private final List<VersionedRule> rules;
 
-    private ArgumentString(String value, boolean isVariable, List<VersionedRule> rules) {
+    private ArgumentString(String variableName, String value, List<VersionedRule> rules) {
+        this.variableName = variableName;
         this.value = value;
-        this.isVariable = isVariable;
         this.rules = rules;
+    }
+
+    public String getVariableName() {
+        return variableName;
     }
 
     public String getValue() {
         return value;
-    }
-
-    public boolean isVariable() {
-        return isVariable;
     }
 
     public List<VersionedRule> getRules() {
@@ -41,14 +41,14 @@ public class ArgumentString {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         ArgumentString that = (ArgumentString) o;
-        return isVariable == that.isVariable &&
+        return Objects.equals(variableName, that.variableName) &&
                 Objects.equals(value, that.value) &&
                 Objects.equals(rules, that.rules);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(value, isVariable, rules);
+        return Objects.hash(variableName, value, rules);
     }
 
     public static class Deserializer extends StdNodeBasedDeserializer<ArgumentString> {
@@ -58,30 +58,36 @@ public class ArgumentString {
 
         @Override
         public ArgumentString convert(JsonNode root, DeserializationContext ctxt) throws IOException {
-            if(root.isTextual()) {
+            if (root.isTextual()) {
                 String value = root.asText();
-                return new ArgumentString(asNonVariableText(value), isVariable(value), null);
+                return new ArgumentString(getVariableName(value), getNonVariableText(value), null);
             } else {
                 String value = root.get("value").requireNonNull().asText();
                 JavaType ruleListType =
                         ctxt.getTypeFactory().constructCollectionType(ArrayList.class, VersionedRule.class);
 
-                return new ArgumentString(asNonVariableText(value), isVariable(value),
+                return new ArgumentString(getVariableName(value), getNonVariableText(value),
                         Util.readJsonValue(ruleListType, root.get("rules"), ctxt));
             }
         }
 
-        private boolean isVariable(String input) {
-            return input.startsWith("$");
+        private String getNonVariableText(String text) {
+            int indexOfVarStart = text.indexOf("${");
+            if (indexOfVarStart == -1) {
+                return text;
+            }
+
+            return text.substring(0, indexOfVarStart);
         }
 
-        private String asNonVariableText(String text) {
-            if(!text.startsWith("$")) {
-                return text;
-            } else {
-                String newText = text.substring(2);
-                return newText.substring(0, newText.length() - 1);
+        private String getVariableName(String text) {
+            int indexOfVarStart = text.indexOf("${");
+            if (indexOfVarStart == -1) {
+                return null;
             }
+
+            int indexOfVarEnd = text.indexOf('}', indexOfVarStart);
+            return text.substring(indexOfVarStart + 2, indexOfVarEnd);
         }
     }
 }

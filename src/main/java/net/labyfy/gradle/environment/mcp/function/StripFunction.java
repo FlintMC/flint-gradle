@@ -96,6 +96,7 @@ public class StripFunction extends MCPFunction {
      * @return {@code true} if the entry should be kept, {@code false} otherwise
      */
     private boolean shouldStripEntry(ZipEntry entry) {
-        return entry.isDirectory() || classList.contains(entry.getName()) != whitelist;
+        return entry.isDirectory() ||
+                (classList.contains(entry.getName()) != whitelist && !entry.getName().startsWith("assets/"));
     }
 }

@@ -7,10 +7,7 @@ import org.gradle.util.Configurable;
 import org.gradle.util.ConfigureUtil;
 
 import javax.annotation.Nonnull;
-import javax.inject.Inject;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 import java.util.function.Predicate;
 
 /**
@@ -20,24 +17,39 @@ public class LabyfyGradleExtension implements Configurable<LabyfyGradleExtension
     public static final String NAME = "labyfy";
 
     private final LabyfyGradlePlugin plugin;
+    private final LabyfyRunsExtension runsExtension;
 
     private boolean configured;
 
-    private List<String> minecraftVersions;
+    private Set<String> minecraftVersions;
     private Predicate<Project> projectFilter;
     private boolean disableInternalSourceSet;
 
     /**
-     * Creates a new {@link LabyfyGradleExtension} with default values
+     * Creates a new {@link LabyfyGradleExtension} with default values.
      *
      * @param plugin The plugin this extension belongs to
      */
-    @Inject
     public LabyfyGradleExtension(LabyfyGradlePlugin plugin) {
         this.plugin = plugin;
 
-        this.minecraftVersions = new ArrayList<>();
+        this.minecraftVersions = new HashSet<>();
         this.projectFilter = p -> p.getPluginManager().hasPlugin("java");
+        this.runsExtension = new LabyfyRunsExtension();
+    }
+
+    /**
+     * Creates a new {@link LabyfyGradleExtension} with values copied from a parent
+     * extension.
+     *
+     * @param plugin The plugin owning this extension
+     * @param parent The parent extension
+     */
+    public LabyfyGradleExtension(LabyfyGradlePlugin plugin, LabyfyGradleExtension parent) {
+        this.plugin = plugin;
+        this.minecraftVersions = new HashSet<>(parent.minecraftVersions);
+        this.projectFilter = parent.projectFilter;
+        this.runsExtension = new LabyfyRunsExtension(parent.runsExtension);
     }
 
     /**
@@ -46,7 +58,7 @@ public class LabyfyGradleExtension implements Configurable<LabyfyGradleExtension
      * @param minecraftVersions The minecraft versions made available to this project
      */
     public void minecraftVersions(String... minecraftVersions) {
-        this.minecraftVersions = new ArrayList<>();
+        this.minecraftVersions = new HashSet<>();
         this.minecraftVersions.addAll(Arrays.asList(minecraftVersions));
     }
 
@@ -55,7 +67,7 @@ public class LabyfyGradleExtension implements Configurable<LabyfyGradleExtension
      *
      * @param minecraftVersions The minecraft versions made available to this project
      */
-    public void setMinecraftVersions(List<String> minecraftVersions) {
+    public void setMinecraftVersions(Set<String> minecraftVersions) {
         this.minecraftVersions = minecraftVersions;
     }
 
@@ -64,7 +76,7 @@ public class LabyfyGradleExtension implements Configurable<LabyfyGradleExtension
      *
      * @return The minecraft versions made available to this project
      */
-    public List<String> getMinecraftVersions() {
+    public Set<String> getMinecraftVersions() {
         return minecraftVersions;
     }
 
@@ -76,6 +88,15 @@ public class LabyfyGradleExtension implements Configurable<LabyfyGradleExtension
      */
     public void setProjectFilter(Predicate<Project> projectFilter) {
         this.projectFilter = projectFilter;
+    }
+
+    /**
+     * Retrieves the project filter predicate.
+     *
+     * @return The project filter predicate
+     */
+    public Predicate<Project> getProjectFilter() {
+        return projectFilter;
     }
 
     /**
@@ -97,10 +118,30 @@ public class LabyfyGradleExtension implements Configurable<LabyfyGradleExtension
     }
 
     /**
+     * Retrieves the runs extension of this extension.
+     *
+     * @return The runs extension of this extension
+     */
+    public LabyfyRunsExtension getRuns() {
+        return this.runsExtension;
+    }
+
+    /**
+     * Configures the runs extension of this extension with the given closure.
+     *
+     * @param closure The closure to use for configuration
+     * @return The configured runs extension of this extension
+     */
+    public LabyfyRunsExtension runs(Closure<?> closure) {
+        return this.runsExtension.configure(closure);
+    }
+
+    /**
      * Configures the values of this instance with the given closure.
      *
      * @param closure The closure to pass this instance to
      * @return Configured this
+     * @throws IllegalStateException If the extension has been configured already
      */
     @Override
     @Nonnull
@@ -113,5 +154,35 @@ public class LabyfyGradleExtension implements Configurable<LabyfyGradleExtension
         configured = true;
         plugin.onExtensionConfigured();
         return result;
+    }
+
+    /**
+     * Triggers the {@link LabyfyGradlePlugin#onExtensionConfigured()} method. This method is meant to be called from
+     * build scripts which need the extension to configure the plugin early without changing values on the extension
+     * itself. This method may only be called if the extension has not been configured by other means.
+     *
+     * @throws IllegalStateException If the extension has been configured already
+     */
+    public void configureNow() {
+        if(configured) {
+            throw new IllegalStateException(
+                    "Please only call configureNow() if you don't configure the extension by other means");
+        }
+
+        configured = true;
+        plugin.onExtensionConfigured();
+    }
+
+    /**
+     * Triggers the {@link LabyfyGradlePlugin#onExtensionConfigured()} method if the extension has not been configured
+     * already.
+     */
+    public void ensureConfigured() {
+        if(configured) {
+            return;
+        }
+
+        configured = true;
+        plugin.onExtensionConfigured();
     }
 }

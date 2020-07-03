@@ -267,7 +267,7 @@ public class ModCoderPackEnvironment implements DeobfuscationEnvironment {
 
         // We only need the client artifact for compilation, this might change at some point
         // if we support servers
-        return Collections.singletonList(getClientArtifact(version));
+        return Collections.singletonList(getJoinedArtifact(version));
     }
 
     /**

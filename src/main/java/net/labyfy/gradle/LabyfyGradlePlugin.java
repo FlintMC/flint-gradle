@@ -3,6 +3,7 @@ package net.labyfy.gradle;
 import net.labyfy.gradle.environment.DeobfuscationEnvironment;
 import net.labyfy.gradle.extension.LabyfyGradleExtension;
 import net.labyfy.gradle.java.JavaPluginInteraction;
+import net.labyfy.gradle.java.RunConfigurationProvider;
 import net.labyfy.gradle.maven.MavenArtifactDownloader;
 import net.labyfy.gradle.maven.RemoteMavenRepository;
 import net.labyfy.gradle.maven.SimpleMavenRepository;
@@ -22,6 +23,8 @@ import java.nio.file.Path;
 import java.util.Collection;
 
 public class LabyfyGradlePlugin implements Plugin<Project> {
+    public static final String MINECRAFT_TASK_GROUP = "minecraft";
+
     private static final String MINECRAFT_MAVEN = "https://libraries.minecraft.net";
 
     private Project project;
@@ -33,37 +36,64 @@ public class LabyfyGradlePlugin implements Plugin<Project> {
     private JavaPluginInteraction interaction;
     private MinecraftRepository minecraftRepository;
     private SimpleMavenRepository internalRepository;
+    private RunConfigurationProvider runConfigurationProvider;
+
+    private LabyfyGradlePlugin parentPlugin;
 
     @Override
     public void apply(@Nonnull Project project) {
         this.project = project;
 
-        Gradle gradle = project.getGradle();
-        httpClient = gradle.getStartParameter().isOffline() ? null :
-                HttpClientBuilder.create().useSystemProperties().build();
-        downloader = new MavenArtifactDownloader();
-
-        if (httpClient != null) {
-            downloader.addSource(new RemoteMavenRepository(httpClient, "https://libraries.minecraft.net"));
-            downloader.addSource(new RemoteMavenRepository(httpClient, "https://repo.maven.apache.org/maven2/"));
+        if(project.getParent() != null) {
+            LabyfyGradlePlugin parentPlugin = project.getParent().getPlugins().findPlugin(getClass());
+            if(parentPlugin != null) {
+                this.parentPlugin = parentPlugin;
+            }
         }
 
         this.interaction = new JavaPluginInteraction(project);
-        this.extension = project.getExtensions().create(LabyfyGradleExtension.NAME, LabyfyGradleExtension.class, this);
 
-        Path labyfyGradlePath = gradle.getGradleUserHomeDir().toPath().resolve("caches/labyfy-gradle");
+        if(this.parentPlugin == null) {
+            Gradle gradle = project.getGradle();
+            httpClient = gradle.getStartParameter().isOffline() ? null :
+                    HttpClientBuilder.create().useSystemProperties().build();
+            downloader = new MavenArtifactDownloader();
 
-        try {
-            this.minecraftRepository = new MinecraftRepository(
-                    labyfyGradlePath.resolve("minecraft-repository"),
-                    labyfyGradlePath.resolve("minecraft-cache"),
-                    httpClient
-            );
+            if (httpClient != null) {
+                downloader.addSource(new RemoteMavenRepository(httpClient, "https://libraries.minecraft.net"));
+                downloader.addSource(new RemoteMavenRepository(httpClient, "https://repo.maven.apache.org/maven2/"));
+            }
 
-            this.internalRepository = new SimpleMavenRepository(labyfyGradlePath.resolve("internal-repository"));
-        } catch (IOException e) {
-            throw new UncheckedIOException("Failed to create minecraft repository", e);
+            this.extension = project.getExtensions().create(LabyfyGradleExtension.NAME, LabyfyGradleExtension.class, this);
+
+            Path labyfyGradlePath = gradle.getGradleUserHomeDir().toPath().resolve("caches/labyfy-gradle");
+            Path minecraftCache = labyfyGradlePath.resolve("minecraft-cache");
+
+            try {
+                this.minecraftRepository = new MinecraftRepository(
+                        labyfyGradlePath.resolve("minecraft-repository"),
+                        minecraftCache,
+                        httpClient
+                );
+
+                this.internalRepository = new SimpleMavenRepository(labyfyGradlePath.resolve("internal-repository"));
+            } catch (IOException e) {
+                throw new UncheckedIOException("Failed to create minecraft repository", e);
+            }
+
+            this.runConfigurationProvider = new RunConfigurationProvider(
+                    project, minecraftRepository, minecraftCache.resolve("run"));
+        } else {
+            this.httpClient = parentPlugin.httpClient;
+            this.downloader = parentPlugin.downloader;
+            this.minecraftRepository = parentPlugin.minecraftRepository;
+            this.internalRepository = parentPlugin.internalRepository;
+            this.extension = project.getExtensions().create(
+                    LabyfyGradleExtension.NAME, LabyfyGradleExtension.class, this, parentPlugin.extension);
+            this.runConfigurationProvider = parentPlugin.runConfigurationProvider;
         }
+
+        project.afterEvaluate((p) -> extension.ensureConfigured());
     }
 
     /**
@@ -85,6 +115,16 @@ public class LabyfyGradlePlugin implements Plugin<Project> {
             repo.setUrl("Internal minecraft");
             repo.setUrl(minecraftRepository.getBaseDir());
         });
+
+        for(Project subProject : project.getSubprojects()) {
+            if(!extension.getProjectFilter().test(subProject)) {
+                continue;
+            }
+
+            subProject.getPluginManager().apply(getClass());
+        }
+
+        runConfigurationProvider.installSourceSets(project, extension);
     }
 
     /**
@@ -159,5 +199,14 @@ public class LabyfyGradlePlugin implements Plugin<Project> {
         }
 
         return allInstalled;
+    }
+
+    /**
+     * Retrieves the HTTP client the plugin uses for downloading files.
+     *
+     * @return The HTTP client of this plugin
+     */
+    public HttpClient getHttpClient() {
+        return httpClient;
     }
 }
