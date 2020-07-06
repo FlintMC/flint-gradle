@@ -1,15 +1,27 @@
 package net.labyfy.gradle.minecraft;
 
+import groovy.util.Node;
+import groovy.util.XmlParser;
+import groovy.util.XmlSlurper;
+import groovy.util.slurpersupport.GPathResult;
+import groovy.xml.XmlUtil;
+import net.labyfy.gradle.LabyfyGradleException;
 import net.labyfy.gradle.minecraft.data.version.ArgumentString;
 import net.labyfy.gradle.minecraft.data.version.VersionedArguments;
 import net.labyfy.gradle.util.RuleChainResolver;
+import net.labyfy.gradle.util.Util;
 import org.gradle.api.file.FileCollection;
 import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.JavaExec;
 import org.gradle.api.tasks.SourceSet;
 import org.gradle.api.tasks.TaskAction;
+import org.xml.sax.SAXException;
 
+import javax.xml.parsers.ParserConfigurationException;
 import java.io.File;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 
@@ -30,6 +42,7 @@ public class MinecraftRunTask extends JavaExec {
         DEFAULT_VARIABLES.put("launcher_version", "3.0.0");
     }
 
+    private String configurationName;
     private String version;
     private String versionType;
     private VersionedArguments versionedArguments;
@@ -37,6 +50,16 @@ public class MinecraftRunTask extends JavaExec {
     private String assetIndex;
     private Path assetsPath;
     private Path nativesDirectory;
+    private List<LogConfigTransformer> logConfigTransformers;
+
+    /**
+     * Sets the name of the configuration this run task belongs to.
+     *
+     * @param configurationName The name of the configuration owning this task
+     */
+    public void setConfigurationName(String configurationName) {
+        this.configurationName = configurationName;
+    }
 
     /**
      * Sets the minecraft version that is being executed
@@ -113,6 +136,16 @@ public class MinecraftRunTask extends JavaExec {
     }
 
     /**
+     * Sets the list of log config transformers which should be applied before running minecraft with the
+     * configuration generated.
+     *
+     * @param logConfigTransformers The list of transformers to apply to the configuration
+     */
+    public void setLogConfigTransformers(List<LogConfigTransformer> logConfigTransformers) {
+        this.logConfigTransformers = logConfigTransformers;
+    }
+
+    /**
      * Launches minecraft with the current configuration.
      *
      * @throws IllegalStateException If a property has not been configured
@@ -120,18 +153,22 @@ public class MinecraftRunTask extends JavaExec {
     @TaskAction
     @Override
     public void exec() {
-        if(version == null) {
+        if (configurationName == null) {
+            throw new IllegalStateException("The configuration name has not been configured");
+        } else if (version == null) {
             throw new IllegalStateException("The version has not been configured");
-        } else if(versionedArguments == null) {
+        } else if (versionedArguments == null) {
             throw new IllegalStateException("Versioned arguments have not been configured");
-        } else if(potentialClasspath == null) {
+        } else if (potentialClasspath == null) {
             throw new IllegalStateException("The potential classpath has not been configured");
-        } else if(assetIndex == null) {
+        } else if (assetIndex == null) {
             throw new IllegalStateException("The asset index has not been configured");
-        } else if(assetsPath == null) {
+        } else if (assetsPath == null) {
             throw new IllegalStateException("The assets path has not been configured");
-        } else if(nativesDirectory == null) {
+        } else if (nativesDirectory == null) {
             throw new IllegalStateException("The natives directory has not been configured");
+        } else if (logConfigTransformers == null) {
+            throw new IllegalStateException("The list of log config transformers has not been configured");
         }
 
         // Configure variables
@@ -149,18 +186,21 @@ public class MinecraftRunTask extends JavaExec {
 
         // Set the JVM arguments
         jvmArgs(jvmArgs);
-        jvmArgs("-Dorg.apache.logging.log4j.simplelog.StatusLogger.level=TRACE");
+
+        // Create the config file
+        Path log4jConfiguration = generateLog4jConfigFile();
+        jvmArgs("-Dlog4j.configurationFile=" + log4jConfiguration.toString());
         args(programArgs);
 
         FileCollection additionalClasspath = getProject().files();
 
         // Iterate the potential classpath
-        for(SourceSet sourceSet : potentialClasspath) {
+        for (SourceSet sourceSet : potentialClasspath) {
             // Retrieve the minecraft version extension
             Object minecraftVersionExtension = sourceSet.getExtensions().findByName("minecraftVersion");
 
             // If the extension is null or equals the version, add it to the classpath
-            if(minecraftVersionExtension == null || minecraftVersionExtension.toString().equals(version)) {
+            if (minecraftVersionExtension == null || minecraftVersionExtension.toString().equals(version)) {
                 // Make sure to always retrieve a valid file collection without any duplicates
                 additionalClasspath = deduplicatedFileCollection(additionalClasspath, sourceSet.getRuntimeClasspath());
             }
@@ -169,14 +209,23 @@ public class MinecraftRunTask extends JavaExec {
         // Add the classpath
         classpath(additionalClasspath);
 
-        super.exec();
+        try {
+            super.exec();
+        } finally {
+            try {
+                // Delete the temporary configuration file, it will be regenerated on next run
+                Files.delete(log4jConfiguration);
+            } catch (IOException e) {
+                getLogger().warn("Failed to delete temporary log4j configuration", e);
+            }
+        }
     }
 
     /**
      * Resolves the given list of minecraft launch arguments.
      *
-     * @param arguments The arguments to resolve
-     * @param variables The variables to use while resolving
+     * @param arguments          The arguments to resolve
+     * @param variables          The variables to use while resolving
      * @param stripClasspathArgs If arguments related to the java classpath should be removed while resolving
      * @return The resolved arguments
      * @throws IllegalArgumentException If an unknown variable is found
@@ -186,27 +235,27 @@ public class MinecraftRunTask extends JavaExec {
         List<String> output = new ArrayList<>();
 
         // Iterate all arguments
-        for(ArgumentString argument : arguments) {
+        for (ArgumentString argument : arguments) {
             // Test if the arguments apply to this platform, if not, skip them
-            if(!RuleChainResolver.testRuleChain(argument.getRules())) {
+            if (!RuleChainResolver.testRuleChain(argument.getRules())) {
                 continue;
             }
 
             // Extract the value of the argument
             String value = argument.getValue();
-            if(stripClasspathArgs && value.equals("-cp")) {
+            if (stripClasspathArgs && value.equals("-cp")) {
                 // Found -cp and strip classpath is enabled, skip the argument
                 continue;
             }
 
             // Extract the variable name
             String variableName = argument.getVariableName();
-            if(variableName != null) {
+            if (variableName != null) {
                 // Found a variable
-                if(stripClasspathArgs && variableName.equals("classpath")) {
+                if (stripClasspathArgs && variableName.equals("classpath")) {
                     // Found the classpath variable and strip classpath is enabled, skip the argument
                     continue;
-                } else if(!variables.containsKey(variableName)) {
+                } else if (!variables.containsKey(variableName)) {
                     throw new IllegalArgumentException("Unknown launch variable name " + variableName);
                 }
 
@@ -231,13 +280,13 @@ public class MinecraftRunTask extends JavaExec {
         Set<File> files = new HashSet<>();
 
         // Iterate all collections
-        for(FileCollection collection : collections) {
+        for (FileCollection collection : collections) {
             if (collection == null) {
                 // Skip collections which are null
                 continue;
             }
 
-            for(File file : collection.getFiles()) {
+            for (File file : collection.getFiles()) {
                 // Make sure every path is absolute to reliably detect duplicates
                 files.add(file.getAbsoluteFile());
             }
@@ -245,5 +294,37 @@ public class MinecraftRunTask extends JavaExec {
 
         // Use the project to create a new file collection out of a set of files
         return getProject().files(files);
+    }
+
+    /**
+     * Generates the log4j config file for the current run.
+     *
+     * @return The path to the generated file
+     */
+    private Path generateLog4jConfigFile() {
+        Path outputPath;
+        try {
+            // Create a temporary file
+            outputPath = Files.createTempFile("log4j", ".xml");
+            XmlSlurper slurper = new XmlSlurper();
+
+            // Retrieve the default XML tree
+            GPathResult rootPath = slurper.parse(getClass().getResourceAsStream("/default_log4j.xml"));
+            for(LogConfigTransformer transformer : logConfigTransformers) {
+                // Run every transformer over the node
+                transformer.transform(configurationName, rootPath);
+            }
+
+            try(OutputStream out = Files.newOutputStream(outputPath)) {
+                // Finally write the xml to the temporary file
+                XmlUtil.serialize(rootPath, out);
+            }
+        } catch (IOException e) {
+            throw new LabyfyGradleException("IO error occurred while creating logging configuration", e);
+        } catch (SAXException | ParserConfigurationException e) {
+            throw new LabyfyGradleException("An error occurred while creating the XML parser", e);
+        }
+
+        return outputPath;
     }
 }

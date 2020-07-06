@@ -41,7 +41,7 @@ import java.util.*;
 public class MinecraftRepository extends SimpleMavenRepository {
     private static final Logger LOGGER = Logging.getLogger(MinecraftRepository.class);
     private static final String VERSION_MANIFEST_URL = "https://launchermeta.mojang.com/mc/game/version_manifest.json";
-    private static final String MAPPINGS_URL = "https://dl.labymod.net/mappings/index.json";
+    private static final String MAPPINGS_URL = "https://dl.labymod.net/mappings/index_new.json";
 
     private static final DateTimeFormatter DATE_TIME_FORMATTER =
             DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss zzz");

@@ -1,6 +1,7 @@
 package net.labyfy.gradle.extension;
 
 import groovy.lang.Closure;
+import net.labyfy.gradle.minecraft.LogConfigTransformer;
 import org.gradle.util.Configurable;
 import org.gradle.util.ConfigureUtil;
 
@@ -11,6 +12,9 @@ public class LabyfyRunsExtension implements Configurable<LabyfyRunsExtension> {
     private final Set<String> allIncludedConfigurations;
     private final Map<String, Set<String>> includedSourceSets;
     private final Map<String, Set<String>> excludedSourceSets;
+    private final List<LogConfigTransformer> logConfigTransformers;
+    private final Map<String, String> mainClassOverrides;
+    private String generalMainClassOverride;
 
     /**
      * Constructs a {@link LabyfyRunsExtension} with default values.
@@ -20,6 +24,9 @@ public class LabyfyRunsExtension implements Configurable<LabyfyRunsExtension> {
         this.allIncludedConfigurations.add("main");
         this.includedSourceSets = new HashMap<>();
         this.excludedSourceSets = new HashMap<>();
+        this.logConfigTransformers = new ArrayList<>();
+        this.mainClassOverrides = new HashMap<>();
+        this.generalMainClassOverride = null;
     }
 
     /**
@@ -31,6 +38,11 @@ public class LabyfyRunsExtension implements Configurable<LabyfyRunsExtension> {
         this.allIncludedConfigurations = new HashSet<>(parent.allIncludedConfigurations);
         this.includedSourceSets = new HashMap<>(parent.includedSourceSets);
         this.excludedSourceSets = new HashMap<>(parent.excludedSourceSets);
+        this.logConfigTransformers = parent.logConfigTransformers;
+
+        // The following can only be configured in the root project
+        this.mainClassOverrides = null;
+        this.generalMainClassOverride = null;
     }
 
     /**
@@ -116,6 +128,83 @@ public class LabyfyRunsExtension implements Configurable<LabyfyRunsExtension> {
      */
     public Map<String, Set<String>> getIncludedSourceSets() {
         return includedSourceSets;
+    }
+
+    /**
+     * Adds a log4j config transformer to the list of transformers.
+     *
+     * @param transformer The transformer to add
+     */
+    public void transformLogConfig(LogConfigTransformer transformer) {
+        this.logConfigTransformers.add(transformer);
+    }
+
+    /**
+     * Retrieves the list of log config transformers.
+     *
+     * @return The list of log config transformers
+     */
+    public List<LogConfigTransformer> getLogConfigTransformers() {
+        return Collections.unmodifiableList(logConfigTransformers);
+    }
+
+    /**
+     * Overrides the main class of the given configuration.
+     *
+     * @param configuration The configuration to override the main class of
+     * @param newMainClass The new main class of the configuration
+     * @throws IllegalStateException If this runs extension is not the one of the root project
+     */
+    public void overrideMainClass(String configuration, String newMainClass) {
+        if(mainClassOverrides == null) {
+            throw new IllegalStateException("Overriding the main classes can only be done in the root project");
+        }
+
+        mainClassOverrides.put(configuration, newMainClass);
+    }
+
+    /**
+     * Retrieves a map of all configurations mapped to their main class overrides.
+     *
+     * @return A map of all main class overrides
+     * @throws IllegalStateException If this runs extension is not the one of the root project
+     */
+    public Map<String, String> getMainClassOverrides() {
+        if(mainClassOverrides == null) {
+            throw new IllegalStateException("The main class overrides can only be retrieved from the root project");
+        }
+
+        return mainClassOverrides;
+    }
+
+    /**
+     * Overrides the main class for all configurations. Overrides set with {@link #overrideMainClass(String, String)}
+     * have precedence.
+     *
+     * @param newMainClass The new main class for all configurations, or {@code null} to set the default
+     * @throws IllegalStateException If this runs extension is not the one of the root project
+     */
+    public void overrideMainClass(String newMainClass) {
+        if(mainClassOverrides == null) {
+            throw new IllegalStateException("Overriding the main classes can only be done in the root project");
+        }
+
+        generalMainClassOverride = newMainClass;
+    }
+
+    /**
+     * Retrieves the main class override which should apply to all configurations which
+     * don't have their main class overridden explicitly.
+     *
+     * @return The general main class override, or {@code null} if none
+     * @throws IllegalStateException If this runs extension is not the one of the root project
+     */
+    public String getGeneralMainClassOverride() {
+        if(mainClassOverrides == null) {
+            throw new IllegalStateException("The main class override can only be retrieved from the root project");
+        }
+
+        return generalMainClassOverride;
     }
 
     /**

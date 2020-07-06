@@ -111,6 +111,23 @@ public class RunConfigurationProvider {
         if(!tasks.containsKey(runTaskName)) {
             // The task does not yet exist, create it
             MinecraftRunTask runTask = createRunTask(runTaskName, version);
+            runTask.setConfigurationName(configuration);
+
+            // Retrieve the runs extension of the root project
+            LabyfyRunsExtension extension = project.getExtensions().getByType(LabyfyGradleExtension.class).getRuns();
+            Map<String, String> overrides = extension.getMainClassOverrides();
+
+            // Retrieve a matching override or null
+            String mainClassOverride = overrides.containsKey(configuration) ?
+                    overrides.get(configuration) : extension.getGeneralMainClassOverride();
+
+            if(mainClassOverride != null) {
+                // Override has been set, pass it to the task
+                runTask.setMain(mainClassOverride);
+            }
+
+            // Set the list of log config transformers
+            runTask.setLogConfigTransformers(extension.getLogConfigTransformers());
 
             // Set the potential classpath and index the task
             runTask.setPotentialClasspath(potentialClasspath);
