@@ -2,6 +2,13 @@
 <Configuration status="WARN">
     <Appenders>
         <Console name="SysOut" target="SYSTEM_OUT">
+            <ThresholdFilter level="WARN" onMatch="DENY" onMismatch="ACCEPT"/>
+            <PatternLayout
+                    disableAnsi="false"
+                    pattern="%highlight{[%d{HH:mm:ss}] [%t/%level]: %msg%n}"/>
+        </Console>
+        <Console name="SysErr" target="SYSTEM_ERR">
+            <ThresholdFilter level="WARN" onMatch="ACCEPT" onMismatch="DENY"/>
             <PatternLayout
                     disableAnsi="false"
                     pattern="%highlight{[%d{HH:mm:ss}] [%t/%level]: %msg%n}"/>
@@ -20,6 +27,7 @@
     <Loggers>
         <Root level="trace">
             <AppenderRef ref="SysOut"/>
+            <AppenderRef ref="SysErr"/>
             <AppenderRef ref="File"/>
         </Root>
     </Loggers>
