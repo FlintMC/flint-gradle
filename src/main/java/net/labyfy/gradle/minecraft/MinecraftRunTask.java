@@ -8,8 +8,13 @@ import groovy.xml.XmlUtil;
 import net.labyfy.gradle.LabyfyGradleException;
 import net.labyfy.gradle.minecraft.data.version.ArgumentString;
 import net.labyfy.gradle.minecraft.data.version.VersionedArguments;
+import net.labyfy.gradle.minecraft.ui.LoginDialog;
+import net.labyfy.gradle.minecraft.ui.LoginDialogResult;
+import net.labyfy.gradle.minecraft.yggdrasil.YggdrasilAuthenticationException;
+import net.labyfy.gradle.minecraft.yggdrasil.YggdrasilAuthenticator;
 import net.labyfy.gradle.util.RuleChainResolver;
 import net.labyfy.gradle.util.Util;
+import org.gradle.api.Project;
 import org.gradle.api.file.FileCollection;
 import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.JavaExec;
@@ -21,6 +26,7 @@ import javax.xml.parsers.ParserConfigurationException;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -51,6 +57,7 @@ public class MinecraftRunTask extends JavaExec {
     private Path assetsPath;
     private Path nativesDirectory;
     private List<LogConfigTransformer> logConfigTransformers;
+    private YggdrasilAuthenticator authenticator;
 
     /**
      * Sets the name of the configuration this run task belongs to.
@@ -146,6 +153,16 @@ public class MinecraftRunTask extends JavaExec {
     }
 
     /**
+     * Sets the authenticator that will be used for logging in into minecraft if the user
+     * desires so.
+     *
+     * @param authenticator The authenticator used for logging in into minecraft
+     */
+    public void setAuthenticator(YggdrasilAuthenticator authenticator) {
+        this.authenticator = authenticator;
+    }
+
+    /**
      * Launches minecraft with the current configuration.
      *
      * @throws IllegalStateException If a property has not been configured
@@ -173,12 +190,18 @@ public class MinecraftRunTask extends JavaExec {
 
         // Configure variables
         Map<String, String> variables = new HashMap<>(DEFAULT_VARIABLES);
-        variables.put("version_name", version);
+        variables.put("version_name", version + " (Labyfy-Gradle)");
         variables.put("game_directory", getWorkingDir().getAbsolutePath());
         variables.put("assets_index_name", assetIndex);
         variables.put("assets_root", assetsPath.toString());
         variables.put("version_type", versionType);
         variables.put("natives_directory", nativesDirectory.toString());
+
+        // Set up the login
+        if(!setup(variables)) {
+            // User cancelled run
+            return;
+        }
 
         // Resolve the commandline arguments
         List<String> jvmArgs = resolveArguments(versionedArguments.getJvm(), variables, true);
@@ -326,5 +349,101 @@ public class MinecraftRunTask extends JavaExec {
         }
 
         return outputPath;
+    }
+
+    /**
+     * Opens an {@link net.labyfy.gradle.minecraft.ui.LoginDialog} to the user if
+     * the project has set the required properties and fills the variables for launch.
+     *
+     * @param variables The variables to fill for launching
+     * @return {@code true} if the launch should continue, {@code false} otherwise
+     */
+    private boolean setup(Map<String, String> variables) {
+        Map<String, ?> projectProperties = getProject().getProperties();
+        if(!projectProperties.containsKey("net.labyfy.gradle.login") ||
+                !Boolean.parseBoolean(projectProperties.get("net.labyfy.gradle.login").toString())) {
+            // Continue launching offline, the user has not requested online launching
+            return true;
+        }
+
+        if(authenticator == null) {
+            getLogger().warn("Can't login because gradle is operating in offline mode!");
+            return true;
+        }
+
+        String errorMessage = null;
+        try {
+            if(!authenticator.requiresReAuth()) {
+                // There are still valid login details cached, use them
+                getLogger().lifecycle("Using cached minecraft login token");
+                setAuthVariables(variables);
+                return true;
+            } else if(authenticator.refreshToken()) {
+                // The token has been refreshed successfully
+                getLogger().lifecycle("Using refreshed minecraft login token");
+                setAuthVariables(variables);
+                return true;
+            }
+        } catch (IOException e) {
+            getLogger().error("IOException while trying to re-auth, asking auth again", e);
+            errorMessage = e.getMessage();
+        }
+
+        String email = null;
+
+        while (true) {
+            // Open the login dialog
+            LoginDialog dialog = new LoginDialog(email, errorMessage);
+            LoginDialogResult result = dialog.execute();
+
+            if(result == null) {
+                // User closed window
+                return false;
+            }
+
+            // Handle the result accordingly
+            switch (result) {
+                case ABORT:
+                    // User aborted launch
+                    return false;
+
+                case ATTEMPT_LOGIN: {
+                    // User filled in login form
+                    email = dialog.getEmail();
+                    String password = dialog.getPassword();
+
+                    try {
+                        authenticator.authenticate(email, password);
+                        setAuthVariables(variables);  // Authentication succeeded
+                        return true;
+                    } catch (YggdrasilAuthenticationException e) {
+                        getLogger().error("Failed to log in into minecraft", e);
+                        errorMessage = e.getMessage();
+                    } catch (IOException e) {
+                        // This should never happen, unless some AntiVirus or something
+                        // like that decides to deny access to cached files
+                        throw new UncheckedIOException("Failed to read login cache", e);
+                    }
+                    break;
+                }
+
+                case CONTINUE_OFFLINE:
+                    return true;
+            }
+
+        }
+    }
+
+    /**
+     * Reads the cached login data from the authenticator and applies
+     * it to the given map.
+     *
+     * @param variables The map to put the login data into
+     * @throws IOException If an I/O error occurs while reading the cached variables
+     */
+    private void setAuthVariables(Map<String, String> variables) throws IOException {
+        variables.put("auth_player_name", authenticator.getCachedPlayerName());
+        variables.put("auth_uuid", authenticator.getCachedUUID().toString());
+        variables.put("auth_access_token", authenticator.getCachedToken());
     }
 }

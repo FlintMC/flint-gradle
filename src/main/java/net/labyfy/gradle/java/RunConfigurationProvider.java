@@ -8,6 +8,7 @@ import net.labyfy.gradle.minecraft.MinecraftAssetsTask;
 import net.labyfy.gradle.minecraft.MinecraftRepository;
 import net.labyfy.gradle.minecraft.MinecraftRunTask;
 import net.labyfy.gradle.minecraft.data.version.VersionManifest;
+import net.labyfy.gradle.minecraft.yggdrasil.YggdrasilAuthenticator;
 import org.gradle.api.Project;
 import org.gradle.api.tasks.SourceSet;
 import org.gradle.api.tasks.SourceSetContainer;
@@ -24,6 +25,7 @@ public class RunConfigurationProvider {
     private final Project project;
     private final MinecraftRepository minecraftRepository;
     private final Path runCacheDir;
+    private final YggdrasilAuthenticator authenticator;
     private final Map<String, MinecraftRunTask> tasks;
     private final Map<String, Set<SourceSet>> sourceSetsByConfiguration;
 
@@ -33,11 +35,18 @@ public class RunConfigurationProvider {
      * @param project The project to generate configurations on
      * @param minecraftRepository The repository to retrieve minecraft launch information from
      * @param runCacheDir The directory certain thins such as natives and assets are cached in
+     * @param authenticator The {@link YggdrasilAuthenticator} passed to minecraft run tasks for authentication
      */
-    public RunConfigurationProvider(Project project, MinecraftRepository minecraftRepository, Path runCacheDir) {
+    public RunConfigurationProvider(
+            Project project,
+            MinecraftRepository minecraftRepository,
+            Path runCacheDir,
+            YggdrasilAuthenticator authenticator
+    ) {
         this.project = project;
         this.minecraftRepository = minecraftRepository;
         this.runCacheDir = runCacheDir;
+        this.authenticator = authenticator;
         this.tasks = new HashMap<>();
         this.sourceSetsByConfiguration = new HashMap<>();
     }
@@ -128,6 +137,9 @@ public class RunConfigurationProvider {
 
             // Set the list of log config transformers
             runTask.setLogConfigTransformers(extension.getLogConfigTransformers());
+
+            // Set up the authenticator
+            runTask.setAuthenticator(authenticator);
 
             // Set the potential classpath and index the task
             runTask.setPotentialClasspath(potentialClasspath);

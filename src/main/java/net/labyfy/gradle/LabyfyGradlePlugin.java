@@ -9,6 +9,7 @@ import net.labyfy.gradle.maven.RemoteMavenRepository;
 import net.labyfy.gradle.maven.SimpleMavenRepository;
 import net.labyfy.gradle.maven.pom.MavenArtifact;
 import net.labyfy.gradle.minecraft.MinecraftRepository;
+import net.labyfy.gradle.minecraft.yggdrasil.YggdrasilAuthenticator;
 import org.apache.http.client.HttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.gradle.api.GradleException;
@@ -36,6 +37,7 @@ public class LabyfyGradlePlugin implements Plugin<Project> {
     private JavaPluginInteraction interaction;
     private MinecraftRepository minecraftRepository;
     private SimpleMavenRepository internalRepository;
+    private YggdrasilAuthenticator authenticator;
     private RunConfigurationProvider runConfigurationProvider;
 
     private LabyfyGradlePlugin parentPlugin;
@@ -44,16 +46,16 @@ public class LabyfyGradlePlugin implements Plugin<Project> {
     public void apply(@Nonnull Project project) {
         this.project = project;
 
-        if(project.getParent() != null) {
+        if (project.getParent() != null) {
             LabyfyGradlePlugin parentPlugin = project.getParent().getPlugins().findPlugin(getClass());
-            if(parentPlugin != null) {
+            if (parentPlugin != null) {
                 this.parentPlugin = parentPlugin;
             }
         }
 
         this.interaction = new JavaPluginInteraction(project);
 
-        if(this.parentPlugin == null) {
+        if (this.parentPlugin == null) {
             Gradle gradle = project.getGradle();
             httpClient = gradle.getStartParameter().isOffline() ? null :
                     HttpClientBuilder.create().useSystemProperties().build();
@@ -81,8 +83,16 @@ public class LabyfyGradlePlugin implements Plugin<Project> {
                 throw new UncheckedIOException("Failed to create minecraft repository", e);
             }
 
+            try {
+                this.authenticator = httpClient != null ?
+                        new YggdrasilAuthenticator(httpClient, labyfyGradlePath.resolve("yggdrasil")) :
+                        null;
+            } catch (IOException e) {
+                throw new UncheckedIOException("Failed to create Yggdrasil authenticator", e);
+            }
+
             this.runConfigurationProvider = new RunConfigurationProvider(
-                    project, minecraftRepository, minecraftCache.resolve("run"));
+                    project, minecraftRepository, minecraftCache.resolve("run"), authenticator);
         } else {
             this.httpClient = parentPlugin.httpClient;
             this.downloader = parentPlugin.downloader;
@@ -90,6 +100,7 @@ public class LabyfyGradlePlugin implements Plugin<Project> {
             this.internalRepository = parentPlugin.internalRepository;
             this.extension = project.getExtensions().create(
                     LabyfyGradleExtension.NAME, LabyfyGradleExtension.class, this, parentPlugin.extension);
+            this.authenticator = parentPlugin.authenticator;
             this.runConfigurationProvider = parentPlugin.runConfigurationProvider;
         }
 
@@ -116,8 +127,8 @@ public class LabyfyGradlePlugin implements Plugin<Project> {
             repo.setUrl(minecraftRepository.getBaseDir());
         });
 
-        for(Project subProject : project.getSubprojects()) {
-            if(!extension.getProjectFilter().test(subProject)) {
+        for (Project subProject : project.getSubprojects()) {
+            if (!extension.getProjectFilter().test(subProject)) {
                 continue;
             }
 
