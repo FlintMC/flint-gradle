@@ -444,7 +444,12 @@ public class ModCoderPackEnvironment implements DeobfuscationEnvironment {
             // Iterate all jar entries
             while (entries.hasMoreElements()) {
                 JarEntry entry = entries.nextElement();
-                if (entry.getName().startsWith("assets/") || entry.getName().startsWith("/data")) {
+                if (
+                        entry.getName().startsWith("assets/") ||
+                                entry.getName().startsWith("/data") ||
+                                entry.getName().equals("pack.png") ||
+                                entry.getName().equals("version.json")
+                ) {
                     // Found an assets entry, index it
                     existingResources.add(entry.getName());
                 }
@@ -481,11 +486,12 @@ public class ModCoderPackEnvironment implements DeobfuscationEnvironment {
 
                 // Iterate all resource jar entries
                 while ((resourcesEntry = resourcesSource.getNextJarEntry()) != null) {
-                    if (
-                            (!resourcesEntry.getName().startsWith("assets/") &&
+                    if ((
+                            !resourcesEntry.getName().startsWith("assets/") &&
                                     !resourcesEntry.getName().startsWith("data/") &&
-                                    !resourcesEntry.getName().equals("pack.png")) ||
-                                    existingResources.contains(resourcesEntry.getName())
+                                    !resourcesEntry.getName().equals("pack.png") &&
+                                    !resourcesEntry.getName().equals("version.json"))
+                            || existingResources.contains(resourcesEntry.getName())
                     ) {
                         // The entry is not a resource or exists already in the other jar, skip it
                         continue;
