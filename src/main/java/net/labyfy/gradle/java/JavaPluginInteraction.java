@@ -41,8 +41,8 @@ public class JavaPluginInteraction {
             extendSourceSet(internalSourceSet, mainSourceSet);
 
             // Create the internal configuration
-            Configuration configuration = project.getConfigurations().maybeCreate("internal");
-            configuration.extendsFrom(project.getConfigurations().getByName("implementation"));
+            Configuration internalConfiguration = project.getConfigurations().maybeCreate("internal");
+            internalConfiguration.extendsFrom(project.getConfigurations().getByName("implementation"));
 
             // Add the internal configuration
             dependencies.add("internal", internalSourceSet.getOutput());
@@ -91,12 +91,17 @@ public class JavaPluginInteraction {
         String compileOnlyConfiguration = versionedSourceSet.getCompileOnlyConfigurationName();
         String runtimeOnlyConfiguration = versionedSourceSet.getRuntimeOnlyConfigurationName();
 
-        for(MavenArtifact compileDependency : compileDependencies) {
+        for (MavenArtifact compileDependency : compileDependencies) {
             // Add all compile dependencies to compileOnly
             project.getDependencies().add(compileOnlyConfiguration, compileDependency.toIdentifier());
         }
 
-        for(MavenArtifact runtimeDependency : runtimeDependencies) {
+        for (MavenArtifact runtimeDependency : runtimeDependencies) {
+            // Add all runtime dependencies to runtimeOnly
+            project.getDependencies().add(runtimeOnlyConfiguration, runtimeDependency.toIdentifier());
+        }
+
+        for (MavenArtifact runtimeDependency : runtimeDependencies) {
             // Add all runtime dependencies to runtimeOnly
             project.getDependencies().add(runtimeOnlyConfiguration, runtimeDependency.toIdentifier());
         }

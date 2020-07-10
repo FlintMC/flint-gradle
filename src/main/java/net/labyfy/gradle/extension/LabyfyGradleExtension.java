@@ -7,7 +7,9 @@ import org.gradle.util.Configurable;
 import org.gradle.util.ConfigureUtil;
 
 import javax.annotation.Nonnull;
-import java.util.*;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.function.Predicate;
 
 /**
@@ -21,6 +23,7 @@ public class LabyfyGradleExtension implements Configurable<LabyfyGradleExtension
 
     private boolean configured;
 
+    private String publishToken;
     private Set<String> minecraftVersions;
     private Predicate<Project> projectFilter;
     private boolean disableInternalSourceSet;
@@ -178,11 +181,19 @@ public class LabyfyGradleExtension implements Configurable<LabyfyGradleExtension
      * already.
      */
     public void ensureConfigured() {
-        if(configured) {
+        if (configured) {
             return;
         }
 
         configured = true;
         plugin.onExtensionConfigured();
+    }
+
+    public void publishToken(String publishToken) {
+        this.publishToken = publishToken;
+    }
+
+    public String getPublishToken() {
+        return publishToken;
     }
 }

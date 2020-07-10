@@ -1,7 +1,5 @@
 package net.labyfy.gradle.minecraft;
 
-import groovy.util.Node;
-import groovy.util.XmlParser;
 import groovy.util.XmlSlurper;
 import groovy.util.slurpersupport.GPathResult;
 import groovy.xml.XmlUtil;
@@ -13,8 +11,6 @@ import net.labyfy.gradle.minecraft.ui.LoginDialogResult;
 import net.labyfy.gradle.minecraft.yggdrasil.YggdrasilAuthenticationException;
 import net.labyfy.gradle.minecraft.yggdrasil.YggdrasilAuthenticator;
 import net.labyfy.gradle.util.RuleChainResolver;
-import net.labyfy.gradle.util.Util;
-import org.gradle.api.Project;
 import org.gradle.api.file.FileCollection;
 import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.JavaExec;
@@ -190,7 +186,7 @@ public class MinecraftRunTask extends JavaExec {
 
         // Configure variables
         Map<String, String> variables = new HashMap<>(DEFAULT_VARIABLES);
-        variables.put("version_name", version + " (Labyfy-Gradle)");
+        variables.put("version_name", version);
         variables.put("game_directory", getWorkingDir().getAbsolutePath());
         variables.put("assets_index_name", assetIndex);
         variables.put("assets_root", assetsPath.toString());

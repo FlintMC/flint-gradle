@@ -16,7 +16,10 @@ import org.gradle.api.tasks.SourceSetContainer;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Utility class for adding run configurations to the root project.
@@ -77,8 +80,11 @@ public class RunConfigurationProvider {
                 if(!excludedSourceSetsByConfiguration.containsKey(configuration) ||
                         !excludedSourceSetsByConfiguration.get(configuration).contains(sourceSet)) {
                     // The source set has not been excluded, add it
-                    sourceSetsByConfiguration.computeIfAbsent(configuration, (k) ->
-                            ensureVersionedTasksSetup(configuration, extension.getMinecraftVersions())).add(sourceSet);
+                    Set<SourceSet> configurationSourceSets =
+                        sourceSetsByConfiguration.computeIfAbsent(configuration, k -> new HashSet<>());
+
+                    ensureVersionedTasksSetup(configuration, extension.getMinecraftVersions(), configurationSourceSets);
+                    configurationSourceSets.add(sourceSet);
                 }
             }
         }
@@ -86,8 +92,10 @@ public class RunConfigurationProvider {
         // Iterate all explicitly included source sets
         includedSourceSetsByConfiguration.forEach((configuration, included) -> {
             // Add the source sets
-            sourceSetsByConfiguration.computeIfAbsent(configuration,
-                    (k) -> ensureVersionedTasksSetup(k, extension.getMinecraftVersions())).addAll(included);
+
+            Set<SourceSet> configurationSourceSets = sourceSetsByConfiguration.computeIfAbsent(configuration, k -> new HashSet<>());
+            ensureVersionedTasksSetup(configuration, extension.getMinecraftVersions(), configurationSourceSets);
+            configurationSourceSets.addAll(included);
         });
     }
 
@@ -95,16 +103,13 @@ public class RunConfigurationProvider {
      * Ensures that all tasks are set up for the given versions and configuration name.
      *
      * @param configuration The name of the configuration
-     * @param versions The versions to set runs up for
-     * @return The potential classpath of the tasks
+     * @param versions      The versions to set runs up for
      */
-    private Set<SourceSet> ensureVersionedTasksSetup(String configuration, Set<String> versions) {
-        Set<SourceSet> potentialClasspath = new HashSet<>();
-        for(String version : versions) {
+    private void ensureVersionedTasksSetup(String configuration, Set<String> versions,
+                                           Set<SourceSet> potentialClasspath) {
+        for (String version : versions) {
             ensureRunTaskSetup(configuration, version, potentialClasspath);
         }
-
-        return potentialClasspath;
     }
 
     /**
