@@ -2,9 +2,12 @@ package net.labyfy.gradle.manifest;
 
 import java.util.Objects;
 
+/**
+ * Java representation for labyfy installer download entry for manifest file.
+ */
 public class ManifestDownload {
 
-  private final String type = "DOWNLOAD_FILE";
+  private static final String type = "DOWNLOAD_FILE";
   private Data data = new Data();
 
   public ManifestDownload() {
