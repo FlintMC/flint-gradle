@@ -66,6 +66,15 @@ public class LabyfyGradleExtension implements Configurable<LabyfyGradleExtension
     }
 
     /**
+     * Retrieves the minecraft versions this project contains modules for.
+     *
+     * @return The minecraft versions made available to this project
+     */
+    public Set<String> getMinecraftVersions() {
+        return minecraftVersions;
+    }
+
+    /**
      * Overwrites the minecraft versions this project contains modules for.
      *
      * @param minecraftVersions The minecraft versions made available to this project
@@ -75,12 +84,12 @@ public class LabyfyGradleExtension implements Configurable<LabyfyGradleExtension
     }
 
     /**
-     * Retrieves the minecraft versions this project contains modules for.
+     * Retrieves the project filter predicate.
      *
-     * @return The minecraft versions made available to this project
+     * @return The project filter predicate
      */
-    public Set<String> getMinecraftVersions() {
-        return minecraftVersions;
+    public Predicate<Project> getProjectFilter() {
+        return projectFilter;
     }
 
     /**
@@ -91,15 +100,6 @@ public class LabyfyGradleExtension implements Configurable<LabyfyGradleExtension
      */
     public void setProjectFilter(Predicate<Project> projectFilter) {
         this.projectFilter = projectFilter;
-    }
-
-    /**
-     * Retrieves the project filter predicate.
-     *
-     * @return The project filter predicate
-     */
-    public Predicate<Project> getProjectFilter() {
-        return projectFilter;
     }
 
     /**
@@ -149,7 +149,7 @@ public class LabyfyGradleExtension implements Configurable<LabyfyGradleExtension
     @Override
     @Nonnull
     public LabyfyGradleExtension configure(@Nonnull Closure closure) {
-        if(configured) {
+        if (configured) {
             throw new IllegalStateException("The labyfy extension can only be configured once");
         }
 
@@ -167,9 +167,9 @@ public class LabyfyGradleExtension implements Configurable<LabyfyGradleExtension
      * @throws IllegalStateException If the extension has been configured already
      */
     public void configureNow() {
-        if(configured) {
+        if (configured) {
             throw new IllegalStateException(
-                    "Please only call configureNow() if you don't configure the extension by other means");
+                "Please only call configureNow() if you don't configure the extension by other means");
         }
 
         configured = true;
@@ -189,10 +189,18 @@ public class LabyfyGradleExtension implements Configurable<LabyfyGradleExtension
         plugin.onExtensionConfigured();
     }
 
+    /**
+     * Sets the Authorization Bearer publish token to authorize for publishment at the lm-distributor.
+     *
+     * @param publishToken The Bearer token
+     */
     public void publishToken(String publishToken) {
         this.publishToken = publishToken;
     }
 
+    /**
+     * @return The Authorization Bearer publish token to authorize for publishment at the lm-distributor.
+     */
     public String getPublishToken() {
         return publishToken;
     }
