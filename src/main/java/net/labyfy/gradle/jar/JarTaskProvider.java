@@ -1,5 +1,6 @@
 package net.labyfy.gradle.jar;
 
+import net.labyfy.gradle.LabyfyGradleException;
 import net.labyfy.gradle.LabyfyGradlePlugin;
 import net.labyfy.gradle.extension.LabyfyGradleExtension;
 import org.gradle.api.Project;
@@ -69,8 +70,7 @@ public class JarTaskProvider {
   /**
    * Creates publish tasks for the minecraft sourcesets.
    *
-   * @param project   the project to install the tasks in
-   * @param extension labyfy gradle extension to fetch data from
+   * @param project the project to install the tasks in
    */
   public void createPublishTask(Project project) {
     project.getTasks().create("labyfyArtifactPublish", jarTask -> {
@@ -83,12 +83,18 @@ public class JarTaskProvider {
           if (outputFile.exists())
             this.labyfyGradlePlugin.getAssetPublisher().publish(outputFile, project.getName(), project.getVersion().toString(), labyfyGradlePlugin.getExtension().getPublishToken());
         } catch (FileNotFoundException e) {
-          e.printStackTrace();
+          throw new LabyfyGradleException("file " + outputFile.getName() + " is not found.", e);
         }
       });
     });
   }
 
+  /**
+   * Installs gradle task to compile a given sourceSet in a given project.
+   *
+   * @param sourceSet The sourceSet to obtain classpath from for compilation
+   * @param project   The project to install task on
+   */
   public void installCompileTask(SourceSet sourceSet, Project project) {
     project.getTasks().getByName("compileJava").finalizedBy(sourceSet.getCompileJavaTaskName());
   }
