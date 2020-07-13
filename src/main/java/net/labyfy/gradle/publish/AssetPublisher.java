@@ -50,7 +50,7 @@ public class AssetPublisher {
       HttpClient client = HttpClientBuilder.create().build();
       HttpResponse response = client.execute(request);
       if (response.getStatusLine().getStatusCode() != 200) {
-        throw new IllegalStateException("Status " + response.getStatusLine().getStatusCode() + " " + response.getStatusLine().getReasonPhrase());
+        throw new IllegalStateException("The server responded with status " + response.getStatusLine().getStatusCode() + ". Reason: " + response.getStatusLine().getReasonPhrase());
       }
       System.out.println(
           "published "
