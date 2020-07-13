@@ -10,19 +10,37 @@ public class ManifestDownloadData {
   private String path;
   private String md5;
 
+  /**
+   * @return The download url for the content
+   */
   public String getUrl() {
     return url;
   }
 
+  /**
+   * Sets the download url for the content.
+   *
+   * @param url The download url
+   * @return this
+   */
   public ManifestDownloadData setUrl(String url) {
     this.url = url;
     return this;
   }
 
+  /**
+   * @return The relative path from .minecraft to install the file to
+   */
   public String getPath() {
     return path;
   }
 
+  /**
+   * Set the relative path from .minecraft to install the file to.
+   *
+   * @param path Relative path to install the file to
+   * @return this
+   */
   public ManifestDownloadData setPath(String path) {
     this.path = path;
     return this;
@@ -32,6 +50,12 @@ public class ManifestDownloadData {
     return md5;
   }
 
+  /**
+   * Sets the md5 hash of the content
+   *
+   * @param md5 md5 hash of the content
+   * @return this
+   */
   public ManifestDownloadData setMd5(String md5) {
     this.md5 = md5;
     return this;
