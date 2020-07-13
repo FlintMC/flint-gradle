@@ -1,5 +1,6 @@
 package net.labyfy.gradle.manifest;
 
+import net.labyfy.gradle.LabyfyGradleException;
 import net.labyfy.gradle.LabyfyGradlePlugin;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.codehaus.groovy.runtime.DefaultGroovyMethods;
@@ -80,7 +81,7 @@ public class ManifestGenerator {
             .setPath("Labyfy/packages/" + jar.getName())
             .setMd5(DigestUtils.md5Hex(Files.readAllBytes(jar.toPath()))));
     } catch (IOException e) {
-      e.printStackTrace();
+      throw new LabyfyGradleException("Cannot read file " + jar, e);
     }
     return manifestDownloads;
   }
