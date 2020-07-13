@@ -21,12 +21,18 @@ public class JarTaskProvider {
     this.labyfyGradlePlugin = labyfyGradlePlugin;
   }
 
+  /**
+   * Creates jar and publish tasks for the minecraft sourcesets.
+   *
+   * @param project   the project to install the tasks in
+   * @param extension labyfy gradle extension to fetch data from
+   */
   public void installTasks(Project project, LabyfyGradleExtension extension) {
     project.getConfigurations().maybeCreate("labyfy");
     JavaPluginConvention plugin = project.getConvention().getPlugin(JavaPluginConvention.class);
     Set<String> minecraftVersions = extension.getMinecraftVersions()
         .stream()
-        .map(name -> name.matches("[0-9]+.[0-9]+.[0-9]+") ? ("v" + name.replace('.', '_')) : name)
+        .map(name -> name.matches("[0-9]+(.[0-9]+)+") ? ("v" + name.replace('.', '_')) : name)
         .collect(Collectors.toSet());
     minecraftVersions.add("main");
     minecraftVersions.add("internal");
@@ -42,6 +48,12 @@ public class JarTaskProvider {
     this.createPublishTask(project);
   }
 
+  /**
+   * Creates jar tasks for the minecraft sourcesets.
+   *
+   * @param project   the project to install the tasks in
+   * @param extension labyfy gradle extension to fetch data from
+   */
   public void createJarTask(SourceSet sourceSet, Project project) {
     project.getTasks().create(sourceSet.getName() + "Jar", Jar.class, jarTask -> {
       jarTask.setGroup("build");
@@ -54,6 +66,12 @@ public class JarTaskProvider {
     });
   }
 
+  /**
+   * Creates publish tasks for the minecraft sourcesets.
+   *
+   * @param project   the project to install the tasks in
+   * @param extension labyfy gradle extension to fetch data from
+   */
   public void createPublishTask(Project project) {
     project.getTasks().create("labyfyArtifactPublish", jarTask -> {
       jarTask.setGroup("publish");
