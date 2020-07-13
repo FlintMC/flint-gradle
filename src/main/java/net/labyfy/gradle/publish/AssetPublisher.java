@@ -1,5 +1,6 @@
 package net.labyfy.gradle.publish;
 
+import net.labyfy.gradle.LabyfyGradleException;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
@@ -9,6 +10,7 @@ import org.apache.http.entity.mime.content.ByteArrayBody;
 import org.apache.http.impl.client.HttpClientBuilder;
 
 import java.io.*;
+import java.net.URISyntaxException;
 import java.net.URL;
 
 public class AssetPublisher {
@@ -62,8 +64,12 @@ public class AssetPublisher {
               + "/"
               + version);
 
-    } catch (Exception ex) {
-      ex.printStackTrace();
+    } catch (IOException | URISyntaxException e) {
+      throw new LabyfyGradleException("Could not punlish asset to " + baseUrl
+          + "/publish/"
+          + name
+          + "/"
+          + version, e);
     }
 
   }
