@@ -51,17 +51,17 @@ public class RemoteMavenRepository implements ReadableMavenRepository {
      * Builds the path of the given artifact within the repository.
      *
      * @param artifact The artifact to build the path for
-     * @param forPom If the path should be the path to the pom
+     * @param forPom   If the path should be the path to the pom
      * @return The path of the artifact within the repository
      */
-    private String buildArtifactPath(MavenArtifact artifact, boolean forPom) {
+    public String buildArtifactPath(MavenArtifact artifact, boolean forPom) {
         String classifier = (forPom || artifact.getClassifier() == null) ? "" : '-' + artifact.getClassifier();
         String extension = (forPom ? "pom" : (artifact.getType() == null ? "jar" : artifact.getType()));
 
         return artifact.getGroupId().replace('.', '/') + '/' +
-                artifact.getArtifactId() + '/' +
-                artifact.getVersion() + '/' +
-                artifact.getArtifactId() + '-' + artifact.getVersion() + classifier + '.' + extension;
+            artifact.getArtifactId() + '/' +
+            artifact.getVersion() + '/' +
+            artifact.getArtifactId() + '-' + artifact.getVersion() + classifier + '.' + extension;
     }
 
     /**

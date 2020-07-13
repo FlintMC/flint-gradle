@@ -2,6 +2,8 @@ package net.labyfy.gradle.manifest;
 
 import net.labyfy.gradle.LabyfyGradleException;
 import net.labyfy.gradle.LabyfyGradlePlugin;
+import net.labyfy.gradle.maven.RemoteMavenRepository;
+import net.labyfy.gradle.maven.pom.MavenArtifact;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.codehaus.groovy.runtime.DefaultGroovyMethods;
 import org.gradle.api.Project;
@@ -13,7 +15,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
-import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.util.Collection;
@@ -121,18 +122,18 @@ public class ManifestGenerator {
 
       for (ArtifactRepository repository : project.getRepositories().getAsMap().values()) {
         try {
-          URL url = ((URI) DefaultGroovyMethods.getProperties(repository).get("url")).toURL();
-          String jarUrl = String.format("%s%s/%s/%s/%s-%s.jar", url.toString(),
-              dependency.getGroup().replace('.', '/'), dependency.getName(), dependency.getVersion(),
-              dependency.getName(), dependency.getVersion());
-          URL jarfile = new URL(jarUrl);
-          try (InputStream inStream = jarfile.openStream()) {
+          String url = ((URI) DefaultGroovyMethods.getProperties(repository).get("url")).toURL().toExternalForm();
+          RemoteMavenRepository remoteMavenRepository = new RemoteMavenRepository(this.labyfyGradlePlugin.getHttpClient(), url);
+          MavenArtifact mavenArtifact = new MavenArtifact(dependency.getGroup(), dependency.getName(), dependency.getVersion());
+          String path = remoteMavenRepository.buildArtifactPath(mavenArtifact, false);
+
+          try (InputStream inStream = remoteMavenRepository.getArtifactStream(mavenArtifact)) {
             if (inStream != null) {
               byte[] data = new byte[inStream.available()];
               inStream.read(data);
 
               manifestDownloads.add(new ManifestDownload()
-                  .setUrl(jarUrl)
+                  .setUrl(url + (path.startsWith("/") ? path.substring(1) : path))
                   .setMd5(DigestUtils.md5Hex(data))
                   .setPath(String.format("Labyfy/libraries/%s/%s/%s/%s-%s.jar",
                       dependency.getGroup().replace('.', '/'), dependency.getName(), dependency.getVersion(),
