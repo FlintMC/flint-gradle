@@ -1,5 +1,8 @@
 package net.labyfy.gradle.manifest;
 
+/**
+ * Java representation for labyfy installer manifest file.
+ */
 public class Manifest {
   private String name;
   private String description;

@@ -18,6 +18,9 @@ import java.nio.file.Files;
 import java.util.Collection;
 import java.util.HashSet;
 
+/**
+ * Creates a task to generate and publish the installer manifest json file.
+ */
 public class ManifestGenerator {
 
   private final LabyfyGradlePlugin labyfyGradlePlugin;
@@ -26,6 +29,11 @@ public class ManifestGenerator {
     this.labyfyGradlePlugin = labyfyGradlePlugin;
   }
 
+  /**
+   * Install a gradle task to generate and publish a projects manifest file.
+   *
+   * @param project The gradle plroject to install task in
+   */
   public void installManifestGenerateTask(Project project) {
     project.getTasks().create("labyfyManifestPublish", task -> {
       task.setGroup("publish");
@@ -56,6 +64,12 @@ public class ManifestGenerator {
     });
   }
 
+  /**
+   * Collects all manifest downloads for dependencies that can be obtained by collectDependencies.
+   *
+   * @param project The project to obtain {@link ManifestDownload} from
+   * @return The collected manifest downloads
+   */
   public Collection<ManifestDownload> collectDownloads(Project project) {
     File jar = project.getTasks().getByName("jar").getOutputs().getFiles().getSingleFile();
     Collection<ManifestDownload> manifestDownloads = this.collectDependencies(project);
@@ -71,6 +85,12 @@ public class ManifestGenerator {
     return manifestDownloads;
   }
 
+  /**
+   * Collects all dependencies that can be obtained from dependency configuration 'labyfy'.
+   *
+   * @param project The project to obtain dependencies from
+   * @return The collected project dependencies
+   */
   public Collection<ManifestDownload> collectDependencies(Project project) {
     Collection<ManifestDownload> manifestDownloads = new HashSet<>();
     project.getConfigurations().maybeCreate("labyfy").getDependencies().forEach(dependency -> {
