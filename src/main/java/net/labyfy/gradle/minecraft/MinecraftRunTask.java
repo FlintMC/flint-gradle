@@ -186,7 +186,7 @@ public class MinecraftRunTask extends JavaExec {
 
         // Configure variables
         Map<String, String> variables = new HashMap<>(DEFAULT_VARIABLES);
-        variables.put("version_name", version);
+        variables.put("version_name", version + "(Labyfy-Gradle)");
         variables.put("game_directory", getWorkingDir().getAbsolutePath());
         variables.put("assets_index_name", assetIndex);
         variables.put("assets_root", assetsPath.toString());
@@ -210,6 +210,7 @@ public class MinecraftRunTask extends JavaExec {
         Path log4jConfiguration = generateLog4jConfigFile();
         jvmArgs("-Dlog4j.configurationFile=" + log4jConfiguration.toString());
         args(programArgs);
+        args("--game-version", version);
 
         FileCollection additionalClasspath = getProject().files();
 
