@@ -12,7 +12,7 @@ variables:
 before_script:
   # cloning scripts repo
   - mkdir -p ~/.ssh && chmod 700 ~/.ssh
-  - ssh-keyscan git.labymod.net >> ~/.ssh/known_hosts && chmod 644 ~/.ssh/known_hosts
+  - ssh-keyscan git.laby.tech >> ~/.ssh/known_hosts && chmod 644 ~/.ssh/known_hosts
   - eval $(ssh-agent -s)
   - ssh-add <(echo "$SSH_PRIVATE_KEY")
   - export SCRIPTS_DIR=$(mktemp -d)
