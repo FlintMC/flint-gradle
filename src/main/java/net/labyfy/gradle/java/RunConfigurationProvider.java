@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
@@ -29,7 +30,7 @@ public class RunConfigurationProvider {
     private final Path runCacheDir;
     private final YggdrasilAuthenticator authenticator;
     private final Map<String, MinecraftRunTask> tasks;
-    private final Map<String, Map<SourceSet, Project>> sourceSetsByConfiguration;
+    private final Map<String, Set<SourceSet>> sourceSetsByConfiguration;
 
     /**
      * Constructs a new {@link RunConfigurationProvider} for the given project.
@@ -68,22 +69,22 @@ public class RunConfigurationProvider {
         Set<String> allIncludedConfigurations = runs.getAllIncludedConfigurations();
 
         // Get the special configurations and resolve their source set names
-        Map<String, Map<SourceSet, Project>> includedSourceSetsByConfiguration =
-            resolveNames(runs.getIncludedSourceSets(), sourceSets, sourceProject);
-        Map<String, Map<SourceSet, Project>> excludedSourceSetsByConfiguration =
-            resolveNames(runs.getExcludedSourceSets(), sourceSets, sourceProject);
+        Map<String, Set<SourceSet>> includedSourceSetsByConfiguration =
+                resolveNames(runs.getIncludedSourceSets(), sourceSets);
+        Map<String, Set<SourceSet>> excludedSourceSetsByConfiguration =
+                resolveNames(runs.getExcludedSourceSets(), sourceSets);
 
-        for (String configuration : allIncludedConfigurations) {
-            for (SourceSet sourceSet : sourceSets) {
+        for(String configuration : allIncludedConfigurations) {
+            for(SourceSet sourceSet : sourceSets) {
                 // Test if the source set has not been explicitly excluded for the given configuration
-                if (!excludedSourceSetsByConfiguration.containsKey(configuration) ||
-                    !excludedSourceSetsByConfiguration.get(configuration).containsKey(sourceSet)) {
+                if(!excludedSourceSetsByConfiguration.containsKey(configuration) ||
+                        !excludedSourceSetsByConfiguration.get(configuration).contains(sourceSet)) {
                     // The source set has not been excluded, add it
-                    Map<SourceSet, Project> configurationSourceSets =
-                        sourceSetsByConfiguration.computeIfAbsent(configuration, k -> new HashMap<>());
+                    Set<SourceSet> configurationSourceSets =
+                        sourceSetsByConfiguration.computeIfAbsent(configuration, k -> new HashSet<>());
 
                     ensureVersionedTasksSetup(configuration, extension.getMinecraftVersions(), configurationSourceSets);
-                    configurationSourceSets.put(sourceSet, sourceProject);
+                    configurationSourceSets.add(sourceSet);
                 }
             }
         }
@@ -92,9 +93,9 @@ public class RunConfigurationProvider {
         includedSourceSetsByConfiguration.forEach((configuration, included) -> {
             // Add the source sets
 
-            Map<SourceSet, Project> configurationSourceSets = sourceSetsByConfiguration.computeIfAbsent(configuration, k -> new HashMap<>());
+            Set<SourceSet> configurationSourceSets = sourceSetsByConfiguration.computeIfAbsent(configuration, k -> new HashSet<>());
             ensureVersionedTasksSetup(configuration, extension.getMinecraftVersions(), configurationSourceSets);
-            configurationSourceSets.putAll(included);
+            configurationSourceSets.addAll(included);
         });
     }
 
@@ -105,7 +106,7 @@ public class RunConfigurationProvider {
      * @param versions      The versions to set runs up for
      */
     private void ensureVersionedTasksSetup(String configuration, Set<String> versions,
-                                           Map<SourceSet, Project> potentialClasspath) {
+                                           Set<SourceSet> potentialClasspath) {
         for (String version : versions) {
             ensureRunTaskSetup(configuration, version, potentialClasspath);
         }
@@ -118,11 +119,10 @@ public class RunConfigurationProvider {
      * @param version The minecraft version of the run task
      * @param potentialClasspath The potential classpath for the task
      */
-    private void ensureRunTaskSetup(String configuration, String version, Map<SourceSet, Project> potentialClasspath) {
+    private void ensureRunTaskSetup(String configuration, String version, Set<SourceSet> potentialClasspath) {
         // Generate a task name
         String runTaskName = "runClient" + version + getConfigurationName(configuration);
-        if (!tasks.containsKey(runTaskName)) {
-
+        if(!tasks.containsKey(runTaskName)) {
             // The task does not yet exist, create it
             MinecraftRunTask runTask = createRunTask(runTaskName, version);
             runTask.setConfigurationName(configuration);
@@ -148,18 +148,11 @@ public class RunConfigurationProvider {
 
             // Set the potential classpath and index the task
             runTask.setPotentialClasspath(potentialClasspath);
-            for (Project value : potentialClasspath.values()) {
-                runTask.dependsOn(value.getTasks().getByName("jar"));
-            }
-
             tasks.put(runTaskName, runTask);
         } else {
             // The task exists already
             MinecraftRunTask runTask = tasks.get(runTaskName);
-            for (Project value : potentialClasspath.values()) {
-                runTask.dependsOn(value.getTasks().getByName("jar"));
-            }
-            if (runTask.getPotentialClasspath() != potentialClasspath) {
+            if(runTask.getPotentialClasspath() != potentialClasspath) {
                 // This means something tried to replace the set of source sets afterwards, this would break
                 // the discovery mechanism
                 throw new IllegalArgumentException("Can't redefine the potential classpath of a minecraft run task");
@@ -262,22 +255,21 @@ public class RunConfigurationProvider {
      *
      * @param names The names to resolve
      * @param sourceSets The source set container with all available source sets
-     * @param sourceProject
      * @return The resolved source sets
      * @throws IllegalArgumentException If a name can't be resolved
      */
-    private Map<String, Map<SourceSet, Project>> resolveNames(Map<String, Set<String>> names, SourceSetContainer sourceSets, Project sourceProject) {
-        Map<String, Map<SourceSet, Project>> output = new HashMap<>();
+    private Map<String, Set<SourceSet>> resolveNames(Map<String, Set<String>> names, SourceSetContainer sourceSets) {
+        Map<String, Set<SourceSet>> output = new HashMap<>();
 
         // Iterate all configurations
         names.forEach((configuration, sourceSetsOrVersions) -> {
             // Iterate all names of the current configuration
-            for (String sourceSetOrVersion : sourceSetsOrVersions) {
+            for(String sourceSetOrVersion : sourceSetsOrVersions) {
                 // Probe for a source set with the given name
                 SourceSet sourceSet = sourceSets.findByName(sourceSetOrVersion);
-                if (sourceSet != null) {
+                if(sourceSet != null) {
                     // A source set exactly matching this name found, add it
-                    output.computeIfAbsent(configuration, (k) -> new HashMap<>()).put(sourceSet, sourceProject);
+                    output.computeIfAbsent(configuration, (k) -> new HashSet<>()).add(sourceSet);
                     continue;
                 }
 
@@ -291,7 +283,7 @@ public class RunConfigurationProvider {
                             "variant exist");
                 } else {
                     // Found the versioned source set, add it
-                    output.computeIfAbsent(configuration, (k) -> new HashMap<>()).put(sourceSet, sourceProject);
+                    output.computeIfAbsent(configuration, (k) -> new HashSet<>()).add(sourceSet);
                 }
             }
         });

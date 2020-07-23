@@ -11,7 +11,6 @@ import net.labyfy.gradle.minecraft.ui.LoginDialogResult;
 import net.labyfy.gradle.minecraft.yggdrasil.YggdrasilAuthenticationException;
 import net.labyfy.gradle.minecraft.yggdrasil.YggdrasilAuthenticator;
 import net.labyfy.gradle.util.RuleChainResolver;
-import org.gradle.api.Project;
 import org.gradle.api.file.FileCollection;
 import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.JavaExec;
@@ -49,13 +48,12 @@ public class MinecraftRunTask extends JavaExec {
     private String version;
     private String versionType;
     private VersionedArguments versionedArguments;
-    private Map<SourceSet, Project> potentialClasspath;
+    private Set<SourceSet> potentialClasspath;
     private String assetIndex;
     private Path assetsPath;
     private Path nativesDirectory;
     private List<LogConfigTransformer> logConfigTransformers;
     private YggdrasilAuthenticator authenticator;
-
 
     /**
      * Sets the name of the configuration this run task belongs to.
@@ -94,23 +92,23 @@ public class MinecraftRunTask extends JavaExec {
     }
 
     /**
-     * Retrieves the potential classpath.
-     *
-     * @return The potential classpath
-     */
-    @Input
-    public Map<SourceSet, Project> getPotentialClasspath() {
-        return potentialClasspath;
-    }
-
-    /**
      * Sets the potential classpath. Shortly before executing the matching source sets will be filtered, so
      * that source sets which don't match the minecraft version don't end up on the classpath.
      *
      * @param potentialClasspath The potential classpath
      */
-    public void setPotentialClasspath(Map<SourceSet, Project> potentialClasspath) {
+    public void setPotentialClasspath(Set<SourceSet> potentialClasspath) {
         this.potentialClasspath = potentialClasspath;
+    }
+
+    /**
+     * Retrieves the potential classpath.
+     *
+     * @return The potential classpath
+     */
+    @Input
+    public Set<SourceSet> getPotentialClasspath() {
+        return potentialClasspath;
     }
 
     /**
@@ -217,7 +215,7 @@ public class MinecraftRunTask extends JavaExec {
         FileCollection additionalClasspath = getProject().files();
 
         // Iterate the potential classpath
-        for (SourceSet sourceSet : potentialClasspath.keySet()) {
+        for (SourceSet sourceSet : potentialClasspath) {
             // Retrieve the minecraft version extension
             Object minecraftVersionExtension = sourceSet.getExtensions().findByName("minecraftVersion");
 
