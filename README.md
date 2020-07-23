@@ -125,7 +125,7 @@ labyfy {
     publishToken "your-personal-publish-token"
 }
 ```
-**For security reasons, you should never push the token to a public Github repository**.
+**For security reasons, you should never push the token to a public GIT repository**.
 Consider using the following approach, which will allow you to set the publish-token in your
 local `gradle.properties`:
 ```groovy
