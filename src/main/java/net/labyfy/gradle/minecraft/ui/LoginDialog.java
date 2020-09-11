@@ -2,9 +2,7 @@ package net.labyfy.gradle.minecraft.ui;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.KeyEvent;
-import java.awt.event.KeyListener;
+import java.awt.event.*;
 import java.util.function.Consumer;
 
 /**
@@ -126,6 +124,19 @@ public class LoginDialog extends JDialog {
 
         // Give the window a title
         setTitle("Minecraft login");
+
+        // Add a window focus listener
+        addWindowFocusListener(new WindowAdapter() {
+            /**
+             * If the dialog loses focus, it is moved in front of all windows.
+             *
+             * @param event The window event
+             */
+            @Override
+            public void windowLostFocus(WindowEvent event) {
+                setAlwaysOnTop(true);
+            }
+        });
     }
 
     /**
@@ -135,6 +146,8 @@ public class LoginDialog extends JDialog {
      */
     public LoginDialogResult execute() {
         setVisible(true);
+        // Brings the dialog to the front
+        toFront();
         return result;
     }
 
