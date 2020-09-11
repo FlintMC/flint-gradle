@@ -114,13 +114,24 @@ public class YggdrasilAuthenticator {
 
             // Extract the required values from the Json structure
             String accessToken = rootNode.get("accessToken").requireNonNull().asText();
-            UUID playerUUID = readUUIDFromString(rootNode.get("selectedProfile").get("id").requireNonNull().asText());
-            String playerName = rootNode.get("selectedProfile").get("name").requireNonNull().asText();
 
-            // Save all values
+            // Checks whether the selectedProfile field is located in the node
+            if(rootNode.has("selectedProfile")) {
+                UUID playerUUID = readUUIDFromString(
+                        rootNode.get("selectedProfile")
+                                .get("id")
+                                .requireNonNull()
+                                .asText()
+                );
+                String playerName = rootNode.get("selectedProfile").get("name").requireNonNull().asText();
+
+                // Save selected profile values
+                saveUUID(uuidPath, playerUUID);
+                saveString(playerNamePath, playerName);
+            }
+
+            // Save access token
             saveString(accessTokenPath, accessToken);
-            saveUUID(uuidPath, playerUUID);
-            saveString(playerNamePath, playerName);
 
             return true;
         } else {
