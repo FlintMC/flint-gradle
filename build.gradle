@@ -15,6 +15,17 @@ buildscript {
         maven {
             url = System.getenv().getOrDefault("artifactory_contextUrl", project.getProperties().get("artifactory_contextUrl").toString()) + "general/"
         }
+        maven {
+            url "https://git.laby.tech/api/v4/groups/client/-/packages/maven"
+            name "GitLab"
+            credentials(HttpHeaderCredentials) {
+                name = 'Job-Token'
+                value = System.getenv("CI_JOB_TOKEN")
+            }
+            authentication {
+                header(HttpHeaderAuthentication)
+            }
+        }
         mavenCentral()
         jcenter()
         mavenLocal()
@@ -28,6 +39,17 @@ plugins {
 group 'net.labyfy'
 
 repositories {
+    maven {
+        url "https://git.laby.tech/api/v4/groups/client/-/packages/maven"
+        name "GitLab"
+        credentials(HttpHeaderCredentials) {
+            name = 'Job-Token'
+            value = System.getenv("CI_JOB_TOKEN")
+        }
+        authentication {
+            header(HttpHeaderAuthentication)
+        }
+    }
     mavenCentral()
 }
 
@@ -99,6 +121,19 @@ publishing {
                 usage('java-runtime') {
                     fromResolutionResult()
                 }
+            }
+        }
+    }
+    repositories {
+        maven {
+            url "https://git.laby.tech/api/v4/projects/148/packages/maven"
+            name "GitLab"
+            credentials(HttpHeaderCredentials) {
+                name = 'Job-Token'
+                value = System.getenv("CI_JOB_TOKEN")
+            }
+            authentication {
+                header(HttpHeaderAuthentication)
             }
         }
     }
