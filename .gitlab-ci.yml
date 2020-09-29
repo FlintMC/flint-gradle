@@ -16,7 +16,9 @@ publish_snapshot:
 # publish to gitlab before release to distibutor
 publish_release:
   stage: publish
-  script: sh gradlew publish
+  script: 
+    - bash $SCRIPTS_DIR/genSemVer.sh release > .dev-version || exit 1
+    - sh gradlew publish
   environment:
     name: production
   only:
