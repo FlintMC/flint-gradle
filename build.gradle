@@ -1,19 +1,16 @@
 buildscript {
-    def versionFile = file(".dev-version")
-    def fixedVersion = null
-    if(versionFile.exists()) {
-        fixedVersion = versionFile.text.replace("\n","")
-    } else {
-        throw new GradleScriptException("VERSIONFILE COULD NOT BE FOUND!", new Throwable("Please check the CI!"))
-    }
-
-    dependencies {
-        classpath "org.jfrog.buildinfo:build-info-extractor-gradle:4+"
-    }
 
     repositories {
         maven {
-            url = System.getenv().getOrDefault("artifactory_contextUrl", project.getProperties().get("artifactory_contextUrl").toString()) + "general/"
+            url "https://git.laby.tech/api/v4/groups/client/-/packages/maven"
+            name "GitLab"
+            credentials(HttpHeaderCredentials) {
+                name = 'Job-Token'
+                value = System.getenv("CI_JOB_TOKEN")
+            }
+            authentication {
+                header(HttpHeaderAuthentication)
+            }
         }
         mavenCentral()
         jcenter()
@@ -23,11 +20,23 @@ buildscript {
 
 plugins {
     id 'java-gradle-plugin'
+    id 'maven-publish'
 }
 
 group 'net.labyfy'
 
 repositories {
+    maven {
+        url "https://git.laby.tech/api/v4/groups/client/-/packages/maven"
+        name "GitLab"
+        credentials(HttpHeaderCredentials) {
+            name = 'Job-Token'
+            value = System.getenv("CI_JOB_TOKEN")
+        }
+        authentication {
+            header(HttpHeaderAuthentication)
+        }
+    }
     mavenCentral()
 }
 
@@ -57,48 +66,28 @@ gradlePlugin {
         }
     }
 }
-apply plugin: 'maven'
-apply plugin: "com.jfrog.artifactory"
-apply plugin: 'maven-publish'
 
-
-artifactory {
-    contextUrl = System.getenv().getOrDefault('artifactory_contextUrl', "${artifactory_contextUrl}")
-    //The base Artifactory URL if not overridden by the publisher/resolver
-    publish {
-        repository {
-            repoKey = 'labymedia'
-            username = System.getenv().getOrDefault("artifactory_user", "${artifactory_user}")
-            password = System.getenv().getOrDefault("artifactory_password", "${artifactory_password}")
-            maven = true
-
-        }
-        defaults {
-            publications('mavenJava')
-        }
-    }
-    resolve {
-        repository {
-            repoKey = 'general'
-            username = System.getenv().getOrDefault("artifactory_user", "${artifactory_user}")
-            password = System.getenv().getOrDefault("artifactory_password", "${artifactory_password}")
-            maven = true
-
-        }
-    }
+task sourcesJar(type: Jar) {
+    from sourceSets.main.allJava
+    archiveClassifier = 'sources'
 }
 
 publishing {
     publications {
-        mavenJava(MavenPublication) {
-            from components.java
-            versionMapping {
-                usage('java-api') {
-                    fromResolutionOf('runtimeClasspath')
-                }
-                usage('java-runtime') {
-                    fromResolutionResult()
-                }
+        pluginMaven(MavenPublication) {
+            artifact sourcesJar
+        }
+    }
+    repositories {
+        maven {
+            url "https://git.laby.tech/api/v4/projects/148/packages/maven"
+            name "GitLab"
+            credentials(HttpHeaderCredentials) {
+                name = 'Job-Token'
+                value = System.getenv("CI_JOB_TOKEN")
+            }
+            authentication {
+                header(HttpHeaderAuthentication)
             }
         }
     }

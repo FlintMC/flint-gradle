@@ -448,7 +448,8 @@ public class ModCoderPackEnvironment implements DeobfuscationEnvironment {
                         entry.getName().startsWith("assets/") ||
                                 entry.getName().startsWith("/data") ||
                                 entry.getName().equals("pack.png") ||
-                                entry.getName().equals("version.json")
+                                entry.getName().equals("version.json") ||
+                                entry.getName().equals("pack.mcmeta")
                 ) {
                     // Found an assets entry, index it
                     existingResources.add(entry.getName());
@@ -490,7 +491,8 @@ public class ModCoderPackEnvironment implements DeobfuscationEnvironment {
                             !resourcesEntry.getName().startsWith("assets/") &&
                                     !resourcesEntry.getName().startsWith("data/") &&
                                     !resourcesEntry.getName().equals("pack.png") &&
-                                    !resourcesEntry.getName().equals("version.json"))
+                                    !resourcesEntry.getName().equals("version.json")) &&
+                                    !resourcesEntry.getName().equals("pack.mcmeta")
                             || existingResources.contains(resourcesEntry.getName())
                     ) {
                         // The entry is not a resource or exists already in the other jar, skip it
