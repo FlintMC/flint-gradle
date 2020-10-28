@@ -23,20 +23,3 @@ publish_release:
   only:
     - tags
   when: on_success
-
-### REPLAY
-gitlab_release:
-  stage: replay
-  image: registry.gitlab.com/gitlab-org/release-cli
-  tags:
-    - docker
-  script:
-    - release-cli create --name "v$(cat .dev-version)" --description "$CI_COMMIT_MESSAGE" --tag-name $(cat .dev-version) --ref $CI_COMMIT_SHA
-  only:
-    - tags
-  when: on_success
-
-include:
-  - project: client/labymod4/common-scripts
-    ref: master
-    file: .gitlab-ci-template.yml
