@@ -39,7 +39,7 @@ dependencies {
 gradlePlugin {
     plugins {
         create("flintGradle") {
-            id = "net.flintmc.flint-gradle"
+            id = "net.flintmc.flint-gradle-plugin"
             implementationClass = "net.flintmc.gradle.FlintGradlePlugin"
         }
     }
