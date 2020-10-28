@@ -40,4 +40,3 @@ include:
   - project: client/labymod4/common-scripts
     ref: master
     file: .gitlab-ci-template.yml
-
