@@ -2,8 +2,7 @@
 publish_snapshot:
   stage: publish
   script:
-    - SNAPSHOT_VERSION=$(echo ${CI_COMMIT_BRANCH} | cut -f2 -d'-')
-    - echo "${SNAPSHOT_VERSION}-SNAPSHOT" > .dev-version || exit 1
+    - echo "$(echo -ne $CI_COMMIT_REF_NAME | cut -d"-" -f2)-SNAPSHOT" > .dev-version || exit 1
     - sh gradlew publish
   environment:
     name: development
@@ -17,7 +16,7 @@ publish_snapshot:
 publish_release:
   stage: publish
   script:
-    - bash $SCRIPTS_DIR/genSemVer.sh release > .dev-version || exit 1
+    - echo "${CI_COMMIT_TAG}" > .dev-version || exit 1
     - sh gradlew publish
   environment:
     name: production

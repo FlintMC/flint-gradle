@@ -3,24 +3,24 @@ package net.flintmc.gradle.minecraft.data.environment;
 import java.net.URL;
 
 public class ModCoderPackInput {
-    private String configVersion;
-    private URL configDownload;
-    private String mappingsVersion;
-    private URL mappingsDownload;
+  private String configVersion;
+  private URL configDownload;
+  private String mappingsVersion;
+  private URL mappingsDownload;
 
-    public String getConfigVersion() {
-        return configVersion;
-    }
+  public String getConfigVersion() {
+    return configVersion;
+  }
 
-    public URL getConfigDownload() {
-        return configDownload;
-    }
+  public URL getConfigDownload() {
+    return configDownload;
+  }
 
-    public String getMappingsVersion() {
-        return mappingsVersion;
-    }
+  public String getMappingsVersion() {
+    return mappingsVersion;
+  }
 
-    public URL getMappingsDownload() {
-        return mappingsDownload;
-    }
+  public URL getMappingsDownload() {
+    return mappingsDownload;
+  }
 }

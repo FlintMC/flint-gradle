@@ -35,13 +35,13 @@ flint {
 This will generate multiple run tasks and source sets:
 
 - Tasks
-  - `runClient1.12.2`
-  - `runClient1.15.2`
+    - `runClient1.12.2`
+    - `runClient1.15.2`
 - Source sets:
-  - `main` Will contain source code shared across all versions and configurations
-  - `internal` Will contain source code only available to source sets bound to versions
-  - `v1_12_2` Will contain source code when running the `1.12.2` client
-  - `v1_15_2` Will contain source code when running the `1.15.2` client
+    - `main` Will contain source code shared across all versions and configurations
+    - `internal` Will contain source code only available to source sets bound to versions
+    - `v1_12_2` Will contain source code when running the `1.12.2` client
+    - `v1_15_2` Will contain source code when running the `1.15.2` client
 
 This results in the following project structure:
 
