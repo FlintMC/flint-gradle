@@ -1,6 +1,6 @@
 fun RepositoryHandler.flintRepository() {
     maven {
-        url = uri("https://git.laby.tech/api/v4/groups/client/packages/maven")
+        url = uri("https://git.laby.tech/api/v4/projects/148/packages/maven")
         name = "GitLab"
         credentials(HttpHeaderCredentials::class) {
             name = "Job-Token"
