@@ -2,6 +2,7 @@ package net.flintmc.gradle.extension;
 
 import groovy.lang.Closure;
 import net.flintmc.gradle.FlintGradlePlugin;
+import org.gradle.api.Action;
 import org.gradle.api.Project;
 import org.gradle.util.Configurable;
 import org.gradle.util.ConfigureUtil;
@@ -82,7 +83,7 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
   public void setMinecraftVersions(Set<String> minecraftVersions) {
     this.minecraftVersions = minecraftVersions;
   }
-
+  
   /**
    * Retrieves the project filter predicate.
    *
@@ -91,6 +92,17 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
   public Predicate<Project> getProjectFilter() {
     return projectFilter;
   }
+
+  /**
+   * Overwrites the project filter with the given predicate. The project filter determines which sub projects
+   * the plugin should automatically apply itself to.
+   *
+   * @param projectFilter The filter to test sub projects against
+   * @see #setProjectFilter(Predicate) 
+   */
+  public void projectFilter(Predicate<Project> projectFilter) {
+    setProjectFilter(projectFilter);
+  } 
 
   /**
    * Overwrites the project filter with the given predicate. The project filter determines which sub projects
@@ -135,8 +147,9 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
    * @param closure The closure to use for configuration
    * @return The configured runs extension of this extension
    */
-  public FlintRunsExtension runs(Closure<?> closure) {
-    return this.runsExtension.configure(closure);
+  public FlintRunsExtension runs(Action<FlintRunsExtension> closure) {
+    closure.execute(this.runsExtension);
+    return this.runsExtension;
   }
 
   /**
