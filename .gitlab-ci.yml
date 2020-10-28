@@ -1,6 +1,6 @@
 ### PUBLISH
 publish_snapshot:
-  stage: publish
+  stage: deploy
   script:
     - echo "$(echo -ne $CI_COMMIT_REF_NAME | cut -d"-" -f2)-SNAPSHOT" > .dev-version || exit 1
     - sh gradlew publish
@@ -14,7 +14,7 @@ publish_snapshot:
 ## only tags
 # publish to gitlab before release to distibutor
 publish_release:
-  stage: publish
+  stage: deploy
   script:
     - echo "${CI_COMMIT_TAG}" > .dev-version || exit 1
     - sh gradlew publish
