@@ -1,4 +1,4 @@
-### PUBLISH
+# publish snapshots if pushed to release-X.X.X branch
 publish_snapshot:
   stage: deploy
   script:
@@ -10,9 +10,7 @@ publish_snapshot:
     - /^release-.*$/
   when: on_success
 
-
-## only tags
-# publish to gitlab before release to distibutor
+# publish release if tag is pushed
 publish_release:
   stage: deploy
   script:
