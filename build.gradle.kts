@@ -1,33 +1,6 @@
-buildscript {
-
-    repositories {
-        maven {
-            setUrl("https://git.laby.tech/api/v4/groups/client/-/packages/maven")
-            name = "GitLab"
-            credentials(HttpHeaderCredentials::class) {
-                name = "Job-Token"
-                value = System.getenv("CI_JOB_TOKEN")
-            }
-            authentication {
-                create<HttpHeaderAuthentication>("header")
-            }
-        }
-        mavenCentral()
-        jcenter()
-        mavenLocal()
-    }
-}
-
-plugins {
-    id("java-gradle-plugin")
-    id("maven-publish")
-}
-
-group = "net.flintmc"
-
 fun RepositoryHandler.flintRepository() {
     maven {
-        url = uri("https://git.laby.tech/api/v4/projects/148/packages/maven")
+        url = uri("https://git.laby.tech/api/v4/groups/client/packages/maven")
         name = "GitLab"
         credentials(HttpHeaderCredentials::class) {
             name = "Job-Token"
@@ -38,6 +11,13 @@ fun RepositoryHandler.flintRepository() {
         }
     }
 }
+
+plugins {
+    id("java-gradle-plugin")
+    id("maven-publish")
+}
+
+group = "net.flintmc"
 
 repositories {
     flintRepository()
