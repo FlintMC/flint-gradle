@@ -23,7 +23,7 @@ plugins {
     id 'maven-publish'
 }
 
-group 'net.labyfy'
+group 'net.flint'
 
 repositories {
     maven {
@@ -42,8 +42,8 @@ repositories {
 
 def versionFile = file(".dev-version")
 def fixedVersion = null
-if(versionFile.exists()) {
-    fixedVersion = versionFile.text.replace("\n","")
+if (versionFile.exists()) {
+    fixedVersion = versionFile.text.replace("\n", "")
 } else {
     throw new GradleScriptException("VERSIONFILE COULD NOT BE FOUND!", new Throwable("Please check the CI!"))
 }
@@ -61,8 +61,8 @@ dependencies {
 gradlePlugin {
     plugins {
         simplePlugin {
-            id = "labyfy-gradle"
-            implementationClass = "net.labyfy.gradle.LabyfyGradlePlugin"
+            id = "flint-gradle"
+            implementationClass = "net.flint.gradle.FlintGradlePlugin"
         }
     }
 }
