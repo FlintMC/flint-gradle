@@ -23,7 +23,7 @@ plugins {
     id 'maven-publish'
 }
 
-group 'net.flint'
+group 'net.flintmc'
 
 repositories {
     maven {
