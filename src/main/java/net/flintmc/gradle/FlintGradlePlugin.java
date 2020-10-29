@@ -54,6 +54,11 @@ public class FlintGradlePlugin implements Plugin<Project> {
   @Override
   public void apply(@Nonnull Project project) {
     this.project = project;
+    String[] versions = {"v1.15.2", "v1.16.3", "internal"};
+    for (String version : versions) {
+      project.getConfigurations().maybeCreate(String.format("%sAnnotationProcessor", version.replace('.', '_')));
+      project.getConfigurations().maybeCreate(String.format("%sImplementation", version.replace('.', '_')));
+    }
     project.afterEvaluate(p -> onAfterEvaluate());
 
     if (project.getParent() != null) {
