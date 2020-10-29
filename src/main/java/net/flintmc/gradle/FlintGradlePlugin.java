@@ -54,11 +54,6 @@ public class FlintGradlePlugin implements Plugin<Project> {
   @Override
   public void apply(@Nonnull Project project) {
     this.project = project;
-    String[] versions = {"v1.15.2", "v1.16.3", "internal"};
-    for (String version : versions) {
-      project.getConfigurations().maybeCreate(String.format("%sAnnotationProcessor", version.replace('.', '_')));
-      project.getConfigurations().maybeCreate(String.format("%sImplementation", version.replace('.', '_')));
-    }
     project.afterEvaluate(p -> onAfterEvaluate());
 
     if (project.getParent() != null) {
@@ -71,7 +66,6 @@ public class FlintGradlePlugin implements Plugin<Project> {
     this.interaction = new JavaPluginInteraction(project);
 
     if (this.parentPlugin == null) {
-
       Gradle gradle = project.getGradle();
       httpClient = gradle.getStartParameter().isOffline() ? null :
           HttpClientBuilder.create().useSystemProperties().build();
@@ -128,7 +122,9 @@ public class FlintGradlePlugin implements Plugin<Project> {
       this.publishTaskProvider = parentPlugin.publishTaskProvider;
     }
 
-    project.afterEvaluate((p) -> extension.ensureConfigured());
+    project.beforeEvaluate((p) -> extension.ensureConfigured());
+
+    project.afterEvaluate((p) -> onAfterEvaluate());
   }
 
   /**
@@ -151,6 +147,13 @@ public class FlintGradlePlugin implements Plugin<Project> {
       repo.setUrl(minecraftRepository.getBaseDir());
     });
 
+    runConfigurationProvider.installSourceSets(project, extension);
+    jarTaskProvider.installTasks(project, extension);
+    manifestGenerator.installManifestGenerateTask(project);
+    publishTaskProvider.installPublishTask(project);
+  }
+
+  public void onAfterEvaluate() {
     for (Project subProject : project.getSubprojects()) {
       if (!extension.getProjectFilter().test(subProject)) {
         continue;
@@ -162,14 +165,6 @@ public class FlintGradlePlugin implements Plugin<Project> {
 
       subProject.getPluginManager().apply(getClass());
     }
-
-    runConfigurationProvider.installSourceSets(project, extension);
-    jarTaskProvider.installTasks(project, extension);
-    manifestGenerator.installManifestGenerateTask(project);
-    publishTaskProvider.installPublishTask(project);
-  }
-
-  public void onAfterEvaluate() {
   }
 
   /**

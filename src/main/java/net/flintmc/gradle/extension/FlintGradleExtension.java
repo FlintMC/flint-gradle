@@ -1,13 +1,9 @@
 package net.flintmc.gradle.extension;
 
-import groovy.lang.Closure;
 import net.flintmc.gradle.FlintGradlePlugin;
 import org.gradle.api.Action;
 import org.gradle.api.Project;
-import org.gradle.util.Configurable;
-import org.gradle.util.ConfigureUtil;
 
-import javax.annotation.Nonnull;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
@@ -16,7 +12,7 @@ import java.util.function.Predicate;
 /**
  * Gradle extension block for configuring the plugin
  */
-public class FlintGradleExtension implements Configurable<FlintGradleExtension> {
+public class FlintGradleExtension {
   public static final String NAME = "flint";
 
   private final FlintGradlePlugin plugin;
@@ -150,43 +146,6 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
   public FlintRunsExtension runs(Action<FlintRunsExtension> closure) {
     closure.execute(this.runsExtension);
     return this.runsExtension;
-  }
-
-  /**
-   * Configures the values of this instance with the given closure.
-   *
-   * @param closure The closure to pass this instance to
-   * @return Configured this
-   * @throws IllegalStateException If the extension has been configured already
-   */
-  @Override
-  @Nonnull
-  public FlintGradleExtension configure(@Nonnull Closure closure) {
-    if (configured) {
-      throw new IllegalStateException("The flint extension can only be configured once");
-    }
-
-    FlintGradleExtension result = ConfigureUtil.configureSelf(closure, this);
-    configured = true;
-    plugin.onExtensionConfigured();
-    return result;
-  }
-
-  /**
-   * Triggers the {@link FlintGradlePlugin#onExtensionConfigured()} method. This method is meant to be called from
-   * build scripts which need the extension to configure the plugin early without changing values on the extension
-   * itself. This method may only be called if the extension has not been configured by other means.
-   *
-   * @throws IllegalStateException If the extension has been configured already
-   */
-  public void configureNow() {
-    if (configured) {
-      throw new IllegalStateException(
-          "Please only call configureNow() if you don't configure the extension by other means");
-    }
-
-    configured = true;
-    plugin.onExtensionConfigured();
   }
 
   /**
