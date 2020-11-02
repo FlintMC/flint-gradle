@@ -9,25 +9,30 @@ public class Manifest {
   private String version;
   private String[] authors;
   private ManifestDownload[] downloads;
+  private ManifestPackageDependency[] packageDependencies;
+  private ManifestMavenDependency[] mavenDependencies;
 
   public Manifest() {
   }
 
   /**
    * Constructs a new {@link Manifest}
-   *
    * @param Flint       package name
    * @param description Flint package description
    * @param version     Flint package version
    * @param authors     Flint package authors
    * @param downloads   Flint package downloads required for execution
+   * @param packageDependencies
+   * @param mavenDependencies
    */
-  public Manifest(String name, String description, String version, String[] authors, ManifestDownload[] downloads) {
+  public Manifest(String name, String description, String version, String[] authors, ManifestDownload[] downloads, ManifestPackageDependency[] packageDependencies, ManifestMavenDependency[] mavenDependencies) {
     this.name = name;
     this.description = description;
     this.version = version;
     this.authors = authors;
     this.downloads = downloads;
+    this.packageDependencies = packageDependencies;
+    this.mavenDependencies = mavenDependencies;
   }
 
   /**
@@ -63,6 +68,24 @@ public class Manifest {
    */
   public Manifest setDescription(String description) {
     this.description = description;
+    return this;
+  }
+
+  public ManifestPackageDependency[] getPackageDependencies() {
+    return packageDependencies;
+  }
+
+  public Manifest setPackageDependencies(ManifestPackageDependency[] packageDependencies) {
+    this.packageDependencies = packageDependencies;
+    return this;
+  }
+
+  public ManifestMavenDependency[] getMavenDependencies() {
+    return mavenDependencies;
+  }
+
+  public Manifest setMavenDependencies(ManifestMavenDependency[] mavenDependencies) {
+    this.mavenDependencies = mavenDependencies;
     return this;
   }
 

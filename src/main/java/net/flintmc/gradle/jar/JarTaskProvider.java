@@ -32,7 +32,6 @@ public class JarTaskProvider {
    * @param extension flint gradle extension to fetch data from
    */
   public void installTasks(Project project, FlintGradleExtension extension) {
-    project.getConfigurations().maybeCreate("flint");
     JavaPluginConvention plugin = project.getConvention().getPlugin(JavaPluginConvention.class);
     Set<String> minecraftVersions = extension.getMinecraftVersions()
         .stream()
@@ -49,7 +48,7 @@ public class JarTaskProvider {
             this.installCompileTask(sourceSet, project);
           }
         });
-    this.createPublishTask(project);
+//    this.createPublishTask(project);
   }
 
   /**
@@ -59,13 +58,6 @@ public class JarTaskProvider {
    */
   @SuppressWarnings("unchecked")
   public void createJarTask(SourceSet sourceSet, Project project) {
-    // Create a jar task for the source set alone
-    Jar jarTask = project.getTasks().create(sourceSet.getName() + "Jar", Jar.class, t -> {
-      t.setGroup("build");
-      t.getArchiveAppendix().set(sourceSet.getName());
-      t.from(sourceSet.getOutput());
-    });
-
     // Retrieve the jar task producing the fat, bundled jar which will be used
     // in the production environment
     Jar mainJarTask = (Jar) project.getTasks().getByName("jar");
@@ -181,7 +173,7 @@ public class JarTaskProvider {
     // doing so other than the single jars not being created. The main jar task does
     // not really require the other jar tasks to run, as it will collect sources and
     // services on its own.
-    mainJarTask.dependsOn(jarTask);
+//    mainJarTask.dependsOn(jarTask);
   }
 
   /**

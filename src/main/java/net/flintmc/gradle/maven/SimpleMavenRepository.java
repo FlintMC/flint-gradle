@@ -7,6 +7,8 @@ import net.flintmc.gradle.maven.pom.io.PomWriter;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -170,5 +172,10 @@ public class SimpleMavenRepository implements ReadableMavenRepository {
   public MavenPom getArtifactPom(MavenArtifact artifact) throws IOException {
     Path pomPath = getPomPath(artifact);
     return Files.exists(pomPath) ? PomReader.read(pomPath) : null;
+  }
+
+  @Override
+  public URI getArtifactUrl(MavenArtifact artifact) {
+    return this.getArtifactPath(artifact).toUri();
   }
 }

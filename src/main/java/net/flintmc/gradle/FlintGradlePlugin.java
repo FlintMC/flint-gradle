@@ -19,6 +19,7 @@ import org.apache.http.impl.client.HttpClientBuilder;
 import org.gradle.api.GradleException;
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;
+import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.invocation.Gradle;
 
 import javax.annotation.Nonnull;
@@ -26,6 +27,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.Collection;
+import java.util.concurrent.TimeUnit;
 
 public class FlintGradlePlugin implements Plugin<Project> {
   public static final String MINECRAFT_TASK_GROUP = "minecraft";
@@ -55,9 +57,15 @@ public class FlintGradlePlugin implements Plugin<Project> {
   public void apply(@Nonnull Project project) {
     this.project = project;
     String[] versions = {"v1.15.2", "v1.16.3", "internal"};
+
+    Configuration runtimeClasspathConfiguration = project.getConfigurations().getAsMap().get("runtimeClasspath");
+
     for (String version : versions) {
       project.getConfigurations().maybeCreate(String.format("%sAnnotationProcessor", version.replace('.', '_')));
-      project.getConfigurations().maybeCreate(String.format("%sImplementation", version.replace('.', '_')));
+      Configuration versionedConfiguration = project.getConfigurations().maybeCreate(String.format("%sImplementation", version.replace('.', '_')));
+      if(runtimeClasspathConfiguration != null){
+        runtimeClasspathConfiguration.extendsFrom(versionedConfiguration);
+      }
     }
     project.afterEvaluate(p -> onAfterEvaluate());
 
@@ -74,7 +82,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
 
       Gradle gradle = project.getGradle();
       httpClient = gradle.getStartParameter().isOffline() ? null :
-          HttpClientBuilder.create().useSystemProperties().build();
+          HttpClientBuilder.create().useSystemProperties().setConnectionTimeToLive(10, TimeUnit.SECONDS).build();
       downloader = new MavenArtifactDownloader();
 
       if (httpClient != null) {
@@ -165,7 +173,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
 
     runConfigurationProvider.installSourceSets(project, extension);
     jarTaskProvider.installTasks(project, extension);
-    manifestGenerator.installManifestGenerateTask(project);
+    manifestGenerator.installManifestGenerateTask().execute(project);
     publishTaskProvider.installPublishTask(project);
   }
 
