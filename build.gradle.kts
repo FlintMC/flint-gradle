@@ -25,7 +25,7 @@ repositories {
 }
 
 // 10.0.0 as default, only relevant for local publishing
-version = System.getenv().getOrDefault("VERSION", "2.3.2")
+version = System.getenv().getOrDefault("VERSION", "10.0.0")
 
 dependencies {
     implementation(group = "com.fasterxml.jackson.core", name = "jackson-core", version = "2.11.1")
