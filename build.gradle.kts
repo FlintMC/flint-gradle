@@ -42,7 +42,6 @@ fun RepositoryHandler.flintRepository() {
 
 plugins {
     id("java-gradle-plugin")
-    id("maven-publish")
     id("maven")
     id("org.jetbrains.kotlin.jvm") version "1.3.72"
 }
@@ -66,7 +65,7 @@ dependencies {
     implementation(group = "org.apache.httpcomponents", name = "httpclient", version = "4.5.12")
     implementation(group = "io.github.java-diff-utils", name = "java-diff-utils", version = "4.7")
     implementation(group = "com.fasterxml.jackson.core", name = "jackson-core", version = "2.12.0-rc1")
-    implementation(group = "net.flintmc.installer", name = "logic-implementation", version = "1.0.4")
+    implementation(group = "net.flintmc.installer", name = "logic-implementation", version = "1.0.5")
 }
 
 gradlePlugin {
@@ -75,11 +74,5 @@ gradlePlugin {
             id = "net.flintmc.flint-gradle-plugin"
             implementationClass = "net.flintmc.gradle.FlintGradlePlugin"
         }
-    }
-}
-
-publishing {
-    repositories {
-        flintRepository()
     }
 }

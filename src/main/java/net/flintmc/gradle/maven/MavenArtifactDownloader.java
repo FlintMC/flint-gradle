@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -206,6 +207,7 @@ public class MavenArtifactDownloader {
     return null;
   }
 
+
   public URI findArtifactUri(MavenArtifact artifact) throws IOException, URISyntaxException {
     for (ReadableMavenRepository source : sources) {
       InputStream stream;
@@ -213,6 +215,22 @@ public class MavenArtifactDownloader {
         // Found the requested artifact
         stream.close();
         return source.getArtifactUrl(artifact);
+      }
+    }
+
+    // Artifact has not been found in any source
+    return null;
+  }
+
+  public URI findRepositoryUri(MavenArtifact artifact) throws IOException, URISyntaxException {
+    for (ReadableMavenRepository source : sources) {
+      InputStream stream;
+      if (source instanceof RemoteMavenRepository) {
+        if ((stream = source.getArtifactStream(artifact)) != null) {
+          // Found the requested artifact
+          stream.close();
+          return new URI(((RemoteMavenRepository) source).getBaseUrl());
+        }
       }
     }
 

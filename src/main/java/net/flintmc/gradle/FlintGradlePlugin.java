@@ -69,11 +69,12 @@ public class FlintGradlePlugin implements Plugin<Project> {
     }
     project.afterEvaluate(p -> onAfterEvaluate());
 
-    if (project.getParent() != null) {
-      FlintGradlePlugin parentPlugin = project.getParent().getPlugins().findPlugin(getClass());
-      if (parentPlugin != null) {
-        this.parentPlugin = parentPlugin;
-      }
+    Project parent = project;
+    while ((parent = parent.getParent()) != null){
+      FlintGradlePlugin parentPlugin = parent.getPlugins().findPlugin(getClass());
+      if(parentPlugin == null) continue;
+      this.parentPlugin = parentPlugin;
+      break;
     }
 
     this.interaction = new JavaPluginInteraction(project);
@@ -273,5 +274,9 @@ public class FlintGradlePlugin implements Plugin<Project> {
 
   public String getPublishBaseUrl() {
     return PUBLISH_BASE_URL;
+  }
+
+  public Project getProject() {
+    return project;
   }
 }

@@ -109,4 +109,8 @@ public class RemoteMavenRepository implements ReadableMavenRepository {
       }
     }
   }
+
+  public String getBaseUrl() {
+    return baseUrl;
+  }
 }
