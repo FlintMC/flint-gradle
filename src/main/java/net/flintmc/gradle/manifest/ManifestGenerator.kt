@@ -11,6 +11,8 @@ import net.flintmc.installer.impl.repository.models.PackageModel
 import net.flintmc.installer.impl.repository.models.install.DownloadMavenDependencyDataModel
 import net.flintmc.installer.impl.repository.models.install.InstallInstructionModel
 import net.flintmc.installer.impl.repository.models.install.InstallInstructionTypes
+import org.apache.http.HttpEntity
+import org.apache.http.client.methods.CloseableHttpResponse
 import org.apache.http.client.methods.HttpPut
 import org.apache.http.entity.ByteArrayEntity
 import org.apache.http.entity.ContentType
@@ -28,6 +30,7 @@ import java.lang.AssertionError
 import java.net.URI
 import java.nio.charset.StandardCharsets
 import java.nio.file.*
+import kotlin.time.seconds
 
 class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
 
@@ -55,14 +58,17 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
             task.dependsOn("generateManifest")
             task.doLast {
                 if (!isValidProject(project)) return@doLast
+                println("Valid project yay " + project)
 
                 this.uploadFile(
-                    Paths.get(project.buildDir.path.plus("/generated/flint/manifest.json")).toFile()
-                        .readText(StandardCharsets.UTF_8),
+                    StringEntity(
+                        Paths.get(project.buildDir.path.plus("/generated/flint/manifest.json")).toFile()
+                            .readText(StandardCharsets.UTF_8),
+                        ContentType.APPLICATION_JSON
+                    ),
                     "publish/release/${
                         project.group.toString().replace('.', '/')
-                    }/${project.name}/${project.version}/manifest.json",
-                    ContentType.APPLICATION_JSON
+                    }/${project.name}/${project.version}/manifest.json"
                 )
             }
         }
@@ -74,28 +80,36 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
                 if (!isValidProject(project)) return@doLast
 
                 this.uploadFile(
-                    project.tasks.getByName("jar").outputs.files.singleFile
-                        .readText(StandardCharsets.UTF_8),
+                    ByteArrayEntity(
+                        project.tasks.getByName("jar").outputs.files.singleFile
+                            .readBytes(),
+                        ContentType.DEFAULT_BINARY
+                    ),
                     "maven/release/${
                         project.group.toString().replace('.', '/')
-                    }/${project.name}/${project.version}/${project.name}-${project.version}.jar",
-                    ContentType.APPLICATION_JSON
+                    }/${project.name}/${project.version}/${project.name}-${project.version}.jar"
                 )
             }
         }
     }
 
-    private fun uploadFile(data: String, path: String, fileType: ContentType) {
+    private fun uploadFile(data: HttpEntity, path: String) {
 
-        val httpPut = HttpPut(System.getenv().getOrDefault("DISTRIBUTOR_URL", "https://dist.labymod.net/api/v1/")+path)
-        httpPut.setHeader("Authorization", "Bearer "+System.getenv("DISTRIBUTOR_AUTHORIZATION"))
+        val httpPut =
+            HttpPut(System.getenv().getOrDefault("DISTRIBUTOR_URL", "https://dist.labymod.net/api/v1/") + path)
+        httpPut.setHeader("Authorization", "Bearer " + System.getenv("DISTRIBUTOR_AUTHORIZATION"))
         httpPut.setHeader("Publish-Token", System.getenv("DISTRIBUTOR_PUBLISH_TOKEN"))
-        httpPut.entity = StringEntity(data, fileType)
+        httpPut.entity = data
 
-        val execute = flintGradlePlugin.httpClient.execute(httpPut)
-        if (execute.statusLine.statusCode == 200) return
+        val execute: CloseableHttpResponse = flintGradlePlugin.httpClient.execute(httpPut) as CloseableHttpResponse
+        if (execute.statusLine.statusCode == 200) {
+            println("Uploaded file $httpPut")
+            execute.close()
+            return
+        }
+        execute.close()
 
-        throw java.lang.RuntimeException(httpPut.toString() + " " +execute.statusLine.reasonPhrase)
+        throw java.lang.RuntimeException("$httpPut $execute")
     }
 
     private fun generateManifest(project: Project): PackageModel {

@@ -87,7 +87,7 @@ public class ManifestGeneratorOld {
                       byte[] data = new byte[content.available()];
                       content.read(data);
                       String response = new String(data);
-                      if (!response.equals("Ok"))
+                      if (!response.equalsIgnoreCase("Ok"))
                         throw new AssertionError("Response code was not Ok" + System.lineSeparator() + response);
 
                     } catch (IOException e) {

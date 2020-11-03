@@ -6,6 +6,7 @@ import net.flintmc.gradle.maven.pom.io.PomReader;
 import org.apache.http.HttpResponse;
 import org.apache.http.StatusLine;
 import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 
 import java.io.IOException;
@@ -52,7 +53,7 @@ public class RemoteMavenRepository implements ReadableMavenRepository {
   @Override
   public URI getArtifactUrl(MavenArtifact artifact) throws URISyntaxException {
     String path = buildArtifactPath(artifact, false);
-    return new URI(    baseUrl + (path.startsWith("/") ? path.substring(1) : path));
+    return new URI(baseUrl + (path.startsWith("/") ? path.substring(1) : path));
   }
 
   /**

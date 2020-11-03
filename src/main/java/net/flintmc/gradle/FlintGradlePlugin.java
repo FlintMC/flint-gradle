@@ -81,9 +81,17 @@ public class FlintGradlePlugin implements Plugin<Project> {
 
     if (this.parentPlugin == null) {
 
+      System.setProperty("org.apache.commons.logging.Log", "org.apache.commons.logging.impl.SimpleLog");
+
+      System.setProperty("org.apache.commons.logging.simplelog.showdatetime", "true");
+      System.setProperty("org.apache.commons.logging.simplelog.log.httpclient.wire", "debug");
+      System.setProperty("org.apache.commons.logging.simplelog.log.org.apache.commons.httpclient", "debug");
+
+
       Gradle gradle = project.getGradle();
       httpClient = gradle.getStartParameter().isOffline() ? null :
-          HttpClientBuilder.create().useSystemProperties().setConnectionTimeToLive(10, TimeUnit.SECONDS).build();
+          HttpClientBuilder.create().useSystemProperties().build();
+
       downloader = new MavenArtifactDownloader();
 
       if (httpClient != null) {
