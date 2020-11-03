@@ -86,9 +86,10 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
     }
 
     private fun uploadFile(data: String, path: String, fileType: ContentType) {
-        val httpPut = HttpPut("https://dist.labymod.net/api/v1/$path")
-        httpPut.setHeader("Authorization", "Bearer CbtTjzAOuDBr5QXcGnBc1MB3eIHxcZetnyHtdN76VpTNgbwAf87bzWPCntsXwj52")
-        httpPut.setHeader("Publish-Token", "6j2vM60FDmkXxlTu1ZZzFzVkS9VjiONLQvSOd7aSwtqapXw9WVWayiaQibGwVZdN")
+
+        val httpPut = HttpPut(System.getenv().getOrDefault("DISTRIBUTOR_URL", "https://dist.labymod.net/api/v1/")+path)
+        httpPut.setHeader("Authorization", "Bearer "+System.getenv("DISTRIBUTOR_AUTHORIZATION"))
+        httpPut.setHeader("Publish-Token", System.getenv("DISTRIBUTOR_PUBLISH_TOKEN"))
         httpPut.entity = StringEntity(data, fileType)
 
         val execute = flintGradlePlugin.httpClient.execute(httpPut)
