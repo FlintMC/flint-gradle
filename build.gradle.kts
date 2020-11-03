@@ -43,6 +43,7 @@ fun RepositoryHandler.flintRepository() {
 plugins {
     id("java-gradle-plugin")
     id("maven")
+    id("maven-publish")
     id("org.jetbrains.kotlin.jvm") version "1.3.72"
 }
 
@@ -74,5 +75,11 @@ gradlePlugin {
             id = "net.flintmc.flint-gradle-plugin"
             implementationClass = "net.flintmc.gradle.FlintGradlePlugin"
         }
+    }
+}
+
+publishing {
+    repositories {
+        flintGradlePluginRepository()
     }
 }
