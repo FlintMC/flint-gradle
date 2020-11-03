@@ -50,6 +50,7 @@ plugins {
 group = "net.flintmc"
 
 repositories {
+    mavenLocal()
     flintRepository()
     flintGradlePluginRepository()
     mavenCentral()

@@ -58,7 +58,6 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
             task.dependsOn("generateManifest")
             task.doLast {
                 if (!isValidProject(project)) return@doLast
-                println("Valid project yay " + project)
 
                 this.uploadFile(
                     StringEntity(
@@ -148,7 +147,7 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
             }
         }
 
-        return collectModuleInstructions(project, mavenArtifactDownloader) + collectProjectInstructions(project)
+        return collectModuleInstructions(project, mavenArtifactDownloader)
     }
 
     private fun collectProjectDependencies(project: Project): Set<DependencyDescriptionModel> {
@@ -171,62 +170,10 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
                 if (!isValidProject(targetProject)) {
                     throw IllegalStateException("project filter does not match project")
                 }
-                if (getFlintExtension(targetProject).type == FlintGradleExtension.Type.PACKAGE) {
-                    return@map DependencyDescriptionModel(targetProject.name, targetProject.version.toString())
-                }
-                return@map null
+                return@map DependencyDescriptionModel(targetProject.name, targetProject.version.toString())
             }
-            .filterNotNull()
             .toSet()
 
-    }
-
-    private fun collectProjectInstructions(project: Project): List<InstallInstructionModel> {
-
-        return collectArtifacts(project)
-            .filter {
-                it.id.componentIdentifier is ProjectComponentIdentifier
-            }
-            .map {
-
-                val componentIdentifier: ProjectComponentIdentifier =
-                    it.id.componentIdentifier as ProjectComponentIdentifier
-
-                val targetProject =
-                    project.rootProject.project(componentIdentifier.projectPath)
-
-
-                var nameSpace = System.getenv("FLINT_NAMESPACE")
-                if (nameSpace == null) {
-                    nameSpace = "RELEASE"
-                }
-                nameSpace = nameSpace.toLowerCase()
-
-
-                if (!hasFlintExtension(project)) {
-                    throw RuntimeException("Project $targetProject does not match and is not a flint package. We cannot handle that.. No Idea where tf to get it from")
-                }
-                if (!isValidProject(project)) {
-                    throw IllegalStateException("project filter does not match project")
-                }
-                if (getFlintExtension(project).type == FlintGradleExtension.Type.LIBRARY) {
-                    return@map InstallInstructionModel(
-                        InstallInstructionTypes.DOWNLOAD_MAVEN_DEPENDENCY,
-                        DownloadMavenDependencyDataModel(
-                            targetProject.group.toString(),
-                            targetProject.name,
-                            targetProject.version.toString(),
-                            null,
-                            String.format(
-                                "\${FLINT_DISTRIBUTOR_URL}/%s",
-                                nameSpace
-                            )
-                        )
-                    )
-                }
-                return@map null
-            }
-            .filterNotNull()
     }
 
     private fun collectModuleInstructions(
