@@ -10,6 +10,8 @@ import org.apache.http.client.methods.HttpGet;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
+import java.net.URISyntaxException;
 
 /**
  * Represents a remote maven repository hosted on some server.
@@ -45,6 +47,12 @@ public class RemoteMavenRepository implements ReadableMavenRepository {
     try (InputStream stream = request(buildArtifactPath(artifact, true))) {
       return stream == null ? null : PomReader.read(stream);
     }
+  }
+
+  @Override
+  public URI getArtifactUrl(MavenArtifact artifact) throws URISyntaxException {
+    String path = buildArtifactPath(artifact, false);
+    return new URI(    baseUrl + (path.startsWith("/") ? path.substring(1) : path));
   }
 
   /**
@@ -100,5 +108,9 @@ public class RemoteMavenRepository implements ReadableMavenRepository {
             status.getStatusCode() + " (" + status.getReasonPhrase() + ")");
       }
     }
+  }
+
+  public String getBaseUrl() {
+    return baseUrl;
   }
 }

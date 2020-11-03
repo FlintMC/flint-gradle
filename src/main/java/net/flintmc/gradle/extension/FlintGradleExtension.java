@@ -24,10 +24,13 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
 
   private boolean configured;
 
+  private String[] authors;
   private String publishToken;
   private Set<String> minecraftVersions;
   private Predicate<Project> projectFilter;
   private boolean disableInternalSourceSet;
+  private Type type = Type.PACKAGE;
+  private String flintVersion;
 
   /**
    * Creates a new {@link FlintGradleExtension} with default values.
@@ -35,6 +38,7 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
    * @param plugin The plugin this extension belongs to
    */
   public FlintGradleExtension(FlintGradlePlugin plugin) {
+    System.out.println("NEW FLINT GRADLE EXTENSION " + plugin.getProject());
     this.plugin = plugin;
 
     this.minecraftVersions = new HashSet<>();
@@ -54,6 +58,10 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
     this.minecraftVersions = new HashSet<>(parent.minecraftVersions);
     this.projectFilter = parent.projectFilter;
     this.runsExtension = new FlintRunsExtension(parent.runsExtension);
+    this.type = parent.type;
+    this.authors = parent.authors != null ? Arrays.copyOf(parent.authors, parent.authors.length) : new String[]{};
+    this.flintVersion = parent.flintVersion;
+    System.out.println(plugin.getProject() + " " + parent.flintVersion);
   }
 
   /**
@@ -83,7 +91,15 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
   public void setMinecraftVersions(Set<String> minecraftVersions) {
     this.minecraftVersions = minecraftVersions;
   }
-  
+
+  public void setFlintVersion(String flintVersion) {
+    this.flintVersion = flintVersion;
+  }
+
+  public String getFlintVersion() {
+    return flintVersion;
+  }
+
   /**
    * Retrieves the project filter predicate.
    *
@@ -102,7 +118,15 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
    */
   public void projectFilter(Predicate<Project> projectFilter) {
     setProjectFilter(projectFilter);
-  } 
+  }
+
+  public String[] getAuthors() {
+    return authors;
+  }
+
+  public void setAuthors(String[] authors) {
+    this.authors = authors;
+  }
 
   /**
    * Overwrites the project filter with the given predicate. The project filter determines which sub projects
@@ -130,6 +154,14 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
    */
   public boolean shouldDisableInternalSourceSet() {
     return this.disableInternalSourceSet;
+  }
+
+  public void setType(@Nonnull Type type) {
+    this.type = type;
+  }
+
+  public Type getType() {
+    return type;
   }
 
   /**
@@ -217,4 +249,9 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
   public String getPublishToken() {
     return publishToken;
   }
+
+  public enum Type{
+    LIBRARY, PACKAGE
+  }
+
 }

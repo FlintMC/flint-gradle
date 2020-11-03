@@ -11,6 +11,9 @@ import org.gradle.api.logging.Logging;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -191,12 +194,43 @@ public class MavenArtifactDownloader {
    * @return An input stream from which the artifact can be read, or {@code null} if not found in the sources
    * @throws IOException If an I/O error occurs while opening the stream
    */
-  private InputStream findArtifact(MavenArtifact artifact) throws IOException {
+  public InputStream findArtifactStream(MavenArtifact artifact) throws IOException {
     for (ReadableMavenRepository source : sources) {
       InputStream stream;
       if ((stream = source.getArtifactStream(artifact)) != null) {
         // Found the requested artifact
         return stream;
+      }
+    }
+
+    // Artifact has not been found in any source
+    return null;
+  }
+
+
+  public URI findArtifactUri(MavenArtifact artifact) throws IOException, URISyntaxException {
+    for (ReadableMavenRepository source : sources) {
+      InputStream stream;
+      if ((stream = source.getArtifactStream(artifact)) != null) {
+        // Found the requested artifact
+        stream.close();
+        return source.getArtifactUrl(artifact);
+      }
+    }
+
+    // Artifact has not been found in any source
+    return null;
+  }
+
+  public URI findRepositoryUri(MavenArtifact artifact) throws IOException, URISyntaxException {
+    for (ReadableMavenRepository source : sources) {
+      InputStream stream;
+      if (source instanceof RemoteMavenRepository) {
+        if ((stream = source.getArtifactStream(artifact)) != null) {
+          // Found the requested artifact
+          stream.close();
+          return new URI(((RemoteMavenRepository) source).getBaseUrl());
+        }
       }
     }
 
@@ -234,7 +268,7 @@ public class MavenArtifactDownloader {
    */
   @SuppressWarnings("BooleanMethodIsAlwaysInverted")
   private boolean installArtifact(MavenArtifact artifact, SimpleMavenRepository target) throws IOException {
-    try (InputStream stream = findArtifact(artifact)) {
+    try (InputStream stream = findArtifactStream(artifact)) {
       // Try to find the given artifact
       if (stream != null) {
         // The artifact has been found, install it

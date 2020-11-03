@@ -10,7 +10,9 @@ import java.util.Objects;
 public class ManifestDownload {
 
   private static final String type = "DOWNLOAD_FILE";
-  private final ManifestDownloadData data = new ManifestDownloadData();
+  private String url;
+  private String path;
+  private String md5;
 
   public ManifestDownload() {
   }
@@ -19,24 +21,23 @@ public class ManifestDownload {
    * @see ManifestDownloadData
    */
   public ManifestDownload(String url, String path, String md5) {
-    this.data
-        .setUrl(url)
-        .setPath(path)
-        .setMd5(md5);
+    this.url = url;
+    this.path = path;
+    this.md5 = md5;
   }
 
   /**
    * @see ManifestDownloadData#getUrl()
    */
   public String getUrl() {
-    return data.getUrl();
+    return this.url;
   }
 
   /**
    * @see ManifestDownloadData#setUrl(String)
    */
   public ManifestDownload setUrl(String url) {
-    data.setUrl(url);
+    this.url = url;
     return this;
   }
 
@@ -44,14 +45,14 @@ public class ManifestDownload {
    * @see ManifestDownloadData#getPath()
    */
   public String getPath() {
-    return data.getPath();
+    return this.path;
   }
 
   /**
    * @see ManifestDownloadData#setPath(String)
    */
   public ManifestDownload setPath(String path) {
-    data.setPath(path);
+    this.path = path;
     return this;
   }
 
@@ -59,26 +60,36 @@ public class ManifestDownload {
    * @see ManifestDownloadData#getMd5()
    */
   public String getMd5() {
-    return data.getMd5();
+    return this.md5;
   }
 
   /**
    * @see ManifestDownloadData#setMd5(String)
    */
   public ManifestDownload setMd5(String md5) {
-    data.setMd5(md5);
+    this.md5 = md5;
     return this;
   }
 
+  @Override
   public boolean equals(Object o) {
     if (this == o) return true;
     if (o == null || getClass() != o.getClass()) return false;
     ManifestDownload that = (ManifestDownload) o;
-    return Objects.equals(data, that.data);
+    return Objects.equals(url, that.url) && Objects.equals(path, that.path) && Objects.equals(md5, that.md5);
   }
 
+  @Override
   public int hashCode() {
-    return Objects.hash(type, data);
+    return Objects.hash(url, path, md5);
   }
 
+  @Override
+  public String toString() {
+    return "ManifestDownload{" +
+        "url='" + url + '\'' +
+        ", path='" + path + '\'' +
+        ", md5='" + md5 + '\'' +
+        '}';
+  }
 }

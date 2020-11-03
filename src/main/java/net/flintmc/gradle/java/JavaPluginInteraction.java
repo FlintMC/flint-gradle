@@ -40,9 +40,13 @@ public class JavaPluginInteraction {
       // Add the output of the main source set to the internal source set
       extendSourceSet(internalSourceSet, mainSourceSet);
 
+      Configuration runtimeConfiguration = project.getConfigurations().getByName("runtimeClasspath");
+
       // Create the internal configuration
       Configuration internalConfiguration = project.getConfigurations().maybeCreate("internal");
       internalConfiguration.extendsFrom(project.getConfigurations().getByName("implementation"));
+
+      runtimeConfiguration.extendsFrom(internalConfiguration);
 
       // Add the internal configuration
       dependencies.add("internal", internalSourceSet.getOutput());
@@ -79,6 +83,7 @@ public class JavaPluginInteraction {
 
     SourceSet implementationSourceSet = extension.shouldDisableInternalSourceSet() ?
         sourceSets.getByName("main") : sourceSets.getByName("internal");
+
 
     // Create the versioned source set by prepending 'v' and replacing all '.' with '_' in the version string
     SourceSet versionedSourceSet = sourceSets.maybeCreate("v" + version.replace('.', '_'));

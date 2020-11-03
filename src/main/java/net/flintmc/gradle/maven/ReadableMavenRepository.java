@@ -5,6 +5,9 @@ import net.flintmc.gradle.maven.pom.MavenPom;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
 
 /**
  * Represents a maven repository which artifacts can be read from.
@@ -27,4 +30,6 @@ public interface ReadableMavenRepository {
    * @throws IOException If an I/O error occurs while reading the POM
    */
   MavenPom getArtifactPom(MavenArtifact artifact) throws IOException;
+
+  URI getArtifactUrl(MavenArtifact artifact) throws URISyntaxException;
 }
