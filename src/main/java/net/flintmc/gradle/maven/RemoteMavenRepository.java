@@ -8,6 +8,7 @@ import org.apache.http.StatusLine;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
+import org.gradle.api.credentials.HttpHeaderCredentials;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -20,6 +21,7 @@ import java.net.URISyntaxException;
 public class RemoteMavenRepository implements ReadableMavenRepository {
   private final HttpClient httpClient;
   private final String baseUrl;
+  private HttpHeaderCredentials httpHeaderCredentials;
 
   /**
    * Constructs a new remote maven repository using the given HTTP client and the given base URL.
@@ -30,6 +32,18 @@ public class RemoteMavenRepository implements ReadableMavenRepository {
   public RemoteMavenRepository(HttpClient httpClient, String baseUrl) {
     this.httpClient = httpClient;
     this.baseUrl = baseUrl.endsWith("/") ? baseUrl : baseUrl + "/";
+  }
+
+  /**
+   * Constructs a new remote maven repository using the given HTTP client and the given base URL.
+   *
+   * @param httpClient The HTTP client to use for downloading artifacts
+   * @param baseUrl    The base url of the maven repository
+   */
+  public RemoteMavenRepository(HttpClient httpClient, String baseUrl, HttpHeaderCredentials httpHeaderCredentials) {
+    this.httpClient = httpClient;
+    this.baseUrl = baseUrl.endsWith("/") ? baseUrl : baseUrl + "/";
+    this.httpHeaderCredentials = httpHeaderCredentials;
   }
 
   /**
@@ -86,6 +100,10 @@ public class RemoteMavenRepository implements ReadableMavenRepository {
 
     // Execute the get request
     HttpGet request = new HttpGet(fullUrl);
+    if(httpHeaderCredentials != null){
+      System.out.println("Set credentials " + fullUrl + " " + httpHeaderCredentials);
+      request.setHeader(this.httpHeaderCredentials.getName(), this.httpHeaderCredentials.getValue());
+    }
     HttpResponse response = httpClient.execute(request);
 
     StatusLine status = response.getStatusLine();

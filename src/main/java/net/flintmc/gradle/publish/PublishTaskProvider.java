@@ -12,7 +12,7 @@ public class PublishTaskProvider {
   public void installPublishTask(Project project) {
     project.getTasks().create("publishFlint", task -> {
       task.setGroup("publish");
-      task.dependsOn("publishFlintJar", "publishFlintStaticFiles", "publishFlintManifest");
+      task.dependsOn("publish", "publishFlintStaticFiles", "publishFlintManifest");
     });
   }
 

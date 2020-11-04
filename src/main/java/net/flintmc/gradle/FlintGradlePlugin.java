@@ -57,6 +57,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
   public void apply(@Nonnull Project project) {
     this.project = project;
     String[] versions = {"v1.15.2", "v1.16.3", "internal"};
+    project.getPlugins().apply("maven-publish");
 
     Configuration runtimeClasspathConfiguration = project.getConfigurations().getAsMap().get("runtimeClasspath");
 
