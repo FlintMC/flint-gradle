@@ -270,7 +270,7 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
                 null,
                 "\${FLINT_DISTRIBUTOR_URL}" + System.getenv()
                     .getOrDefault("FLINT_DISTRIBUTOR_CHANNEL", "release") + "/",
-                if (flintExtension.type == FlintGradleExtension.Type.LIBRARY) null else "packages/${project.name}.jar"
+                if (flintExtension.type == FlintGradleExtension.Type.LIBRARY) null else "\${FLINT_PACKAGE_DIR}/${project.name}.jar"
             )
         )
 
@@ -380,7 +380,9 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
                                 it.classifier
                             )
                         ).toString(),
-                        null
+                        "\${FLINT_LIBRARY_DIR}/${
+                            componentIdentifier.group.toString().replace('.', '/')
+                        }/${componentIdentifier.module}/${componentIdentifier.version}/${componentIdentifier.module}-${componentIdentifier.version}${if (it.classifier != null) "-${it.classifier}" else ""}.jar"
                     )
                 )
             }
