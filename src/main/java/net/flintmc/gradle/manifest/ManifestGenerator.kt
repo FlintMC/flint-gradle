@@ -8,6 +8,7 @@ import net.flintmc.gradle.maven.pom.MavenArtifact
 import net.flintmc.installer.impl.repository.models.DependencyDescriptionModel
 import net.flintmc.installer.impl.repository.models.InternalModelSerializer
 import net.flintmc.installer.impl.repository.models.PackageModel
+import net.flintmc.installer.impl.repository.models.install.DownloadFileDataModel
 import net.flintmc.installer.impl.repository.models.install.DownloadMavenDependencyDataModel
 import net.flintmc.installer.impl.repository.models.install.InstallInstructionModel
 import net.flintmc.installer.impl.repository.models.install.InstallInstructionTypes
@@ -17,27 +18,27 @@ import org.apache.http.client.methods.HttpPut
 import org.apache.http.entity.ByteArrayEntity
 import org.apache.http.entity.ContentType
 import org.apache.http.entity.StringEntity
-import org.apache.http.entity.mime.content.ByteArrayBody
 import org.gradle.api.Action
 import org.gradle.api.Project
+import org.gradle.api.Task
 import org.gradle.api.artifacts.ResolvedArtifact
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.artifacts.component.ProjectComponentIdentifier
 import org.gradle.api.artifacts.repositories.MavenArtifactRepository
+import org.gradle.api.tasks.TaskOutputs
 import org.gradle.jvm.tasks.Jar
 import java.io.File
-import java.lang.AssertionError
 import java.net.URI
 import java.nio.charset.StandardCharsets
 import java.nio.file.*
-import kotlin.time.seconds
 
 class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
 
     fun installManifestGenerateTask(): Action<Project> = Action { project ->
 
-        project.tasks.create("generateManifest") { task ->
+        project.tasks.create("generateFlintManifest") { task ->
             task.doLast {
+                task.group = "publish"
                 val manifest = InternalModelSerializer().toString(generateManifest(project))
                 val path = Paths.get(project.buildDir.path.plus("/generated/flint/manifest.json"));
                 val file = File(path.toString())
@@ -50,12 +51,12 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
 
 
         val jarTask: Jar = project.tasks.findByName("jar") as Jar;
-        jarTask.dependsOn("generateManifest")
+        jarTask.dependsOn("generateFlintManifest")
         jarTask.from(project.buildDir.path.plus("/generated/flint/manifest.json"))
 
-        project.tasks.create("publishManifest") { task ->
+        project.tasks.create("publishFlintManifest") { task ->
             task.group = "publish"
-            task.dependsOn("generateManifest")
+            task.dependsOn("generateFlintManifest")
             task.doLast {
                 if (!isValidProject(project)) return@doLast
 
@@ -72,12 +73,33 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
             }
         }
 
-        project.tasks.create("publishJar") { task ->
+
+        project.tasks.create("publishFlintStaticFiles") { task ->
+            task.group = "publish"
+            task.doLast {
+                if (!isValidProject(project)) return@doLast
+                val flintExtension = getFlintExtension(project)
+
+                flintExtension.staticFileEntries.forEach {
+                    this.uploadFile(
+                        ByteArrayEntity(
+                            project.file(it.from).readBytes(),
+                            ContentType.DEFAULT_BINARY
+                        ),
+                        "maven/release/${
+                            project.group.toString().replace('.', '/')
+                        }/${project.name}/${project.version}/${it.upstreamName}"
+                    )
+                }
+
+            }
+        }
+
+        project.tasks.create("publishFlintJar") { task ->
             task.group = "publish"
             task.dependsOn("jar")
             task.doLast {
                 if (!isValidProject(project)) return@doLast
-
                 this.uploadFile(
                     ByteArrayEntity(
                         project.tasks.getByName("jar").outputs.files.singleFile
@@ -95,9 +117,9 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
     private fun uploadFile(data: HttpEntity, path: String) {
 
         val httpPut =
-            HttpPut(System.getenv().getOrDefault("DISTRIBUTOR_URL", "https://dist.labymod.net/api/v1/") + path)
-        httpPut.setHeader("Authorization", "Bearer " + System.getenv("DISTRIBUTOR_AUTHORIZATION"))
-        httpPut.setHeader("Publish-Token", System.getenv("DISTRIBUTOR_PUBLISH_TOKEN"))
+            HttpPut(System.getenv().getOrDefault("FLINT_DISTRIBUTOR_URL", "https://dist.labymod.net/api/v1/") + path)
+        httpPut.setHeader("Authorization", "Bearer " + System.getenv("FLINT_DISTRIBUTOR_AUTHORIZATION"))
+        httpPut.setHeader("Publish-Token", System.getenv("FLINT_DISTRIBUTOR_PUBLISH_TOKEN"))
         httpPut.entity = data
 
         val execute: CloseableHttpResponse = flintGradlePlugin.httpClient.execute(httpPut) as CloseableHttpResponse
@@ -147,11 +169,47 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
             }
         }
 
-        return collectModuleInstructions(project, mavenArtifactDownloader)
+        return collectModuleInstructions(project, mavenArtifactDownloader) + collectOwnDependency(project)
+    }
+
+    private fun collectOwnDependency(project: Project): List<InstallInstructionModel> {
+
+        val flintExtension = getFlintExtension(project)
+
+        var ownModel: InstallInstructionModel
+
+        ownModel = InstallInstructionModel(
+            InstallInstructionTypes.DOWNLOAD_MAVEN_DEPENDENCY,
+            DownloadMavenDependencyDataModel(
+                project.group.toString(),
+                project.name,
+                project.version.toString(),
+                null,
+                "\${FLINT_DISTRIBUTOR_URL}/release/",
+                if (flintExtension.type == FlintGradleExtension.Type.LIBRARY) null else "packages/${project.name}.jar"
+            )
+        )
+
+        return flintExtension.staticFileEntries
+            .map {
+                InstallInstructionModel(
+                    InstallInstructionTypes.DOWNLOAD_MAVEN_DEPENDENCY,
+                    DownloadMavenDependencyDataModel(
+                        project.group.toString(),
+                        project.name,
+                        project.version.toString(),
+                        null,
+                        "\${FLINT_DISTRIBUTOR_URL}/release/${
+                            project.group.toString().replace('.', '/')
+                        }/${project.name}/${project.version}/${it.upstreamName}",
+                        it.to.toString()
+                    )
+                )
+
+            } + ownModel
     }
 
     private fun collectProjectDependencies(project: Project): Set<DependencyDescriptionModel> {
-
         return collectArtifacts(project)
             .filter {
                 it.id.componentIdentifier is ProjectComponentIdentifier
@@ -173,7 +231,6 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
                 return@map DependencyDescriptionModel(targetProject.name, targetProject.version.toString())
             }
             .toSet()
-
     }
 
     private fun collectModuleInstructions(
@@ -202,7 +259,8 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
                                 componentIdentifier.version,
                                 it.classifier
                             )
-                        ).toString()
+                        ).toString(),
+                        null
                     )
                 )
             }

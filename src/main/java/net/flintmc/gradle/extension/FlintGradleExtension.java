@@ -8,7 +8,9 @@ import org.gradle.util.Configurable;
 import org.gradle.util.ConfigureUtil;
 
 import javax.annotation.Nonnull;
+import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Predicate;
@@ -31,6 +33,7 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
   private boolean disableInternalSourceSet;
   private Type type = Type.PACKAGE;
   private String flintVersion;
+  private Collection<FlintStaticFileEntry> staticFileEntries;
 
   /**
    * Creates a new {@link FlintGradleExtension} with default values.
@@ -44,6 +47,7 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
     this.minecraftVersions = new HashSet<>();
     this.projectFilter = p -> p.getPluginManager().hasPlugin("java");
     this.runsExtension = new FlintRunsExtension();
+    this.staticFileEntries = new HashSet<>();
   }
 
   /**
@@ -61,7 +65,11 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
     this.type = parent.type;
     this.authors = parent.authors != null ? Arrays.copyOf(parent.authors, parent.authors.length) : new String[]{};
     this.flintVersion = parent.flintVersion;
-    System.out.println(plugin.getProject() + " " + parent.flintVersion);
+    this.staticFileEntries = new HashSet<>();
+
+    parent.staticFileEntries.stream()
+        .map(FlintStaticFileEntry::new)
+        .forEach(this.staticFileEntries::add);
   }
 
   /**
@@ -100,6 +108,10 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
     return flintVersion;
   }
 
+  public void staticFileEntry(Path from, Path to, String upstreamName) {
+    this.staticFileEntries.add(new FlintStaticFileEntry(from, to, upstreamName));
+  }
+
   /**
    * Retrieves the project filter predicate.
    *
@@ -114,7 +126,7 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
    * the plugin should automatically apply itself to.
    *
    * @param projectFilter The filter to test sub projects against
-   * @see #setProjectFilter(Predicate) 
+   * @see #setProjectFilter(Predicate)
    */
   public void projectFilter(Predicate<Project> projectFilter) {
     setProjectFilter(projectFilter);
@@ -234,6 +246,10 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
     plugin.onExtensionConfigured();
   }
 
+  public Collection<FlintStaticFileEntry> getStaticFileEntries() {
+    return staticFileEntries;
+  }
+
   /**
    * Sets the Authorization Bearer publish token to authorize for publishment at the lm-distributor.
    *
@@ -250,8 +266,55 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
     return publishToken;
   }
 
-  public enum Type{
+  public enum Type {
     LIBRARY, PACKAGE
+  }
+
+
+  public static class FlintStaticFileEntry {
+    private Path to;
+    private Path from;
+    private String upstreamName;
+
+    public FlintStaticFileEntry(FlintStaticFileEntry parent) {
+      this.to = parent.to;
+      this.from = parent.from;
+      this.upstreamName = parent.upstreamName;
+    }
+
+    public FlintStaticFileEntry(Path from, Path to, String upstreamName) {
+      this.from = from;
+      this.to = to;
+      this.setUpstreamName(upstreamName);
+    }
+
+    public void setFrom(Path from) {
+      this.from = from;
+    }
+
+    public void setTo(Path to) {
+      this.to = to;
+    }
+
+    public void setUpstreamName(String upstreamName) {
+      if (upstreamName.isEmpty())
+        throw new IllegalArgumentException("Upstream name must not be empty");
+      if (!upstreamName.matches("^([a-zA-Z0-9)]|\\.||_|-)+$"))
+        throw new IllegalArgumentException("Can only use 'a-z', 'A-Z', '0-9', '_', '-' and '.'] in upstream name");
+      this.upstreamName = upstreamName;
+    }
+
+    public Path getFrom() {
+      return from;
+    }
+
+    public Path getTo() {
+      return to;
+    }
+
+    public String getUpstreamName() {
+      return upstreamName;
+    }
   }
 
 }
