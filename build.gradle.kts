@@ -67,7 +67,7 @@ dependencies {
     implementation(group = "org.apache.httpcomponents", name = "httpclient", version = "4.5.12")
     implementation(group = "io.github.java-diff-utils", name = "java-diff-utils", version = "4.7")
     implementation(group = "com.fasterxml.jackson.core", name = "jackson-core", version = "2.12.0-rc1")
-    implementation(group = "net.flintmc.installer", name = "logic-implementation", version = "1.0.7")
+    implementation(group = "net.flintmc.installer", name = "logic-implementation", version = "1.1.1")
 }
 
 gradlePlugin {

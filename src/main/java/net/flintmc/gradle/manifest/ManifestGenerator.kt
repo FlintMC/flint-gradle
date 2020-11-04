@@ -8,6 +8,7 @@ import net.flintmc.gradle.maven.pom.MavenArtifact
 import net.flintmc.installer.impl.repository.models.DependencyDescriptionModel
 import net.flintmc.installer.impl.repository.models.InternalModelSerializer
 import net.flintmc.installer.impl.repository.models.PackageModel
+import net.flintmc.installer.impl.repository.models.install.DownloadFileDataModel
 import net.flintmc.installer.impl.repository.models.install.DownloadMavenDependencyDataModel
 import net.flintmc.installer.impl.repository.models.install.InstallInstructionModel
 import net.flintmc.installer.impl.repository.models.install.InstallInstructionTypes
@@ -19,24 +20,22 @@ import org.apache.http.entity.ContentType
 import org.apache.http.entity.StringEntity
 import org.gradle.api.Action
 import org.gradle.api.Project
-import org.gradle.api.Task
 import org.gradle.api.artifacts.ResolvedArtifact
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.artifacts.component.ProjectComponentIdentifier
 import org.gradle.api.artifacts.repositories.MavenArtifactRepository
-import org.gradle.api.credentials.Credentials
 import org.gradle.api.credentials.HttpHeaderCredentials
 import org.gradle.api.publish.PublishingExtension
 import org.gradle.api.publish.maven.MavenPublication
-import org.gradle.api.publish.maven.tasks.PublishToMavenRepository
-import org.gradle.api.tasks.TaskOutputs
 import org.gradle.authentication.http.HttpHeaderAuthentication
 import org.gradle.jvm.tasks.Jar
 import java.io.File
 import java.net.URI
 import java.nio.charset.StandardCharsets
 import java.nio.file.*
+import java.util.*
 import java.util.jar.JarFile
+import kotlin.collections.HashSet
 
 class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
 
@@ -56,7 +55,10 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
             }
 
             publishingExtension.repositories.maven { mavenArtifactRepository ->
-                mavenArtifactRepository.setUrl(System.getenv()["FLINT_DISTRIBUTOR_URL"] + "maven/" + System.getenv().getOrDefault("FLINT_DISTRIBUTOR_CHANNEL", "release") + "/")
+                mavenArtifactRepository.setUrl(
+                    System.getenv()["FLINT_DISTRIBUTOR_URL"] + "maven/" + System.getenv()
+                        .getOrDefault("FLINT_DISTRIBUTOR_CHANNEL", "release") + "/"
+                )
                 mavenArtifactRepository.name = "Distributor"
 
                 mavenArtifactRepository.credentials(HttpHeaderCredentials::class.java) { httpHeaderCredentials ->
@@ -187,15 +189,30 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
         if (flintExtension.flintVersion == null)
             throw IllegalArgumentException("Flint version defined for project $project must not be null")
 
+        val collectedInstructions = collectInstructions(project);
+
         return PackageModel(
             project.name,
             project.description,
             project.version.toString(),
+            System.getenv().getOrDefault("FLINT_DISTRIBUTOR_CHANNEL", "release"),
             flintExtension.minecraftVersions.joinToString(","),
             flintExtension.flintVersion,
             flintExtension.authors.toSet(),
             collectDependencies(project),
-            collectInstructions(project)
+            collectedInstructions
+                .map {
+                    when (it.type) {
+                        InstallInstructionTypes.DOWNLOAD_MAVEN_DEPENDENCY.toString() ->
+                            it.getData<DownloadMavenDependencyDataModel>().path
+                        InstallInstructionTypes.DOWNLOAD_FILE.toString() ->
+                            it.getData<DownloadFileDataModel>().path
+                        else -> null
+                    }
+                }
+                .filterNotNull()
+                .toSet(),
+            collectedInstructions
         )
     }
 
@@ -251,7 +268,8 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
                 project.name,
                 project.version.toString(),
                 null,
-                "\${FLINT_DISTRIBUTOR_URL}" + System.getenv().getOrDefault("FLINT_DISTRIBUTOR_CHANNEL", "release") + "/",
+                "\${FLINT_DISTRIBUTOR_URL}" + System.getenv()
+                    .getOrDefault("FLINT_DISTRIBUTOR_CHANNEL", "release") + "/",
                 if (flintExtension.type == FlintGradleExtension.Type.LIBRARY) null else "packages/${project.name}.jar"
             )
         )
@@ -265,7 +283,8 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
                         project.name,
                         project.version.toString(),
                         null,
-                        "\${FLINT_DISTRIBUTOR_URL}" + System.getenv().getOrDefault("FLINT_DISTRIBUTOR_CHANNEL", "release") + "/${
+                        "\${FLINT_DISTRIBUTOR_URL}" + System.getenv()
+                            .getOrDefault("FLINT_DISTRIBUTOR_CHANNEL", "release") + "/${
                             project.group.toString().replace('.', '/')
                         }/${project.name}/${project.version}/${it.upstreamName}",
                         it.to.toString()
@@ -294,7 +313,11 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
                 if (!isValidProject(targetProject)) {
                     throw IllegalStateException("project filter does not match project")
                 }
-                return@map DependencyDescriptionModel(targetProject.name, targetProject.version.toString())
+                return@map DependencyDescriptionModel(
+                    targetProject.name,
+                    targetProject.version.toString(),
+                    System.getenv().getOrDefault("FLINT_DISTRIBUTOR_CHANNEL", "release")
+                )
             }
             .toSet()
     }
@@ -313,7 +336,7 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
                     val inputStream = jarFile.getInputStream(entry)
                     val manifestData = String(inputStream.readBytes())
                     val packageModel = InternalModelSerializer().fromString(manifestData, PackageModel::class.java)
-                    return@map DependencyDescriptionModel(packageModel.name, packageModel.version)
+                    return@map DependencyDescriptionModel(packageModel.name, packageModel.version, packageModel.channel)
 
                 }
                 jarFile.close()
