@@ -12,6 +12,7 @@ import net.flintmc.installer.impl.repository.models.install.DownloadFileDataMode
 import net.flintmc.installer.impl.repository.models.install.DownloadMavenDependencyDataModel
 import net.flintmc.installer.impl.repository.models.install.InstallInstructionModel
 import net.flintmc.installer.impl.repository.models.install.InstallInstructionTypes
+import net.flintmc.installer.impl.util.InternalFileHelper
 import org.apache.http.HttpEntity
 import org.apache.http.client.methods.CloseableHttpResponse
 import org.apache.http.client.methods.HttpPut
@@ -138,6 +139,19 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
                             project.group.toString().replace('.', '/')
                         }/${project.name}/${project.version}/${it.upstreamName}"
                     )
+
+                    this.uploadFile(
+                        ByteArrayEntity(
+                            InternalFileHelper().getHash(project.projectDir.toPath().toString() + "/" + it.from.toString())
+                                .toByteArray(StandardCharsets.UTF_8),
+                            ContentType.DEFAULT_BINARY
+                        ),
+                        "maven/" + System.getenv().getOrDefault("FLINT_DISTRIBUTOR_CHANNEL", "release") + "/${
+                            project.group.toString().replace('.', '/')
+                        }/${project.name}/${project.version}/${it.upstreamName}.md5"
+                    )
+
+
                 }
 
             }
@@ -174,7 +188,6 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
 
         val execute: CloseableHttpResponse = flintGradlePlugin.httpClient.execute(httpPut) as CloseableHttpResponse
         if (execute.statusLine.statusCode == 200) {
-            println("Uploaded file $httpPut")
             execute.close()
             return
         }

@@ -41,7 +41,6 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
    * @param plugin The plugin this extension belongs to
    */
   public FlintGradleExtension(FlintGradlePlugin plugin) {
-    System.out.println("NEW FLINT GRADLE EXTENSION " + plugin.getProject());
     this.plugin = plugin;
 
     this.minecraftVersions = new HashSet<>();

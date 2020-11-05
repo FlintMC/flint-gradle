@@ -91,15 +91,6 @@ public class AssetPublisher {
       if (response.getStatusLine().getStatusCode() != 200) {
         throw new IllegalStateException("The server responded with status " + response.getStatusLine().getStatusCode() + ". Reason: " + response.getStatusLine().getReasonPhrase());
       }
-      System.out.println(
-          "published "
-              + fileName
-              + " to "
-              + baseUrl
-              + "/publish/"
-              + name
-              + "/"
-              + version);
 
     } catch (IOException | URISyntaxException e) {
       throw new FlintGradleException("Could not punlish asset to " + baseUrl

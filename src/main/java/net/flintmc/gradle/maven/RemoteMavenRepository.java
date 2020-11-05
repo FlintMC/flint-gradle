@@ -101,7 +101,6 @@ public class RemoteMavenRepository implements ReadableMavenRepository {
     // Execute the get request
     HttpGet request = new HttpGet(fullUrl);
     if(httpHeaderCredentials != null){
-      System.out.println("Set credentials " + fullUrl + " " + httpHeaderCredentials);
       request.setHeader(this.httpHeaderCredentials.getName(), this.httpHeaderCredentials.getValue());
     }
     HttpResponse response = httpClient.execute(request);
