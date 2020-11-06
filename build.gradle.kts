@@ -67,8 +67,8 @@ dependencies {
     implementation(group = "org.apache.httpcomponents", name = "httpclient", version = "4.5.12")
     implementation(group = "io.github.java-diff-utils", name = "java-diff-utils", version = "4.7")
     implementation(group = "com.fasterxml.jackson.core", name = "jackson-core", version = "2.12.0-rc1")
-    implementation(group = "net.flintmc.installer", name = "logic-implementation", version = "1.1.1")
-    implementation(group = "net.flintmc.installer", name = "logic", version = "1.1.1")
+    implementation(group = "net.flintmc.installer", name = "logic-implementation", version = "1.1.2")
+    implementation(group = "net.flintmc.installer", name = "logic", version = "1.1.2")
 }
 
 gradlePlugin {
@@ -80,8 +80,20 @@ gradlePlugin {
     }
 }
 
+
 publishing {
     repositories {
         flintGradlePluginRepository()
+        maven {
+            setUrl("https://dist.labymod.net/api/v1/maven/release")
+            name = "Flint"
+            credentials(HttpHeaderCredentials::class) {
+                name = "Authorization"
+                value = "Bearer CbtTjzAOuDBr5QXcGnBc1MB3eIHxcZetnyHtdN76VpTNgbwAf87bzWPCntsXwj52"
+            }
+            authentication {
+                create<HttpHeaderAuthentication>("header")
+            }
+        }
     }
 }

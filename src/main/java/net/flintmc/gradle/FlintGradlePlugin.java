@@ -59,21 +59,23 @@ public class FlintGradlePlugin implements Plugin<Project> {
     String[] versions = {"v1.15.2", "v1.16.3", "internal"};
     project.getPlugins().apply("maven-publish");
 
-    Configuration runtimeClasspathConfiguration = project.getConfigurations().getAsMap().get("runtimeClasspath");
 
     for (String version : versions) {
       project.getConfigurations().maybeCreate(String.format("%sAnnotationProcessor", version.replace('.', '_')));
       Configuration versionedConfiguration = project.getConfigurations().maybeCreate(String.format("%sImplementation", version.replace('.', '_')));
-      if(runtimeClasspathConfiguration != null){
+
+      project.beforeEvaluate((dummy) -> {
+        Configuration runtimeClasspathConfiguration = project.getConfigurations().getByName("runtimeClasspath");
         runtimeClasspathConfiguration.extendsFrom(versionedConfiguration);
-      }
+      });
     }
+
     project.afterEvaluate(p -> onAfterEvaluate());
 
     Project parent = project;
-    while ((parent = parent.getParent()) != null){
+    while ((parent = parent.getParent()) != null) {
       FlintGradlePlugin parentPlugin = parent.getPlugins().findPlugin(getClass());
-      if(parentPlugin == null) continue;
+      if (parentPlugin == null) continue;
       this.parentPlugin = parentPlugin;
       break;
     }

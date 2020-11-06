@@ -50,7 +50,7 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
                     publication.groupId = project.group.toString()
                     publication.artifactId = project.name
                     publication.version = project.version.toString()
-                    project.components.forEach(publication::from)
+                    publication.from(project.components.getByName("java"))
 
                 }
             }
@@ -81,8 +81,6 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
                 }
             }
         }
-
-
 
 
         project.tasks.create("generateFlintManifest") { task ->
@@ -142,7 +140,9 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
 
                     this.uploadFile(
                         ByteArrayEntity(
-                            InternalFileHelper().getHash(project.projectDir.toPath().toString() + "/" + it.from.toString())
+                            InternalFileHelper().getHash(
+                                project.projectDir.toPath().toString() + "/" + it.from.toString()
+                            )
                                 .toByteArray(StandardCharsets.UTF_8),
                             ContentType.DEFAULT_BINARY
                         ),
@@ -203,8 +203,10 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
             throw IllegalArgumentException("Flint version defined for project $project must not be null")
 
         val collectedInstructions = collectInstructions(project);
+        val collectedDependencies = collectDependencies(project)
 
         return PackageModel(
+            project.group.toString(),
             project.name,
             project.description,
             project.version.toString(),
@@ -212,7 +214,7 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
             flintExtension.minecraftVersions.joinToString(","),
             flintExtension.flintVersion,
             flintExtension.authors.toSet(),
-            collectDependencies(project),
+            collectedDependencies,
             collectedInstructions
                 .map {
                     when (it.type) {
@@ -224,7 +226,16 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
                     }
                 }
                 .filterNotNull()
-                .toSet(),
+                .toSet() +
+                    collectedDependencies.map {
+                        if (flintExtension.type == FlintGradleExtension.Type.PACKAGE) {
+                            "\${FLINT_PACKAGE_DIR}/${it.name}-${it.versions}.jar"
+                        } else if (flintExtension.type == FlintGradleExtension.Type.LIBRARY) {
+                            "\${FLINT_LIBRARY_DIR}/${it.group.toString().replace('.', '/')}/${it.name}/${it.versions}/${it.name}-${it.versions}.jar"
+                        } else {
+                            throw java.lang.IllegalStateException()
+                        }
+                    },
             collectedInstructions
         )
     }
@@ -283,7 +294,12 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
                 null,
                 "\${FLINT_DISTRIBUTOR_URL}" + System.getenv()
                     .getOrDefault("FLINT_DISTRIBUTOR_CHANNEL", "release") + "/",
-                if (flintExtension.type == FlintGradleExtension.Type.LIBRARY) null else "\${FLINT_PACKAGE_DIR}/${project.name}.jar"
+                if (flintExtension.type == FlintGradleExtension.Type.LIBRARY)
+                    "\${FLINT_LIBRARY_DIR}/${
+                        project.group.toString().replace('.', '/')
+                    }/${project.name}/${project.version}/${project.name}-${project.version}.jar"
+                else
+                    "\${FLINT_PACKAGE_DIR}/${project.name}.jar"
             )
         )
 
@@ -327,6 +343,7 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
                     throw IllegalStateException("project filter does not match project")
                 }
                 return@map DependencyDescriptionModel(
+                    targetProject.group.toString(),
                     targetProject.name,
                     targetProject.version.toString(),
                     System.getenv().getOrDefault("FLINT_DISTRIBUTOR_CHANNEL", "release")
@@ -349,7 +366,12 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
                     val inputStream = jarFile.getInputStream(entry)
                     val manifestData = String(inputStream.readBytes())
                     val packageModel = InternalModelSerializer().fromString(manifestData, PackageModel::class.java)
-                    return@map DependencyDescriptionModel(packageModel.name, packageModel.version, packageModel.channel)
+                    return@map DependencyDescriptionModel(
+                        packageModel.group,
+                        packageModel.name,
+                        packageModel.version,
+                        packageModel.channel
+                    )
 
                 }
                 jarFile.close()
