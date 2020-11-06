@@ -36,9 +36,12 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.*
 import java.util.*
 import java.util.jar.JarFile
+import kotlin.collections.HashMap
 import kotlin.collections.HashSet
 
 class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
+
+    val dependencyDescriptionModelGroups: MutableMap<DependencyDescriptionModel, String> = HashMap()
 
     fun installManifestGenerateTask(): Action<Project> = Action { project ->
 
@@ -228,10 +231,17 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
                 .filterNotNull()
                 .toSet() +
                     collectedDependencies.map {
+                        val group = dependencyDescriptionModelGroups[it]
+
                         if (flintExtension.type == FlintGradleExtension.Type.PACKAGE) {
                             "\${FLINT_PACKAGE_DIR}/${it.name}-${it.versions}.jar"
                         } else if (flintExtension.type == FlintGradleExtension.Type.LIBRARY) {
-                            "\${FLINT_LIBRARY_DIR}/${it.group.toString().replace('.', '/')}/${it.name}/${it.versions}/${it.name}-${it.versions}.jar"
+                            "\${FLINT_LIBRARY_DIR}/${
+                                group?.replace(
+                                    '.',
+                                    '/'
+                                )
+                            }/${it.name}/${it.versions}/${it.name}-${it.versions}.jar"
                         } else {
                             throw java.lang.IllegalStateException()
                         }
@@ -342,12 +352,14 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
                 if (!isValidProject(targetProject)) {
                     throw IllegalStateException("project filter does not match project")
                 }
-                return@map DependencyDescriptionModel(
-                    targetProject.group.toString(),
+                val dependencyDescriptionModel = DependencyDescriptionModel(
                     targetProject.name,
                     targetProject.version.toString(),
                     System.getenv().getOrDefault("FLINT_DISTRIBUTOR_CHANNEL", "release")
                 )
+                dependencyDescriptionModelGroups[dependencyDescriptionModel] = targetProject.group.toString()
+
+                dependencyDescriptionModel
             }
             .toSet()
     }
@@ -366,13 +378,14 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
                     val inputStream = jarFile.getInputStream(entry)
                     val manifestData = String(inputStream.readBytes())
                     val packageModel = InternalModelSerializer().fromString(manifestData, PackageModel::class.java)
-                    return@map DependencyDescriptionModel(
-                        packageModel.group,
+                    val dependencyDescriptionModel = DependencyDescriptionModel(
                         packageModel.name,
                         packageModel.version,
                         packageModel.channel
                     )
 
+                    dependencyDescriptionModelGroups[dependencyDescriptionModel] = packageModel.group.toString()
+                    return@map dependencyDescriptionModel
                 }
                 jarFile.close()
                 return@map null
