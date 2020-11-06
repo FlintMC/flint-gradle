@@ -208,6 +208,7 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
         val collectedInstructions = collectInstructions(project);
         val collectedDependencies = collectDependencies(project)
 
+        val collectedOwnDependency = collectOwnDependency(project)
         return PackageModel(
             project.group.toString(),
             project.name,
@@ -218,34 +219,19 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
             flintExtension.flintVersion,
             flintExtension.authors.toSet(),
             collectedDependencies,
-            collectedInstructions
-                .map {
-                    when (it.type) {
-                        InstallInstructionTypes.DOWNLOAD_MAVEN_DEPENDENCY.toString() ->
-                            it.getData<DownloadMavenDependencyDataModel>().path
-                        InstallInstructionTypes.DOWNLOAD_FILE.toString() ->
-                            it.getData<DownloadFileDataModel>().path
-                        else -> null
+            collectedInstructions.mapNotNull {
+                when (it.type) {
+                    InstallInstructionTypes.DOWNLOAD_MAVEN_DEPENDENCY.toString() -> {
+                        val data = collectedOwnDependency.getData<DownloadMavenDependencyDataModel>()
+                        if (data.path != it.getData<DownloadMavenDependencyDataModel>().path)
+                            return@mapNotNull it.getData<DownloadMavenDependencyDataModel>().path
+                        else return@mapNotNull null
                     }
+                    InstallInstructionTypes.DOWNLOAD_FILE.toString() ->
+                        it.getData<DownloadFileDataModel>().path
+                    else -> null
                 }
-                .filterNotNull()
-                .toSet() +
-                    collectedDependencies.map {
-                        val group = dependencyDescriptionModelGroups[it]
-
-                        if (flintExtension.type == FlintGradleExtension.Type.PACKAGE) {
-                            "\${FLINT_PACKAGE_DIR}/${it.name}-${it.versions}.jar"
-                        } else if (flintExtension.type == FlintGradleExtension.Type.LIBRARY) {
-                            "\${FLINT_LIBRARY_DIR}/${
-                                group?.replace(
-                                    '.',
-                                    '/'
-                                )
-                            }/${it.name}/${it.versions}/${it.name}-${it.versions}.jar"
-                        } else {
-                            throw java.lang.IllegalStateException()
-                        }
-                    },
+            }.toSet(),
             collectedInstructions
         )
     }
@@ -288,10 +274,35 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
             }
         }
 
-        return collectModuleInstructions(project, mavenArtifactDownloader) + collectOwnDependency(project)
+        return collectModuleInstructions(
+            project,
+            mavenArtifactDownloader
+        ) + collectStatic(project) + collectOwnDependency(project)
     }
 
-    private fun collectOwnDependency(project: Project): List<InstallInstructionModel> {
+    private fun collectStatic(project: Project): List<InstallInstructionModel> {
+        val flintExtension = getFlintExtension(project)
+        return flintExtension.staticFileEntries
+            .map {
+                InstallInstructionModel(
+                    InstallInstructionTypes.DOWNLOAD_MAVEN_DEPENDENCY,
+                    DownloadMavenDependencyDataModel(
+                        project.group.toString(),
+                        project.name,
+                        project.version.toString(),
+                        null,
+                        "\${FLINT_DISTRIBUTOR_URL}" + System.getenv()
+                            .getOrDefault("FLINT_DISTRIBUTOR_CHANNEL", "release") + "/${
+                            project.group.toString().replace('.', '/')
+                        }/${project.name}/${project.version}/${it.upstreamName}",
+                        it.to.toString()
+                    )
+                )
+
+            }
+    }
+
+    private fun collectOwnDependency(project: Project): InstallInstructionModel {
 
         val flintExtension = getFlintExtension(project)
 
@@ -313,24 +324,7 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
             )
         )
 
-        return flintExtension.staticFileEntries
-            .map {
-                InstallInstructionModel(
-                    InstallInstructionTypes.DOWNLOAD_MAVEN_DEPENDENCY,
-                    DownloadMavenDependencyDataModel(
-                        project.group.toString(),
-                        project.name,
-                        project.version.toString(),
-                        null,
-                        "\${FLINT_DISTRIBUTOR_URL}" + System.getenv()
-                            .getOrDefault("FLINT_DISTRIBUTOR_CHANNEL", "release") + "/${
-                            project.group.toString().replace('.', '/')
-                        }/${project.name}/${project.version}/${it.upstreamName}",
-                        it.to.toString()
-                    )
-                )
-
-            } + ownModel
+        return ownModel
     }
 
     private fun collectProjectDependencies(project: Project): Set<DependencyDescriptionModel> {
@@ -377,6 +371,7 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
 
                     val inputStream = jarFile.getInputStream(entry)
                     val manifestData = String(inputStream.readBytes())
+                    println(manifestData)
                     val packageModel = InternalModelSerializer().fromString(manifestData, PackageModel::class.java)
                     val dependencyDescriptionModel = DependencyDescriptionModel(
                         packageModel.name,
@@ -384,6 +379,7 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
                         packageModel.channel
                     )
 
+                    println("group ${packageModel.group} for " + packageModel.name)
                     dependencyDescriptionModelGroups[dependencyDescriptionModel] = packageModel.group.toString()
                     return@map dependencyDescriptionModel
                 }

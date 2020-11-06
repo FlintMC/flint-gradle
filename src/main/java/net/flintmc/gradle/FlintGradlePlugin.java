@@ -27,7 +27,6 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.Collection;
-import java.util.concurrent.TimeUnit;
 
 public class FlintGradlePlugin implements Plugin<Project> {
   public static final String MINECRAFT_TASK_GROUP = "minecraft";
