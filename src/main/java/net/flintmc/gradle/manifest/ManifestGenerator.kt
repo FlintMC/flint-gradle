@@ -250,15 +250,13 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
 
                 for (uri in uris) {
                     if (uri.scheme.equals("http", true) || uri.scheme.equals("https", true)) {
-                        var creds =
-                            repository.getCredentials(HttpHeaderCredentials::class.java) as HttpHeaderCredentials
-
-                        if (creds.name != null && creds.value != null) {
+                        if (repository.authentication.withType(HttpHeaderAuthentication::class.java).any()) {
+                            val credentials = repository.getCredentials(HttpHeaderCredentials::class.java)
                             mavenArtifactDownloader.addSource(
                                 RemoteMavenRepository(
                                     flintGradlePlugin.httpClient,
                                     uri.toString(),
-                                    creds
+                                    credentials
                                 )
                             )
                         } else {
