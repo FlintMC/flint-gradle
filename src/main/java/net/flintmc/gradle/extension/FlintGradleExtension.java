@@ -8,6 +8,7 @@ import org.gradle.util.Configurable;
 import org.gradle.util.ConfigureUtil;
 
 import javax.annotation.Nonnull;
+import java.net.URL;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collection;
@@ -34,6 +35,7 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
   private Type type = Type.PACKAGE;
   private String flintVersion;
   private Collection<FlintStaticFileEntry> staticFileEntries;
+  private Collection<FlintUrlFileEntry> flintUrlFileEntries;
 
   /**
    * Creates a new {@link FlintGradleExtension} with default values.
@@ -47,6 +49,7 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
     this.projectFilter = p -> p.getPluginManager().hasPlugin("java");
     this.runsExtension = new FlintRunsExtension();
     this.staticFileEntries = new HashSet<>();
+    this.flintUrlFileEntries = new HashSet<>();
   }
 
   /**
@@ -65,10 +68,15 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
     this.authors = parent.authors != null ? Arrays.copyOf(parent.authors, parent.authors.length) : new String[]{};
     this.flintVersion = parent.flintVersion;
     this.staticFileEntries = new HashSet<>();
+    this.flintUrlFileEntries = new HashSet<>();
 
     parent.staticFileEntries.stream()
         .map(FlintStaticFileEntry::new)
         .forEach(this.staticFileEntries::add);
+
+    parent.flintUrlFileEntries.stream()
+        .map(FlintUrlFileEntry::new)
+        .forEach(this.flintUrlFileEntries::add);
   }
 
   /**
@@ -109,6 +117,14 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
 
   public void staticFileEntry(Path from, Path to, String upstreamName) {
     this.staticFileEntries.add(new FlintStaticFileEntry(from, to, upstreamName));
+  }
+
+  public void urlFileEntry(URL url, Path to) {
+    this.flintUrlFileEntries.add(new FlintUrlFileEntry(to, url));
+  }
+
+  public Collection<FlintUrlFileEntry> getFlintUrlFileEntries() {
+    return flintUrlFileEntries;
   }
 
   /**
@@ -267,6 +283,29 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
 
   public enum Type {
     LIBRARY, PACKAGE
+  }
+
+  public static class FlintUrlFileEntry {
+    private Path to;
+    private URL from;
+
+    public FlintUrlFileEntry(FlintUrlFileEntry flintUrlFileEntry) {
+      this.to = flintUrlFileEntry.to;
+      this.from = flintUrlFileEntry.from;
+    }
+
+    public FlintUrlFileEntry(Path to, URL from) {
+      this.to = to;
+      this.from = from;
+    }
+
+    public Path getTo() {
+      return to;
+    }
+
+    public URL getFrom() {
+      return from;
+    }
   }
 
 

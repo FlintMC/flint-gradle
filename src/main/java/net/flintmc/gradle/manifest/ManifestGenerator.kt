@@ -13,6 +13,7 @@ import net.flintmc.installer.impl.repository.models.install.DownloadMavenDepende
 import net.flintmc.installer.impl.repository.models.install.InstallInstructionModel
 import net.flintmc.installer.impl.repository.models.install.InstallInstructionTypes
 import net.flintmc.installer.impl.util.InternalFileHelper
+import org.apache.commons.codec.digest.DigestUtils
 import org.apache.http.HttpEntity
 import org.apache.http.client.methods.CloseableHttpResponse
 import org.apache.http.client.methods.HttpPut
@@ -232,7 +233,15 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
                     else -> null
                 }
             }.toSet(),
-            collectedInstructions
+            collectedInstructions + flintExtension.flintUrlFileEntries.map {
+                val openStream = it.from.openStream();
+                val md5Hex = DigestUtils.md5Hex(openStream);
+                openStream.close();
+                InstallInstructionModel(
+                    InstallInstructionTypes.DOWNLOAD_FILE,
+                    DownloadFileDataModel(it.from.toString(), it.to.toString(), md5Hex)
+                )
+            }
         )
     }
 
