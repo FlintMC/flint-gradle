@@ -318,7 +318,7 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
                     it.id.componentIdentifier as ProjectComponentIdentifier
 
                 val targetProject =
-                    project.rootProject.project(componentIdentifier.projectPath)
+                    project.rootProject.findProject(componentIdentifier.projectPath) ?: return@map null
 
                 if (!hasFlintExtension(targetProject)) {
                     throw RuntimeException("Project $targetProject does not match and is not a flint package. We cannot handle that.. No Idea where tf to get it from")
@@ -332,6 +332,7 @@ class ManifestGenerator(val flintGradlePlugin: FlintGradlePlugin) {
                     System.getenv().getOrDefault("FLINT_DISTRIBUTOR_CHANNEL", "release")
                 )
             }
+            .filterNotNull()
             .toSet()
     }
 
