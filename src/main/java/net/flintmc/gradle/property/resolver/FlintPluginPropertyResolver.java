@@ -32,7 +32,7 @@ public abstract class FlintPluginPropertyResolver<T> {
     if(RESOLVERS.isEmpty()) {
       RESOLVERS.put(boolean.class, new BooleanPropertyResolver());
       RESOLVERS.put(String.class, new StringPropertyResolver());
-      RESOLVERS.put(URL.class, new URLPropertyResolver());
+      RESOLVERS.put(URL.class, new URIPropertyResolver());
     }
 
     FlintPluginPropertyResolver<T> resolver = ((FlintPluginPropertyResolver<T>) RESOLVERS.get(type));

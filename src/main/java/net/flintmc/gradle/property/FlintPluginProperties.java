@@ -1,6 +1,6 @@
 package net.flintmc.gradle.property;
 
-import java.net.URL;
+import java.net.URI;
 
 /**
  * Global list of all {@link FlintPluginProperty} instances.
@@ -31,10 +31,10 @@ public final class FlintPluginProperties {
    * The property is a URL and can be set using the project property {@code net.flint.distributor.url} or the
    * environment variable {@code FLINT_DISTRIBUTOR_URL}.
    */
-  public static final FlintPluginProperty<URL> DISTRIBUTOR_URL = FlintPluginProperty.builder()
+  public static final FlintPluginProperty<URI> DISTRIBUTOR_URL = FlintPluginProperty.builder()
       .name("net.flint.distributor.url")
       .environment("FLINT_DISTRIBUTOR_URL")
-      .complete(URL.class);
+      .complete(URI.class);
 
   /**
    * Determines the release channel of the flint distributor.
