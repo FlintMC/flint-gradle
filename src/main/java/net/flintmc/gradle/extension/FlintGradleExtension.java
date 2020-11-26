@@ -10,10 +10,7 @@ import org.gradle.util.ConfigureUtil;
 import javax.annotation.Nonnull;
 import java.net.URL;
 import java.nio.file.Path;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Predicate;
 
 /**
@@ -180,7 +177,7 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
    *
    * @param authors The new project authors
    */
-  public void setAuthors(String... authors) {
+  public void setAuthors(String[] authors) {
     this.authors = authors;
   }
 

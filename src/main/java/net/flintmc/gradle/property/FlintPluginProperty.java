@@ -43,7 +43,7 @@ public final class FlintPluginProperty<T> {
    * @return The name of the property for the project properties
    */
   public String getPropertyName() {
-    return "net.flint.gradle." + propertyName;
+    return propertyName;
   }
 
   /**

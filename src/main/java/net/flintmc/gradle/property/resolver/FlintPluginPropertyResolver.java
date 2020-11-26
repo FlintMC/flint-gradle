@@ -6,6 +6,7 @@ import org.gradle.api.logging.Logger;
 import org.gradle.api.logging.Logging;
 
 import java.io.File;
+import java.net.URI;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
@@ -32,7 +33,7 @@ public abstract class FlintPluginPropertyResolver<T> {
     if(RESOLVERS.isEmpty()) {
       RESOLVERS.put(boolean.class, new BooleanPropertyResolver());
       RESOLVERS.put(String.class, new StringPropertyResolver());
-      RESOLVERS.put(URL.class, new URIPropertyResolver());
+      RESOLVERS.put(URI.class, new URIPropertyResolver());
     }
 
     FlintPluginPropertyResolver<T> resolver = ((FlintPluginPropertyResolver<T>) RESOLVERS.get(type));
