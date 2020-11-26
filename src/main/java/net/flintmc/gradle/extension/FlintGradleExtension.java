@@ -36,6 +36,7 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
   private String flintVersion;
   private Collection<FlintStaticFileEntry> staticFileEntries;
   private Collection<FlintUrlFileEntry> flintUrlFileEntries;
+  private boolean autoConfigurePublishing;
 
   /**
    * Creates a new {@link FlintGradleExtension} with default values.
@@ -48,13 +49,13 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
     this.minecraftVersions = new HashSet<>();
     this.projectFilter = p -> p.getPluginManager().hasPlugin("java");
     this.runsExtension = new FlintRunsExtension();
+    this.autoConfigurePublishing = true;
     this.staticFileEntries = new HashSet<>();
     this.flintUrlFileEntries = new HashSet<>();
   }
 
   /**
-   * Creates a new {@link FlintGradleExtension} with values copied from a parent
-   * extension.
+   * Creates a new {@link FlintGradleExtension} with values copied from a parent extension.
    *
    * @param plugin The plugin owning this extension
    * @param parent The parent extension
@@ -67,6 +68,7 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
     this.type = parent.type;
     this.authors = parent.authors != null ? Arrays.copyOf(parent.authors, parent.authors.length) : new String[]{};
     this.flintVersion = parent.flintVersion;
+    this.autoConfigurePublishing = parent.autoConfigurePublishing;
     this.staticFileEntries = new HashSet<>();
     this.flintUrlFileEntries = new HashSet<>();
 
@@ -107,14 +109,31 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
     this.minecraftVersions = minecraftVersions;
   }
 
+  /**
+   * Overwrites the flint version this project targets.
+   *
+   * @param flintVersion The flint version this project targets
+   */
   public void setFlintVersion(String flintVersion) {
     this.flintVersion = flintVersion;
   }
 
+  /**
+   * Retrieves the flint version this project targets.
+   *
+   * @return The flint version this project targets
+   */
   public String getFlintVersion() {
     return flintVersion;
   }
 
+  /**
+   * Adds a static file to this project configuration.
+   *
+   * @param from         The path to get the file from
+   * @param to           The path to store the file to
+   * @param upstreamName The name of the object in the repository
+   */
   public void staticFileEntry(Path from, Path to, String upstreamName) {
     this.staticFileEntries.add(new FlintStaticFileEntry(from, to, upstreamName));
   }
@@ -137,8 +156,8 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
   }
 
   /**
-   * Overwrites the project filter with the given predicate. The project filter determines which sub projects
-   * the plugin should automatically apply itself to.
+   * Overwrites the project filter with the given predicate. The project filter determines which sub projects the plugin
+   * should automatically apply itself to.
    *
    * @param projectFilter The filter to test sub projects against
    * @see #setProjectFilter(Predicate)
@@ -147,17 +166,27 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
     setProjectFilter(projectFilter);
   }
 
+  /**
+   * Retrieves the project authors.
+   *
+   * @return The project authors
+   */
   public String[] getAuthors() {
     return authors;
   }
 
-  public void setAuthors(String[] authors) {
+  /**
+   * Overwrites the project authors.
+   *
+   * @param authors The new project authors
+   */
+  public void setAuthors(String... authors) {
     this.authors = authors;
   }
 
   /**
-   * Overwrites the project filter with the given predicate. The project filter determines which sub projects
-   * the plugin should automatically apply itself to.
+   * Overwrites the project filter with the given predicate. The project filter determines which sub projects the plugin
+   * should automatically apply itself to.
    *
    * @param projectFilter The filter to test sub projects against
    */
@@ -221,7 +250,7 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
   @Override
   @Nonnull
   public FlintGradleExtension configure(@Nonnull Closure closure) {
-    if (configured) {
+    if(configured) {
       throw new IllegalStateException("The flint extension can only be configured once");
     }
 
@@ -232,14 +261,14 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
   }
 
   /**
-   * Triggers the {@link FlintGradlePlugin#onExtensionConfigured()} method. This method is meant to be called from
-   * build scripts which need the extension to configure the plugin early without changing values on the extension
-   * itself. This method may only be called if the extension has not been configured by other means.
+   * Triggers the {@link FlintGradlePlugin#onExtensionConfigured()} method. This method is meant to be called from build
+   * scripts which need the extension to configure the plugin early without changing values on the extension itself.
+   * This method may only be called if the extension has not been configured by other means.
    *
    * @throws IllegalStateException If the extension has been configured already
    */
   public void configureNow() {
-    if (configured) {
+    if(configured) {
       throw new IllegalStateException(
           "Please only call configureNow() if you don't configure the extension by other means");
     }
@@ -253,7 +282,7 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
    * already.
    */
   public void ensureConfigured() {
-    if (configured) {
+    if(configured) {
       return;
     }
 
@@ -266,7 +295,7 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
   }
 
   /**
-   * Sets the Authorization Bearer publish token to authorize for publishment at the lm-distributor.
+   * Sets the Authorization Bearer publish token used for authorizing at the lm-distributor.
    *
    * @param publishToken The Bearer token
    */
@@ -275,14 +304,36 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
   }
 
   /**
-   * @return The Authorization Bearer publish token to authorize for publishment at the lm-distributor.
+   * Retrieves the Authorization Bearer publish token used for authorizing at the lm-distributor.
+   *
+   * @return The bearer token
    */
   public String getPublishToken() {
     return publishToken;
   }
 
+  /**
+   * Overwrites whether the {@link org.gradle.api.publish.PublishingExtension} should be automatically configured if
+   * found.
+   *
+   * @param autoConfigurePublishing If {@code true}, the plugin will automatically set up publishing
+   */
+  public void autoConfigurePublishing(boolean autoConfigurePublishing) {
+    this.autoConfigurePublishing = autoConfigurePublishing;
+  }
+
+  /**
+   * Determines if the plugin should automatically configure the publishing extension.
+   *
+   * @return {@code true} if the plugin should automatically configure the extension, {@code false} otherwise
+   */
+  public boolean shouldAutoConfigurePublishing() {
+    return autoConfigurePublishing;
+  }
+
   public enum Type {
-    LIBRARY, PACKAGE
+    LIBRARY,
+    PACKAGE
   }
 
   public static class FlintUrlFileEntry {
@@ -335,10 +386,12 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
     }
 
     public void setUpstreamName(String upstreamName) {
-      if (upstreamName.isEmpty())
+      if(upstreamName.isEmpty()) {
         throw new IllegalArgumentException("Upstream name must not be empty");
-      if (!upstreamName.matches("^([a-zA-Z0-9)]|\\.||_|-)+$"))
+      }
+      if(!upstreamName.matches("^([a-zA-Z0-9)]|\\.||_|-)+$")) {
         throw new IllegalArgumentException("Can only use 'a-z', 'A-Z', '0-9', '_', '-' and '.'] in upstream name");
+      }
       this.upstreamName = upstreamName;
     }
 

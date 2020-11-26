@@ -10,6 +10,7 @@ import net.flintmc.gradle.minecraft.ui.LoginDialog;
 import net.flintmc.gradle.minecraft.ui.LoginDialogResult;
 import net.flintmc.gradle.minecraft.yggdrasil.YggdrasilAuthenticationException;
 import net.flintmc.gradle.minecraft.yggdrasil.YggdrasilAuthenticator;
+import net.flintmc.gradle.property.FlintPluginProperties;
 import net.flintmc.gradle.util.RuleChainResolver;
 import org.gradle.api.Project;
 import org.gradle.api.file.FileCollection;
@@ -358,9 +359,7 @@ public class MinecraftRunTask extends JavaExec {
    * @return {@code true} if the launch should continue, {@code false} otherwise
    */
   private boolean setup(Map<String, String> variables) {
-    Map<String, ?> projectProperties = getProject().getProperties();
-    if (!projectProperties.containsKey("net.flint.gradle.login") ||
-        !Boolean.parseBoolean(projectProperties.get("net.flint.gradle.login").toString())) {
+    if(!FlintPluginProperties.ENABLE_MINECRAFT_LOGIN.resolve(getProject())) {
       // Continue launching offline, the user has not requested online launching
       return true;
     }

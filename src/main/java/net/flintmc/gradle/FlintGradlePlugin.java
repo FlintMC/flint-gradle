@@ -5,7 +5,7 @@ import net.flintmc.gradle.extension.FlintGradleExtension;
 import net.flintmc.gradle.jar.JarTaskProvider;
 import net.flintmc.gradle.java.JavaPluginInteraction;
 import net.flintmc.gradle.java.RunConfigurationProvider;
-import net.flintmc.gradle.manifest.ManifestGenerator;
+import net.flintmc.gradle.manifest.ManifestConfigurator;
 import net.flintmc.gradle.maven.MavenArtifactDownloader;
 import net.flintmc.gradle.maven.RemoteMavenRepository;
 import net.flintmc.gradle.maven.SimpleMavenRepository;
@@ -47,7 +47,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
   private RunConfigurationProvider runConfigurationProvider;
   private JarTaskProvider jarTaskProvider;
   private AssetPublisher assetPublisher;
-  private ManifestGenerator manifestGenerator;
+  private ManifestConfigurator manifestConfigurator;
   private PublishTaskProvider publishTaskProvider;
 
   private FlintGradlePlugin parentPlugin;
@@ -130,7 +130,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
           project, minecraftRepository, minecraftCache.resolve("run"), authenticator);
       this.jarTaskProvider = new JarTaskProvider(this);
       this.assetPublisher = new AssetPublisher(PUBLISH_BASE_URL);
-      this.manifestGenerator = new ManifestGenerator(this);
+      this.manifestConfigurator = new ManifestConfigurator();
       this.publishTaskProvider = new PublishTaskProvider();
     } else {
       this.httpClient = parentPlugin.httpClient;
@@ -143,7 +143,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
       this.runConfigurationProvider = parentPlugin.runConfigurationProvider;
       this.jarTaskProvider = parentPlugin.jarTaskProvider;
       this.assetPublisher = parentPlugin.assetPublisher;
-      this.manifestGenerator = parentPlugin.manifestGenerator;
+      this.manifestConfigurator = parentPlugin.manifestConfigurator;
       this.publishTaskProvider = parentPlugin.publishTaskProvider;
     }
 
@@ -184,7 +184,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
 
     runConfigurationProvider.installSourceSets(project, extension);
     jarTaskProvider.installTasks(project, extension);
-    manifestGenerator.installManifestGenerateTask().execute(project);
+    manifestConfigurator.configureProject(project);
     publishTaskProvider.installPublishTask(project);
   }
 
