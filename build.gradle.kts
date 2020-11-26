@@ -30,7 +30,6 @@ plugins {
     id("java-gradle-plugin")
     id("maven-publish")
     id("maven")
-    id("org.jetbrains.kotlin.jvm") version "1.3.72"
 }
 
 group = "net.flintmc"

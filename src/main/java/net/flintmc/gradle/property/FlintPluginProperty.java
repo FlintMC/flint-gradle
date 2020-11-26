@@ -99,15 +99,16 @@ public final class FlintPluginProperty<T> {
   /**
    * Resolves the property value for the given project and checks that it is set.
    *
-   * @param project The project to resolve the property for
+   * @param project   The project to resolve the property for
+   * @param solutions Solutions to display to the user in case the property is missing
    * @return The resolved value
    * @throws IllegalStateException    If the property can not be resolved
    * @throws IllegalArgumentException If the value of the property can not be parsed
    */
-  public T require(Project project) {
+  public T require(Project project, String... solutions) {
     T value = resolve(project);
     if(value == null) {
-      FlintPluginPropertyResolver.abortPropertyMissing(project, this);
+      FlintPluginPropertyResolver.abortPropertyMissing(project, this, solutions);
     }
 
     return value;

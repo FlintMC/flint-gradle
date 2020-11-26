@@ -180,17 +180,22 @@ public abstract class FlintPluginPropertyResolver<T> {
    * Tells the user that a required property is missing and briefs him about possible solutions, then throws an {@link
    * IllegalStateException}.
    *
-   * @param project  The project the property is missing from
-   * @param property The property that is missing
+   * @param project        The project the property is missing from
+   * @param property       The property that is missing
+   * @param otherSolutions Other solution that should be presented to the user
    * @throws IllegalStateException Always
    */
-  public static void abortPropertyMissing(Project project, FlintPluginProperty<?> property) {
-    LOGGER.error("The property {} is missing", property.getPropertyName());
+  public static void abortPropertyMissing(Project project, FlintPluginProperty<?> property, String... otherSolutions) {
+    LOGGER.error("The property {} is missing!", property.getPropertyName());
     LOGGER.error("The following solutions are available:");
     LOGGER.error("- Add the property to the project gradle.properties next to the build.gradle");
-    LOGGER.error("- Add the property to " +
+    LOGGER.error("- Add the property to {}",
         new File(project.getGradle().getGradleUserHomeDir(), "gradle.properties").getAbsolutePath());
-    LOGGER.error("- Set the environment variable " + property.getEnvironmentName());
+    LOGGER.error("- Set the environment variable {}", property.getEnvironmentName());
+
+    for(String solution : otherSolutions) {
+      LOGGER.error("- {}", solution);
+    }
 
     throw new IllegalStateException(
         "Missing required property " + property.getPropertyName() + " on " + project.getDisplayName());
