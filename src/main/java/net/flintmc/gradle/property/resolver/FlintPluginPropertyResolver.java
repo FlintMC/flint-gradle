@@ -5,6 +5,7 @@ import org.gradle.api.Project;
 import org.gradle.api.logging.Logger;
 import org.gradle.api.logging.Logging;
 
+import java.io.File;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
@@ -173,5 +174,25 @@ public abstract class FlintPluginPropertyResolver<T> {
 
     LOGGER.trace("Failed to resolve property {} by any means, returning null", property.getPropertyName());
     return null;
+  }
+
+  /**
+   * Tells the user that a required property is missing and briefs him about possible solutions, then throws an {@link
+   * IllegalStateException}.
+   *
+   * @param project  The project the property is missing from
+   * @param property The property that is missing
+   * @throws IllegalStateException Always
+   */
+  public static void abortPropertyMissing(Project project, FlintPluginProperty<?> property) {
+    LOGGER.error("The property {} is missing", property.getPropertyName());
+    LOGGER.error("The following solutions are available:");
+    LOGGER.error("- Add the property to the project gradle.properties next to the build.gradle");
+    LOGGER.error("- Add the property to " +
+        new File(project.getGradle().getGradleUserHomeDir(), "gradle.properties").getAbsolutePath());
+    LOGGER.error("- Set the environment variable " + property.getEnvironmentName());
+
+    throw new IllegalStateException(
+        "Missing required property " + property.getPropertyName() + " on " + project.getDisplayName());
   }
 }
