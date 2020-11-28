@@ -14,12 +14,24 @@ import org.gradle.authentication.http.HttpHeaderAuthentication;
 import java.net.URI;
 
 public class ManifestConfigurator {
+  private final Project project;
+
+  /**
+   * Constructs a new {@link ManifestConfigurator} for the given project.
+   *
+   * @param project The project to configure the manifest for
+   */
+  public ManifestConfigurator(Project project) {
+    this.project = project;
+  }
+
+  private URI distributorMavenURI;
+  private URI projectMavenURI;
+
   /**
    * Installs the required gradle tasks to generate the flint manifests.
-   *
-   * @param project The project to install the tasks on
    */
-  public void configureProject(Project project) {
+  public void configure() {
     if(!isValidProject(project)) {
       return;
     }
@@ -30,13 +42,7 @@ public class ManifestConfigurator {
       PublishingExtension publishingExtension = project.getExtensions().findByType(PublishingExtension.class);
 
       // Build the distributor URL in form of <host>/maven/<channel>
-      URI distributorUrl = Util.concatURI(
-          FlintPluginProperties.DISTRIBUTOR_URL
-              .require(project, "Set shouldAutoConfigurePublishing to false in the flint extension"),
-          "maven",
-          FlintPluginProperties.DISTRIBUTOR_CHANNEL
-              .require(project, "Set shouldAutoConfigurePublishing to false in the flint extension")
-      );
+      URI distributorUrl = getDistributorMavenURI("Set shouldAutoConfigurePublishing to false in the flint extension");
 
       // Retrieve either a bearer or publish token
       String bearerToken = FlintPluginProperties.DISTRIBUTOR_BEARER_TOKEN.resolve(project);
@@ -92,5 +98,46 @@ public class ManifestConfigurator {
   private boolean isValidProject(Project project) {
     FlintGradleExtension remote = project.getExtensions().findByType(FlintGradleExtension.class);
     return remote != null && remote.getProjectFilter().test(project);
+  }
+
+  /**
+   * Retrieves the base URI of the distributor repository.
+   *
+   * @param notAvailableSolution Message to display as a solution in case URI can't be computed
+   * @return The base URI of the distributor repository
+   */
+  public URI getDistributorMavenURI(String notAvailableSolution) {
+    if(distributorMavenURI == null) {
+      distributorMavenURI = Util.concatURI(
+          FlintPluginProperties.DISTRIBUTOR_URL
+              .require(project, notAvailableSolution),
+          "maven",
+          FlintPluginProperties.DISTRIBUTOR_CHANNEL
+              .require(project, notAvailableSolution)
+      );
+    }
+
+    return distributorMavenURI;
+  }
+
+  /**
+   * Retrieves the base URI of the distributor repository including the project namespace.
+   *
+   * @param notAvailableSolution Message to display as a solution in case the URI can't be computed
+   * @return The base URI of the distributor repository including the project namespace
+   */
+  public URI getProjectMavenURI(String notAvailableSolution) {
+    if(projectMavenURI == null) {
+      URI distributorURI = getDistributorMavenURI(notAvailableSolution);
+
+      projectMavenURI = Util.concatURI(
+          distributorURI,
+          project.getGroup().toString().replace('.', '/'),
+          project.getName(),
+          project.getVersion().toString()
+      );
+    }
+
+    return projectMavenURI;
   }
 }

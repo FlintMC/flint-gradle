@@ -10,6 +10,7 @@ import org.apache.http.StatusLine;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 
+import javax.naming.spi.ObjectFactory;
 import java.io.*;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -309,5 +310,15 @@ public class Util {
       Object value = objectInput.readObject();
       collection.add(forceCast(value)); // forceCast required, can't cast back to `?`
     }
+  }
+
+  /**
+   * Converts an Object to a string or {@code "undefined"} if the object is null. Used to mimic Gradle's behavior.
+   *
+   * @param value The object to convert
+   * @return The object as a string
+   */
+  public static String toStringOrUndefined(Object value) {
+    return value == null ? "undefined" : value.toString();
   }
 }

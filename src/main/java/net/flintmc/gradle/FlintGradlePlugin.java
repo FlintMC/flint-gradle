@@ -80,6 +80,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
     }
 
     this.interaction = new JavaPluginInteraction(project);
+    this.manifestConfigurator = new ManifestConfigurator(project);
 
     if (this.parentPlugin == null) {
 
@@ -130,7 +131,6 @@ public class FlintGradlePlugin implements Plugin<Project> {
           project, minecraftRepository, minecraftCache.resolve("run"), authenticator);
       this.jarTaskProvider = new JarTaskProvider(this);
       this.assetPublisher = new AssetPublisher(PUBLISH_BASE_URL);
-      this.manifestConfigurator = new ManifestConfigurator();
       this.publishTaskProvider = new PublishTaskProvider();
     } else {
       this.httpClient = parentPlugin.httpClient;
@@ -143,7 +143,6 @@ public class FlintGradlePlugin implements Plugin<Project> {
       this.runConfigurationProvider = parentPlugin.runConfigurationProvider;
       this.jarTaskProvider = parentPlugin.jarTaskProvider;
       this.assetPublisher = parentPlugin.assetPublisher;
-      this.manifestConfigurator = parentPlugin.manifestConfigurator;
       this.publishTaskProvider = parentPlugin.publishTaskProvider;
     }
 
@@ -184,7 +183,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
 
     runConfigurationProvider.installSourceSets(project, extension);
     jarTaskProvider.installTasks(project, extension);
-    manifestConfigurator.configureProject(project);
+    manifestConfigurator.configure();
     publishTaskProvider.installPublishTask(project);
   }
 

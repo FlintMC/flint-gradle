@@ -1,9 +1,11 @@
 package net.flintmc.gradle.extension;
 
+import org.gradle.api.Named;
 import org.gradle.api.Project;
 import org.gradle.api.logging.Logger;
 import org.gradle.api.logging.Logging;
 
+import javax.annotation.Nonnull;
 import java.io.File;
 import java.net.URI;
 import java.nio.file.InvalidPathException;
@@ -15,7 +17,7 @@ import java.nio.file.Paths;
  *
  * @see FlintStaticFilesExtension
  */
-public class FlintStaticFileDescription {
+public class FlintStaticFileDescription implements Named {
   private static final Logger LOGGER = Logging.getLogger(FlintStaticFileDescription.class);
 
   private final Project project;
@@ -123,5 +125,44 @@ public class FlintStaticFileDescription {
     } catch(InvalidPathException e) {
       throw new IllegalStateException("Target path is invalid", e);
     }
+  }
+
+  /**
+   * Retrieves the name of this static file.
+   *
+   * @return The name of this static file
+   */
+  @Nonnull
+  public String getName() {
+    return name;
+  }
+
+  /**
+   * Retrieves the target path of this static file.
+   *
+   * @return The target path
+   */
+  public String getTarget() {
+    return target;
+  }
+
+  /**
+   * Retrieves the source file of this static file. Always {@code null} if {@link #isRemote()} is {@code true}, never
+   * {@code null} otherwise.
+   *
+   * @return The source file
+   */
+  public File getSourceFile() {
+    return sourceFile;
+  }
+
+  /**
+   * Retrieves the source URI of this static file. Always {@code null} if {@link #isRemote()} is {@code false}, never
+   * {@code null} otherwise.
+   *
+   * @return The source uri
+   */
+  public URI getSourceURI() {
+    return sourceURI;
   }
 }

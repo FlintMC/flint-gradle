@@ -12,37 +12,51 @@ import java.net.URI;
 public class ManifestStaticFile implements Externalizable {
   private URI uri;
   private String path;
-  private String md5sum;
 
   /**
    * Constructs a new {@link ManifestStaticFile}.
    *
-   * @param uri    The URI where the file can be downloaded from
-   * @param path   The path to put the file at
-   * @param md5sum The MD5 checksum of the file
+   * @param uri  The URI where the file can be downloaded from
+   * @param path The path to put the file at
    */
-  public ManifestStaticFile(URI uri, String path, String md5sum) {
+  public ManifestStaticFile(URI uri, String path) {
     this.uri = uri;
     this.path = path;
-    this.md5sum = md5sum;
   }
 
   /**
    * Constructs a new {@link ManifestStaticFile} with all values set to null, used for deserialization.
    */
-  public ManifestStaticFile() {}
+  public ManifestStaticFile() {
+  }
+
+  /**
+   * Retrieves the URI this file will be downloaded from.
+   *
+   * @return The URI this file will be downloaded from
+   */
+  public URI getURI() {
+    return uri;
+  }
+
+  /**
+   * Retrieves the path this file will be downloaded to
+   *
+   * @return The path this file will be downloaded to
+   */
+  public String getPath() {
+    return path;
+  }
 
   @Override
   public void writeExternal(ObjectOutput out) throws IOException {
     out.writeObject(uri);
     out.writeUTF(path);
-    out.writeUTF(md5sum);
   }
 
   @Override
   public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
     uri = (URI) in.readObject();
     path = in.readUTF();
-    md5sum = in.readUTF();
   }
 }
