@@ -207,37 +207,6 @@ public class MavenArtifactDownloader {
     return null;
   }
 
-
-  public URI findArtifactUri(MavenArtifact artifact) throws IOException, URISyntaxException {
-    for (ReadableMavenRepository source : sources) {
-      InputStream stream;
-      if ((stream = source.getArtifactStream(artifact)) != null) {
-        // Found the requested artifact
-        stream.close();
-        return source.getArtifactUrl(artifact);
-      }
-    }
-
-    // Artifact has not been found in any source
-    return null;
-  }
-
-  public URI findRepositoryUri(MavenArtifact artifact) throws IOException, URISyntaxException {
-    for (ReadableMavenRepository source : sources) {
-      InputStream stream;
-      if (source instanceof RemoteMavenRepository) {
-        if ((stream = source.getArtifactStream(artifact)) != null) {
-          // Found the requested artifact
-          stream.close();
-          return new URI(((RemoteMavenRepository) source).getBaseUrl());
-        }
-      }
-    }
-
-    // Artifact has not been found in any source
-    return null;
-  }
-
   /**
    * Tries to find the given POM in the sources.
    *

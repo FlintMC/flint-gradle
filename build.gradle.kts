@@ -1,3 +1,6 @@
+import java.io.ObjectInput
+import java.io.ObjectOutput
+
 fun RepositoryHandler.flintGradlePluginRepository() {
     maven {
         setUrl("https://dist.labymod.net/api/v1/maven/release")
@@ -12,7 +15,7 @@ fun RepositoryHandler.flintGradlePluginRepository() {
     }
 }
 
-fun RepositoryHandler.flintRepository(){
+fun RepositoryHandler.flintRepository() {
     maven {
         setUrl("http://dist.labymod.net/api/v1/maven/release")
         name = "Flint"
@@ -82,3 +85,44 @@ publishing {
         }
     }
 }
+
+class SomeProperty(var prop: String) : java.io.Externalizable {
+    companion object {
+        private const val serialVersionUID: Long = 7829136421241571165L
+    }
+
+    override fun writeExternal(out: ObjectOutput?) {
+        println("Writing object")
+        out?.writeInt(100)
+    }
+
+    override fun readExternal(`in`: ObjectInput?) {
+        println("Reading object")
+        `in`?.readInt()
+    }
+}
+
+open class TestTask : DefaultTask() {
+    private val id = kotlin.random.Random.nextInt()
+
+    @get:org.gradle.api.tasks.Input
+    var prop: SomeProperty = SomeProperty("DEFG")
+
+    @org.gradle.api.tasks.OutputFile
+    fun getOut(): File {
+        println("Retrieving output on $id")
+        return File("ABC")
+    }
+
+    @org.gradle.api.tasks.TaskAction
+    fun run() {
+        println("Running task")
+        getOut().writeText("Hello, ${prop.prop}")
+    }
+}
+
+println("Creating task")
+tasks.create<TestTask>("testTask") {
+    println("Configuring task")
+}
+println("Creation done")

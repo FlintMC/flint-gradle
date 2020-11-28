@@ -16,10 +16,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.CopyOption;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.Enumeration;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -244,7 +241,7 @@ public class Util {
   /**
    * Safely concatenates paths to an URI.
    *
-   * @param base The URI to concatenate to
+   * @param base  The URI to concatenate to
    * @param paths The paths to concatenate
    * @return The new URI
    */
@@ -259,10 +256,58 @@ public class Util {
       if(!path.startsWith("/")) {
         path = "/" + path;
       }
-      
+
       current = current.resolve(path);
     }
 
     return current;
+  }
+
+  /**
+   * Used for completely erasing the type of a variable. Sometimes Java does not allow casting back target type easily,
+   * especially when a wildcard is used. In this case this method may help to force the type to fit.
+   * <p>
+   * <b>Use with care! This essentially circumvents all type checking, you have been warned!</b>
+   *
+   * @param in  The object to cast
+   * @param <T> The type to cast to
+   * @return in
+   */
+  @SuppressWarnings("unchecked")
+  public static <T> T forceCast(Object in) {
+    return (T) in;
+  }
+
+  /**
+   * Serializes a collection into an {@link ObjectOutput}.
+   *
+   * @param collection   The collection to serialize
+   * @param objectOutput The output to write to
+   * @throws IOException If an I/O error occurs while writing
+   */
+  public static void serializeCollection(Collection<?> collection, ObjectOutput objectOutput) throws IOException {
+    objectOutput.write(collection.size());
+
+    for(Object value : collection) {
+      objectOutput.writeObject(value);
+    }
+  }
+
+  /**
+   * Deserializes a collection from an {@link ObjectInput}.
+   *
+   * @param collection  The collection to deserialize
+   * @param objectInput The input to read from
+   * @throws IOException            If an I/O error occurs while reading
+   * @throws ClassNotFoundException If the original collection contained a class which now can't be found
+   */
+  public static void deserializeCollection(Collection<?> collection, ObjectInput objectInput)
+      throws IOException, ClassNotFoundException {
+    int size = objectInput.readInt();
+
+    for(int i = 0; i < size; i++) {
+      Object value = objectInput.readObject();
+      collection.add(forceCast(value)); // forceCast required, can't cast back to `?`
+    }
   }
 }
