@@ -6,6 +6,7 @@ import net.flintmc.gradle.maven.pom.MavenDependencyScope;
 import net.flintmc.gradle.maven.pom.MavenPom;
 import net.flintmc.gradle.maven.pom.io.PomReader;
 import net.flintmc.gradle.maven.pom.io.PomWriter;
+import net.flintmc.gradle.util.Pair;
 import org.gradle.api.logging.Logger;
 import org.gradle.api.logging.Logging;
 
@@ -79,7 +80,7 @@ public class MavenArtifactDownloader {
     Path localPomPath = target.getPomPath(artifact);
 
     MavenPom artifactPom;
-    if (artifact instanceof MavenPom) {
+    if(artifact instanceof MavenPom) {
       // If the artifact is a POM already, don't try to read it from anywhere
       artifactPom = (MavenPom) artifact;
     } else {
@@ -87,21 +88,21 @@ public class MavenArtifactDownloader {
       artifactPom = Files.exists(localPomPath) ? PomReader.read(localPomPath) : findPom(artifact);
     }
 
-    if (artifactPom != null) {
+    if(artifactPom != null) {
       // POM found, install it with all its dependencies
       installAll(artifactPom, target);
 
-      if (installIfNotExists) {
-        if (!Files.exists(localPomPath)) {
+      if(installIfNotExists) {
+        if(!Files.exists(localPomPath)) {
           // The POM file does not exist locally, write it down
           PomWriter.write(artifactPom, localPomPath);
         }
       }
     }
 
-    if (installIfNotExists) {
+    if(installIfNotExists) {
       // If the artifact is not installed locally, try to install it
-      if (!target.isInstalled(artifact) && !installArtifact(artifact, target) && artifactPom == null) {
+      if(!target.isInstalled(artifact) && !installArtifact(artifact, target) && artifactPom == null) {
         // The artifact failed to install and there was also no POM for it
         throw new MavenResolveException("Could not resolve " + artifact);
       }
@@ -109,8 +110,8 @@ public class MavenArtifactDownloader {
   }
 
   /**
-   * Installs all dependencies recursively required by the given POM into the given repository.
-   * This method does not create the POM file if it does not exist.
+   * Installs all dependencies recursively required by the given POM into the given repository. This method does not
+   * create the POM file if it does not exist.
    *
    * @param pom    The POM to install all artifacts for
    * @param target The repository to install artifacts and POM's into
@@ -123,19 +124,19 @@ public class MavenArtifactDownloader {
     Set<MavenDependency> toProcess = new HashSet<>(pom.getDependencies());
 
     // Process until the list to process is empty
-    while (!toProcess.isEmpty()) {
+    while(!toProcess.isEmpty()) {
       // Copy over the dependencies to process into the current processing round
       Set<MavenDependency> roundDependencies = new HashSet<>(toProcess);
       toProcess.clear();
 
-      for (MavenDependency dependency : roundDependencies) {
+      for(MavenDependency dependency : roundDependencies) {
         // Mark the dependency as found
         dependencies.add(dependency);
 
         // Sort out unwanted dependencies
-        if (shouldSkip(dependency)) {
+        if(shouldSkip(dependency)) {
           continue;
-        } else if (dependency.isBroken()) {
+        } else if(dependency.isBroken()) {
           continue;
         }
 
@@ -144,30 +145,30 @@ public class MavenArtifactDownloader {
 
         // Try to read the POM locally, if it does not exist fall back to reading it online
         MavenPom dependencyPom = Files.exists(localPomPath) ? PomReader.read(localPomPath) : findPom(dependency);
-        if (dependencyPom != null) {
+        if(dependencyPom != null) {
           // A POM file was found, iterate its dependencies
-          for (MavenDependency innerDependency : dependencyPom.getDependencies()) {
+          for(MavenDependency innerDependency : dependencyPom.getDependencies()) {
             // Sort out unwanted dependencies
-            if (shouldSkip(innerDependency)) {
+            if(shouldSkip(innerDependency)) {
               continue;
-            } else if (innerDependency.isBroken()) {
+            } else if(innerDependency.isBroken()) {
               continue;
             }
 
-            if (!dependencies.contains(innerDependency)) {
+            if(!dependencies.contains(innerDependency)) {
               // The dependency has not been found already, process it
               toProcess.add(innerDependency);
             }
           }
 
-          if (!Files.exists(localPomPath)) {
+          if(!Files.exists(localPomPath)) {
             // If the POM does not exist locally, install it
             PomWriter.write(dependencyPom, localPomPath);
           }
         }
 
         // Try to install the dependency locally
-        if (!target.isInstalled(dependency) && !installArtifact(dependency, target) && dependencyPom == null) {
+        if(!target.isInstalled(dependency) && !installArtifact(dependency, target) && dependencyPom == null) {
           // The dependency had no artifact and also no POM
           throw new MavenResolveException("Could not resolve " + dependency);
         }
@@ -195,11 +196,30 @@ public class MavenArtifactDownloader {
    * @throws IOException If an I/O error occurs while opening the stream
    */
   public InputStream findArtifactStream(MavenArtifact artifact) throws IOException {
-    for (ReadableMavenRepository source : sources) {
+    for(ReadableMavenRepository source : sources) {
       InputStream stream;
-      if ((stream = source.getArtifactStream(artifact)) != null) {
+      if((stream = source.getArtifactStream(artifact)) != null) {
         // Found the requested artifact
         return stream;
+      }
+    }
+
+    // Artifact has not been found in any source
+    return null;
+  }
+
+  /**
+   * Tries to find the URI of the given artifact in the sources.
+   *
+   * @param artifact The artifact to find the URI for
+   * @return The found URI, or {@code null}, if not found in the sources
+   * @throws IOException If an I/O error occurs while checking for the artifact
+   */
+  public Pair<ReadableMavenRepository, URI> findArtifactURI(MavenArtifact artifact) throws IOException {
+    for(ReadableMavenRepository source : sources) {
+      URI uri = source.getArtifactURI(artifact);
+      if(uri != null) {
+        return new Pair<>(source, uri);
       }
     }
 
@@ -215,9 +235,9 @@ public class MavenArtifactDownloader {
    * @throws IOException If an I/O error occurs while trying to read a POM
    */
   private MavenPom findPom(MavenArtifact artifact) throws IOException {
-    for (ReadableMavenRepository source : sources) {
+    for(ReadableMavenRepository source : sources) {
       MavenPom pom;
-      if ((pom = source.getArtifactPom(artifact)) != null) {
+      if((pom = source.getArtifactPom(artifact)) != null) {
         // Found the requested POM
         return pom;
       }
@@ -237,12 +257,12 @@ public class MavenArtifactDownloader {
    */
   @SuppressWarnings("BooleanMethodIsAlwaysInverted")
   private boolean installArtifact(MavenArtifact artifact, SimpleMavenRepository target) throws IOException {
-    try (InputStream stream = findArtifactStream(artifact)) {
+    try(InputStream stream = findArtifactStream(artifact)) {
       // Try to find the given artifact
-      if (stream != null) {
+      if(stream != null) {
         // The artifact has been found, install it
         Path targetPath = target.getArtifactPath(artifact);
-        if (!Files.isDirectory(targetPath.getParent())) {
+        if(!Files.isDirectory(targetPath.getParent())) {
           // Make sure the parent directories exist
           Files.createDirectories(targetPath.getParent());
         }

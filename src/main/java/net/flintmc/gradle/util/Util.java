@@ -5,12 +5,17 @@ import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.JsonNode;
+import net.flintmc.gradle.json.JsonConverter;
+import net.flintmc.gradle.json.JsonConverterException;
+import net.flintmc.installer.impl.repository.models.InternalModelSerializer;
+import net.flintmc.installer.impl.repository.models.PackageModel;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.http.HttpResponse;
 import org.apache.http.StatusLine;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
+import org.gradle.api.Project;
 
-import javax.naming.spi.ObjectFactory;
 import java.io.*;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -18,6 +23,8 @@ import java.nio.file.CopyOption;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -250,15 +257,10 @@ public class Util {
     URI current = base;
 
     for(String path : paths) {
-      while(path.startsWith("//")) {
+      while(path.startsWith("/")) {
         path = path.substring(1);
       }
-
-      if(!path.startsWith("/")) {
-        path = "/" + path;
-      }
-
-      current = current.resolve(path);
+      current = current.resolve(current.getPath() + '/' + path);
     }
 
     return current;
@@ -320,5 +322,59 @@ public class Util {
    */
   public static String toStringOrUndefined(Object value) {
     return value == null ? "undefined" : value.toString();
+  }
+
+  /**
+   * Checks if a file is a package jar file.
+   *
+   * @param file The file to check
+   * @return {@code true} if the jar is a package jar, {@code false} otherwise
+   * @throws IOException If an I/O error occurs
+   */
+  public static boolean isPackageJar(File file) throws IOException {
+    if(file.getName().endsWith(".jar")) {
+      // Needs to be a jar file
+      return false;
+    }
+
+    try(JarFile jarFile = new JarFile(file)) {
+      return jarFile.getJarEntry("manifest.json") != null;
+    }
+  }
+
+  /**
+   * Tries to read the package model from a jar file.
+   *
+   * @param file The file to read the package model from
+   * @return The read package model, or {@code null}, if the file is not a jar or does not contain a manifest
+   * @throws IOException If an I/O error occurs
+   * @throws JsonConverterException If the {@code manifest.json} can't be read as a {@link PackageModel}
+   */
+  public static PackageModel getPackageModelFromJar(File file) throws IOException, JsonConverterException {
+    if(file.getName().endsWith(".jar")) {
+      // Needs to be a jar file
+      return null;
+    }
+
+    try(JarFile jarFile = new JarFile(file)) {
+      JarEntry entry = jarFile.getJarEntry("manifest.json");
+      if(entry == null) {
+        return null;
+      }
+
+      try(InputStream stream = jarFile.getInputStream(entry)) {
+        return JsonConverter.streamToObject(stream, PackageModel.class);
+      }
+    }
+  }
+
+  /**
+   * Retrieves the per project unique cache directory.
+   *
+   * @return The per project unique cache directory
+   */
+  public static File getProjectCacheDir(Project project) {
+    File buildDir = project.getBuildDir();
+    return new File(buildDir, "flint/" + DigestUtils.md5Hex(project.getPath()));
   }
 }

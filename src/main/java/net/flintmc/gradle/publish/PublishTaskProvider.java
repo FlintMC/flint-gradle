@@ -10,10 +10,10 @@ public class PublishTaskProvider {
    * @param project The project to install the task on
    */
   public void installPublishTask(Project project) {
-    project.getTasks().create("publishFlint", task -> {
-      task.setGroup("publish");
-      task.dependsOn("publish", "publishFlintStaticFiles", "publishFlintManifest");
-    });
+    // project.getTasks().create("publishFlint", task -> {
+    //   task.setGroup("publish");
+    //   task.dependsOn("publish", "publishFlintStaticFiles", "publishFlintManifest");
+    // });
   }
 
 }

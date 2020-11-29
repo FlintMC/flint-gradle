@@ -31,5 +31,12 @@ public interface ReadableMavenRepository {
    */
   MavenPom getArtifactPom(MavenArtifact artifact) throws IOException;
 
-  URI getArtifactUrl(MavenArtifact artifact) throws URISyntaxException;
+  /**
+   * Retrieves the URI for the given artifact.
+   *
+   * @param artifact The artifact to retrieve the URI for
+   * @return The URI of the artifact or {@code null} if the artifact could not be found
+   * @throws IOException If an I/O error occurs while checking if the artifact exists
+   */
+  URI getArtifactURI(MavenArtifact artifact) throws IOException;
 }

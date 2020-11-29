@@ -9,6 +9,7 @@ import net.flintmc.gradle.manifest.ManifestConfigurator;
 import net.flintmc.gradle.maven.MavenArtifactDownloader;
 import net.flintmc.gradle.maven.RemoteMavenRepository;
 import net.flintmc.gradle.maven.SimpleMavenRepository;
+import net.flintmc.gradle.maven.cache.MavenArtifactURLCache;
 import net.flintmc.gradle.maven.pom.MavenArtifact;
 import net.flintmc.gradle.minecraft.MinecraftRepository;
 import net.flintmc.gradle.minecraft.yggdrasil.YggdrasilAuthenticator;
@@ -25,6 +26,7 @@ import org.gradle.api.invocation.Gradle;
 import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.net.URI;
 import java.nio.file.Path;
 import java.util.Collection;
 
@@ -38,6 +40,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
 
   private HttpClient httpClient;
   private MavenArtifactDownloader downloader;
+  private MavenArtifactURLCache mavenArtifactURLCache;
 
   private FlintGradleExtension extension;
   private JavaPluginInteraction interaction;
@@ -59,7 +62,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
     project.getPlugins().apply("maven-publish");
 
 
-    for (String version : versions) {
+    for(String version : versions) {
       project.getConfigurations().maybeCreate(String.format("%sAnnotationProcessor", version.replace('.', '_')));
       Configuration versionedConfiguration = project.getConfigurations().maybeCreate(String.format("%sImplementation", version.replace('.', '_')));
 
@@ -72,17 +75,18 @@ public class FlintGradlePlugin implements Plugin<Project> {
     project.afterEvaluate(p -> onAfterEvaluate());
 
     Project parent = project;
-    while ((parent = parent.getParent()) != null) {
+    while((parent = parent.getParent()) != null) {
       FlintGradlePlugin parentPlugin = parent.getPlugins().findPlugin(getClass());
-      if (parentPlugin == null) continue;
+      if(parentPlugin == null) {
+        continue;
+      }
       this.parentPlugin = parentPlugin;
       break;
     }
 
     this.interaction = new JavaPluginInteraction(project);
-    this.manifestConfigurator = new ManifestConfigurator(project);
 
-    if (this.parentPlugin == null) {
+    if(this.parentPlugin == null) {
 
       System.setProperty("org.apache.commons.logging.Log", "org.apache.commons.logging.impl.SimpleLog");
 
@@ -97,9 +101,9 @@ public class FlintGradlePlugin implements Plugin<Project> {
 
       downloader = new MavenArtifactDownloader();
 
-      if (httpClient != null) {
-        downloader.addSource(new RemoteMavenRepository(httpClient, "https://libraries.minecraft.net"));
-        downloader.addSource(new RemoteMavenRepository(httpClient, "https://repo.maven.apache.org/maven2/"));
+      if(httpClient != null) {
+        downloader.addSource(new RemoteMavenRepository(httpClient, URI.create("https://libraries.minecraft.net")));
+        downloader.addSource(new RemoteMavenRepository(httpClient, URI.create("https://repo.maven.apache.org/maven2/")));
       }
 
       this.extension = project.getExtensions().create(FlintGradleExtension.NAME, FlintGradleExtension.class, this);
@@ -115,7 +119,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
         );
 
         this.internalRepository = new SimpleMavenRepository(flintGradlePath.resolve("internal-repository"));
-      } catch (IOException e) {
+      } catch(IOException e) {
         throw new UncheckedIOException("Failed to create minecraft repository", e);
       }
 
@@ -123,7 +127,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
         this.authenticator = httpClient != null ?
             new YggdrasilAuthenticator(httpClient, flintGradlePath.resolve("yggdrasil")) :
             null;
-      } catch (IOException e) {
+      } catch(IOException e) {
         throw new UncheckedIOException("Failed to create Yggdrasil authenticator", e);
       }
 
@@ -132,6 +136,12 @@ public class FlintGradlePlugin implements Plugin<Project> {
       this.jarTaskProvider = new JarTaskProvider(this);
       this.assetPublisher = new AssetPublisher(PUBLISH_BASE_URL);
       this.publishTaskProvider = new PublishTaskProvider();
+      this.mavenArtifactURLCache = new MavenArtifactURLCache(flintGradlePath.resolve("maven-artifact-urls"), httpClient == null);
+      try {
+        this.mavenArtifactURLCache.setup();
+      } catch(IOException e) {
+        throw new UncheckedIOException("Failed to setup artifact URL cache", e);
+      }
     } else {
       this.httpClient = parentPlugin.httpClient;
       this.downloader = parentPlugin.downloader;
@@ -144,8 +154,10 @@ public class FlintGradlePlugin implements Plugin<Project> {
       this.jarTaskProvider = parentPlugin.jarTaskProvider;
       this.assetPublisher = parentPlugin.assetPublisher;
       this.publishTaskProvider = parentPlugin.publishTaskProvider;
+      this.mavenArtifactURLCache = parentPlugin.mavenArtifactURLCache;
     }
 
+    this.manifestConfigurator = new ManifestConfigurator(this);
     project.afterEvaluate((p) -> extension.ensureConfigured());
   }
 
@@ -155,7 +167,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
   public void onExtensionConfigured() {
     interaction.setup(extension);
 
-    for (String version : extension.getMinecraftVersions()) {
+    for(String version : extension.getMinecraftVersions()) {
       handleVersion(version);
     }
 
@@ -169,8 +181,8 @@ public class FlintGradlePlugin implements Plugin<Project> {
       repo.setUrl(minecraftRepository.getBaseDir());
     });
 
-    for (Project subProject : project.getSubprojects()) {
-      if (!extension.getProjectFilter().test(subProject)) {
+    for(Project subProject : project.getSubprojects()) {
+      if(!extension.getProjectFilter().test(subProject)) {
         continue;
       }
       subProject.getRepositories().maven(repo -> {
@@ -207,12 +219,12 @@ public class FlintGradlePlugin implements Plugin<Project> {
     Collection<MavenArtifact> compileArtifacts = environment.getCompileArtifacts(client, server);
     Collection<MavenArtifact> runtimeArtifacts = environment.getRuntimeArtifacts(client, server);
 
-    if (!allInstalled(compileArtifacts, minecraftRepository) ||
+    if(!allInstalled(compileArtifacts, minecraftRepository) ||
         !allInstalled(runtimeArtifacts, minecraftRepository)) {
       try {
         // Some artifacts are missing, request installation with the given environment
         minecraftRepository.install(version, environment, internalRepository, downloader, project);
-      } catch (IOException e) {
+      } catch(IOException e) {
         throw new GradleException("Failed to install minecraft version " + version, e);
       }
     }
@@ -249,28 +261,32 @@ public class FlintGradlePlugin implements Plugin<Project> {
    * @return {@code true} if all given artifacts are installed, {@code false} otherwise
    */
   private boolean allInstalled(Collection<MavenArtifact> artifacts, SimpleMavenRepository repository) {
-    boolean allInstalled = true;
-
-    for (MavenArtifact artifact : artifacts) {
-      // Simply execute a logical or to build a chain of checks
-      allInstalled = repository.isInstalled(artifact);
-
-      if (!allInstalled) {
+    for(MavenArtifact artifact : artifacts) {
+      if(!repository.isInstalled(artifact)) {
         // Avoid further check to save time
-        break;
+        return false;
       }
     }
 
-    return allInstalled;
+    return true;
   }
 
   /**
    * Retrieves the HTTP client the plugin uses for downloading files.
    *
-   * @return The HTTP client of this plugin
+   * @return The HTTP client of this plugin, or {@code null}, when using the offline mode
    */
   public HttpClient getHttpClient() {
     return httpClient;
+  }
+
+  /**
+   * Retrieves the maven artifact URL cache the plugin uses for caching maven artifact URL's.
+   *
+   * @return The maven artifact URL cache
+   */
+  public MavenArtifactURLCache getMavenArtifactURLCache() {
+    return mavenArtifactURLCache;
   }
 
   public AssetPublisher getAssetPublisher() {
@@ -279,10 +295,6 @@ public class FlintGradlePlugin implements Plugin<Project> {
 
   public FlintGradleExtension getExtension() {
     return extension;
-  }
-
-  public String getPublishBaseUrl() {
-    return PUBLISH_BASE_URL;
   }
 
   public Project getProject() {

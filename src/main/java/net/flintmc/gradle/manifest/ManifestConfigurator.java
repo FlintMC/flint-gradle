@@ -1,8 +1,15 @@
 package net.flintmc.gradle.manifest;
 
+import net.flintmc.gradle.FlintGradlePlugin;
 import net.flintmc.gradle.extension.FlintGradleExtension;
+import net.flintmc.gradle.manifest.data.ManifestMavenDependencyInput;
+import net.flintmc.gradle.manifest.data.ManifestRepositoryInput;
+import net.flintmc.gradle.manifest.data.ManifestStaticFileInput;
+import net.flintmc.gradle.maven.cache.MavenArtifactURLCache;
 import net.flintmc.gradle.property.FlintPluginProperties;
+import net.flintmc.gradle.util.MaybeNull;
 import net.flintmc.gradle.util.Util;
+import org.apache.http.client.HttpClient;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.repositories.MavenArtifactRepository;
 import org.gradle.api.component.SoftwareComponent;
@@ -15,14 +22,18 @@ import java.net.URI;
 
 public class ManifestConfigurator {
   private final Project project;
+  private final HttpClient httpClient;
+  private final MavenArtifactURLCache mavenArtifactURLCache;
 
   /**
-   * Constructs a new {@link ManifestConfigurator} for the given project.
+   * Constructs a new {@link ManifestConfigurator} for the given plugin.
    *
-   * @param project The project to configure the manifest for
+   * @param plugin The plugin to configure the manifest for
    */
-  public ManifestConfigurator(Project project) {
-    this.project = project;
+  public ManifestConfigurator(FlintGradlePlugin plugin) {
+    this.project = plugin.getProject();
+    this.httpClient = plugin.getHttpClient();
+    this.mavenArtifactURLCache = plugin.getMavenArtifactURLCache();
   }
 
   private URI distributorMavenURI;
@@ -37,19 +48,23 @@ public class ManifestConfigurator {
     }
 
     FlintGradleExtension extension = project.getExtensions().getByType(FlintGradleExtension.class);
-    if(extension.shouldAutoConfigurePublishing()) {
+
+    if(extension.shouldAutoConfigurePublishing() && extension.shouldEnablePublishing()) {
       // Auto configuration is enabled
       PublishingExtension publishingExtension = project.getExtensions().findByType(PublishingExtension.class);
 
       // Build the distributor URL in form of <host>/maven/<channel>
-      URI distributorUrl = getDistributorMavenURI("Set shouldAutoConfigurePublishing to false in the flint extension");
+      URI distributorUrl = getDistributorMavenURI(
+          "Set enablePublishing to false in the flint extension",
+          "Set shouldAutoConfigurePublishing to false in the flint extension");
 
       // Retrieve either a bearer or publish token
       String bearerToken = FlintPluginProperties.DISTRIBUTOR_BEARER_TOKEN.resolve(project);
       String publishToken = null;
       if(bearerToken == null) {
         publishToken = FlintPluginProperties.DISTRIBUTOR_PUBLISH_TOKEN
-            .require(project, "Set shouldAutoConfigurePublishing to false in the flint extension");
+            .require(project, "Set enablePublishing to false in the flint extension",
+                "Set shouldAutoConfigurePublishing to false in the flint extension");
       }
 
       if(publishingExtension != null) {
@@ -87,6 +102,26 @@ public class ManifestConfigurator {
         repository.getAuthentication().create("header", HttpHeaderAuthentication.class);
       }
     }
+
+    // Create the task inputs
+    ManifestMavenDependencyInput mavenDependencyInput = new ManifestMavenDependencyInput();
+    ManifestRepositoryInput repositoryInput = new ManifestRepositoryInput();
+    ManifestStaticFileInput staticFileInput = new ManifestStaticFileInput();
+
+    // Compute the inputs
+    mavenDependencyInput.compute(project);
+    repositoryInput.compute(project);
+    staticFileInput.compute(project, this);
+
+    // Create the tasks
+    project.getTasks().create(
+        "resolveArtifactURLs",
+        ResolveArtifactURLsTask.class,
+        new MaybeNull<>(httpClient),
+        mavenArtifactURLCache,
+        repositoryInput,
+        mavenDependencyInput
+    );
   }
 
   /**
@@ -103,10 +138,10 @@ public class ManifestConfigurator {
   /**
    * Retrieves the base URI of the distributor repository.
    *
-   * @param notAvailableSolution Message to display as a solution in case URI can't be computed
+   * @param notAvailableSolution Messages to display as a solution in case URI can't be computed
    * @return The base URI of the distributor repository
    */
-  public URI getDistributorMavenURI(String notAvailableSolution) {
+  public URI getDistributorMavenURI(String... notAvailableSolution) {
     if(distributorMavenURI == null) {
       distributorMavenURI = Util.concatURI(
           FlintPluginProperties.DISTRIBUTOR_URL
@@ -123,10 +158,10 @@ public class ManifestConfigurator {
   /**
    * Retrieves the base URI of the distributor repository including the project namespace.
    *
-   * @param notAvailableSolution Message to display as a solution in case the URI can't be computed
+   * @param notAvailableSolution Messages to display as a solution in case the URI can't be computed
    * @return The base URI of the distributor repository including the project namespace
    */
-  public URI getProjectMavenURI(String notAvailableSolution) {
+  public URI getProjectMavenURI(String... notAvailableSolution) {
     if(projectMavenURI == null) {
       URI distributorURI = getDistributorMavenURI(notAvailableSolution);
 

@@ -9,6 +9,7 @@ import org.gradle.util.Configurable;
 import org.gradle.util.ConfigureUtil;
 
 import javax.annotation.Nonnull;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Path;
 import java.util.*;
@@ -33,6 +34,7 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
   private boolean disableInternalSourceSet;
   private Type type = Type.PACKAGE;
   private String flintVersion;
+  private boolean enablePublishing;
   private boolean autoConfigurePublishing;
 
   /**
@@ -47,6 +49,7 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
     this.projectFilter = p -> p.getPluginManager().hasPlugin("java");
     this.runsExtension = new FlintRunsExtension();
     this.staticFilesExtension = new FlintStaticFilesExtension(plugin.getProject());
+    this.enablePublishing = true;
     this.autoConfigurePublishing = true;
   }
 
@@ -65,6 +68,7 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
     this.type = parent.type;
     this.authors = parent.authors != null ? Arrays.copyOf(parent.authors, parent.authors.length) : new String[]{};
     this.flintVersion = parent.flintVersion;
+    this.enablePublishing = parent.enablePublishing;
     this.autoConfigurePublishing = parent.autoConfigurePublishing;
   }
 
@@ -131,7 +135,7 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
         this.staticFilesExtension.getStaticFileDescriptions();
 
     FlintStaticFileDescription description = staticFileDescriptions.create(upstreamName);
-    description.from(from);
+    description.from(from.toUri());
     description.to(to);
   }
 
@@ -140,10 +144,11 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
    *
    * @param url The url to retrieve the file from
    * @param to  The path to store the file to
+   * @throws URISyntaxException If the URL can't be converted to an URI
    * @deprecated Use the {@link #staticFiles(Action)} method instead.
    */
   @Deprecated
-  public void urlFileEntry(URL url, Path to) {
+  public void urlFileEntry(URL url, Path to) throws URISyntaxException {
     plugin.getProject().getLogger().warn(
         "The urlFileEntry method of the flint extension is deprecated, use the staticFiles configuration instead");
 
@@ -151,7 +156,7 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
         this.staticFilesExtension.getStaticFileDescriptions();
 
     FlintStaticFileDescription description = staticFileDescriptions.create(to.getFileName().toString());
-    description.from(url);
+    description.from(url.toURI());
     description.to(to);
   }
 
@@ -345,6 +350,24 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
    */
   public String getPublishToken() {
     return publishToken;
+  }
+
+  /**
+   * Overwrites whether the publishing tasks should be created.
+   *
+   * @param enablePublishing If {@code true}, the plugin will create a few publish tasks
+   */
+  public void enablePublishing(boolean enablePublishing) {
+    this.enablePublishing = enablePublishing;
+  }
+
+  /**
+   * Determines whether the publish tasks should be created.
+   *
+   * @return {@code true} if the publish tasks should be created, {@code false} otherwise
+   */
+  public boolean shouldEnablePublishing() {
+    return enablePublishing;
   }
 
   /**

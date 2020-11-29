@@ -9,6 +9,7 @@ import org.gradle.api.tasks.Internal;
 import org.gradle.authentication.Authentication;
 import org.gradle.authentication.http.HttpHeaderAuthentication;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -36,6 +37,12 @@ public class ManifestRepositoryInput {
       if(repository instanceof MavenArtifactRepository) {
         // Found a maven repository, the only type we currently process
         MavenArtifactRepository mavenArtifactRepository = (MavenArtifactRepository) repository;
+        URI repositoryURI = mavenArtifactRepository.getUrl();
+
+        if(!repositoryURI.getScheme().equals("http") && !repositoryURI.getScheme().equals("https")) {
+          continue;
+        }
+
         String authenticationHeader = null;
         String authenticationContent = null;
 

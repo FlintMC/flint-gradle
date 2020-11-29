@@ -8,6 +8,7 @@ import org.gradle.api.logging.Logging;
 import javax.annotation.Nonnull;
 import java.io.File;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -43,10 +44,19 @@ public class FlintStaticFileDescription implements Named {
    *
    * @param source The source of this static file
    */
-  public void from(Object source) {
+  public void from(Object source) throws URISyntaxException {
     if(source instanceof URI) {
       from((URI) source);
     } else {
+      if(source instanceof String) {
+        String src = (String) source;
+
+        if(src.contains("://")) {
+          from(new URI(src));
+          return;
+        }
+      }
+
       from(project.file(source).toURI());
     }
   }
@@ -70,9 +80,28 @@ public class FlintStaticFileDescription implements Named {
         this.sourceFile = new File(uri);
         break;
 
+      case "jar":
+        URI sourceURI = URI.create(uri.getSchemeSpecificPart());
+
+        if(sourceURI.getScheme().equals("http")) {
+          LOGGER.warn("Static file {} uses unsafe http scheme", name);
+          this.sourceURI = uri;
+          break;
+        }
+
+        if(sourceURI.getScheme().equals("https")) {
+          this.sourceURI = uri;
+          break;
+        }
+
+        throw new IllegalArgumentException(
+            "Unsupported URI scheme jar:" + sourceURI.getScheme() +
+                ", only https:// and file:// are supported (or their corresponding jar: prefixes)");
+
       default:
         throw new IllegalArgumentException(
-            "Unsupported URI scheme " + uri.getScheme() + ", only https:// and file:// are supported");
+            "Unsupported URI scheme " + uri.getScheme() +
+                ", only https:// and file:// are supported (or their corresponding jar: prefixes)");
     }
   }
 

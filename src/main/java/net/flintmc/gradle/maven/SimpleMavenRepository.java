@@ -5,6 +5,7 @@ import net.flintmc.gradle.maven.pom.MavenPom;
 import net.flintmc.gradle.maven.pom.io.PomReader;
 import net.flintmc.gradle.maven.pom.io.PomWriter;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -156,18 +157,12 @@ public class SimpleMavenRepository implements ReadableMavenRepository {
     return baseDir;
   }
 
-  /**
-   * {@inheritDoc}
-   */
   @Override
   public InputStream getArtifactStream(MavenArtifact artifact) throws IOException {
     Path artifactPath = getArtifactPath(artifact);
     return Files.exists(artifactPath) ? Files.newInputStream(artifactPath) : null;
   }
 
-  /**
-   * {@inheritDoc}
-   */
   @Override
   public MavenPom getArtifactPom(MavenArtifact artifact) throws IOException {
     Path pomPath = getPomPath(artifact);
@@ -175,7 +170,8 @@ public class SimpleMavenRepository implements ReadableMavenRepository {
   }
 
   @Override
-  public URI getArtifactUrl(MavenArtifact artifact) {
-    return this.getArtifactPath(artifact).toUri();
+  public URI getArtifactURI(MavenArtifact artifact) {
+    Path artifactPath = getArtifactPath(artifact);
+    return Files.exists(artifactPath) ? artifactPath.toUri() : null;
   }
 }
