@@ -1,5 +1,6 @@
-package net.flintmc.gradle.manifest;
+package net.flintmc.gradle.manifest.tasks;
 
+import net.flintmc.gradle.manifest.cache.BoundMavenDependencies;
 import net.flintmc.gradle.manifest.data.ManifestMavenDependency;
 import net.flintmc.gradle.manifest.data.ManifestMavenDependencyInput;
 import net.flintmc.gradle.manifest.data.ManifestRepository;
@@ -35,7 +36,7 @@ public class ResolveArtifactURLsTask extends DefaultTask {
   private File cacheFile;
 
   /**
-   * Creates a new {@link ResolveArtifactURLsTask}.
+   * Constructs a new {@link ResolveArtifactURLsTask}.
    *
    * @param httpClient            The HTTP client to use for repository access
    * @param mavenArtifactURLCache The cache to use for caching maven artifact URL's
@@ -60,6 +61,7 @@ public class ResolveArtifactURLsTask extends DefaultTask {
    *
    * @return The repository inputs this task is using
    */
+  @SuppressWarnings("unused") // Required for @Nested on `repositoryInput`
   public ManifestRepositoryInput getRepositoryInput() {
     return repositoryInput;
   }
@@ -69,6 +71,7 @@ public class ResolveArtifactURLsTask extends DefaultTask {
    *
    * @return The dependency inputs this task is using
    */
+  @SuppressWarnings("unused") // Required for @Nested on `dependencyInput`
   public ManifestMavenDependencyInput getDependencyInput() {
     return dependencyInput;
   }
@@ -127,7 +130,8 @@ public class ResolveArtifactURLsTask extends DefaultTask {
     // Resolve all artifact URI's
     Map<MavenArtifact, URI> resolvedArtifacts = mavenArtifactURLCache.resolve(
         artifactsToResolve,
-        repositories
+        repositories,
+        false
     );
 
     // Map back the artifacts to dependencies

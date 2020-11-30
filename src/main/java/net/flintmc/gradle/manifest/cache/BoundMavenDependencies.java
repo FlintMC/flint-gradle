@@ -1,7 +1,6 @@
-package net.flintmc.gradle.manifest;
+package net.flintmc.gradle.manifest.cache;
 
 import net.flintmc.gradle.manifest.data.ManifestMavenDependency;
-import net.flintmc.gradle.maven.pom.MavenArtifact;
 import net.flintmc.gradle.util.Util;
 import org.gradle.api.Project;
 
@@ -26,7 +25,7 @@ public class BoundMavenDependencies {
   }
 
   /**
-   * Saves the bound dependencies to a file
+   * Saves the bound dependencies to a file.
    *
    * @param file         The file to save the bound dependencies to
    * @param dependencies The bound dependencies to save

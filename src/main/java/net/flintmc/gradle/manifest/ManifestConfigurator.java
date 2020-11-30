@@ -3,8 +3,12 @@ package net.flintmc.gradle.manifest;
 import net.flintmc.gradle.FlintGradlePlugin;
 import net.flintmc.gradle.extension.FlintGradleExtension;
 import net.flintmc.gradle.manifest.data.ManifestMavenDependencyInput;
+import net.flintmc.gradle.manifest.data.ManifestPackageDependencyInput;
 import net.flintmc.gradle.manifest.data.ManifestRepositoryInput;
 import net.flintmc.gradle.manifest.data.ManifestStaticFileInput;
+import net.flintmc.gradle.manifest.tasks.GenerateFlintManifestTask;
+import net.flintmc.gradle.manifest.tasks.GenerateStaticFileChecksumsTask;
+import net.flintmc.gradle.manifest.tasks.ResolveArtifactURLsTask;
 import net.flintmc.gradle.maven.cache.MavenArtifactURLCache;
 import net.flintmc.gradle.property.FlintPluginProperties;
 import net.flintmc.gradle.util.MaybeNull;
@@ -18,7 +22,9 @@ import org.gradle.api.publish.PublishingExtension;
 import org.gradle.api.publish.maven.MavenPublication;
 import org.gradle.authentication.http.HttpHeaderAuthentication;
 
+import java.io.File;
 import java.net.URI;
+import java.util.Arrays;
 
 public class ManifestConfigurator {
   private final Project project;
@@ -107,14 +113,16 @@ public class ManifestConfigurator {
     ManifestMavenDependencyInput mavenDependencyInput = new ManifestMavenDependencyInput();
     ManifestRepositoryInput repositoryInput = new ManifestRepositoryInput();
     ManifestStaticFileInput staticFileInput = new ManifestStaticFileInput();
+    ManifestPackageDependencyInput packageDependencyInput = new ManifestPackageDependencyInput();
 
     // Compute the inputs
     mavenDependencyInput.compute(project);
     repositoryInput.compute(project);
     staticFileInput.compute(project, this);
+    packageDependencyInput.compute(project);
 
     // Create the tasks
-    project.getTasks().create(
+    ResolveArtifactURLsTask resolveArtifactURLsTask = project.getTasks().create(
         "resolveArtifactURLs",
         ResolveArtifactURLsTask.class,
         new MaybeNull<>(httpClient),
@@ -122,6 +130,30 @@ public class ManifestConfigurator {
         repositoryInput,
         mavenDependencyInput
     );
+    resolveArtifactURLsTask.setGroup("publishing");
+    resolveArtifactURLsTask.setDescription("Resolves the URLs of all package dependency artifacts and caches them");
+
+    GenerateStaticFileChecksumsTask generateStaticFileChecksumsTask = project.getTasks().create(
+        "generateStaticFileChecksums",
+        GenerateStaticFileChecksumsTask.class,
+        new MaybeNull<>(httpClient),
+        staticFileInput
+    );
+    generateStaticFileChecksumsTask.setGroup("publishing");
+    generateStaticFileChecksumsTask.setDescription("Calculates the checksums of all static files and caches them");
+
+    File manifestFile = new File(Util.getProjectCacheDir(project), "manifest.json");
+
+    GenerateFlintManifestTask generateFlintManifestTask = project.getTasks().create(
+        "generateFlintManifest",
+        GenerateFlintManifestTask.class,
+        manifestFile,
+        staticFileInput,
+        packageDependencyInput
+    );
+    generateFlintManifestTask.setGroup("publishing");
+    generateFlintManifestTask.setDescription("Generates the flint manifest.json and caches it");
+    generateFlintManifestTask.setDependsOn(Arrays.asList(resolveArtifactURLsTask, generateStaticFileChecksumsTask));
   }
 
   /**

@@ -18,7 +18,6 @@ import java.net.URI;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
-import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.*;
@@ -82,13 +81,18 @@ public class MavenArtifactURLCache {
    *
    * @param artifacts          The artifacts to resolve
    * @param remoteRepositories The repositories to use for resolving
+   * @param resolveFullURI     If {@code true}, the full artifact URI will be returned, if {@code false}, the maven
+   *                           repository base URI will be returned
    * @return The artifacts and their resolved URL's
    * @throws IOException If an I/O error occurs
    */
   public synchronized Map<MavenArtifact, URI> resolve(
-      Collection<MavenArtifact> artifacts, Collection<RemoteMavenRepository> remoteRepositories) throws IOException {
+      Collection<MavenArtifact> artifacts,
+      Collection<RemoteMavenRepository> remoteRepositories,
+      boolean resolveFullURI
+  ) throws IOException {
     Map<MavenArtifact, URI> out = new HashMap<>();
-    Collection<MavenArtifact> missing = resolveInternal(out, artifacts, remoteRepositories, true);
+    Collection<MavenArtifact> missing = resolveInternal(out, artifacts, remoteRepositories, resolveFullURI, true);
 
     if(missing.isEmpty()) {
       return out;
@@ -116,6 +120,8 @@ public class MavenArtifactURLCache {
    * @param out                The map to store resolved artifacts and their URL's into
    * @param artifacts          The artifacts to resolve the URL's for
    * @param remoteRepositories The repositories to consider while searching
+   * @param resolveFullURI     If {@code true}, the full artifact URI will be returned, if {@code false}, the maven
+   *                           repository base URI will be returned
    * @param autoResolveMissing If {@code true}, this method will try to resolve missing artifacts online
    * @return A collection of artifacts which could not be resolved
    * @throws IOException If an I/O error occurs
@@ -124,6 +130,7 @@ public class MavenArtifactURLCache {
       Map<MavenArtifact, URI> out,
       Collection<MavenArtifact> artifacts,
       Collection<RemoteMavenRepository> remoteRepositories,
+      boolean resolveFullURI,
       boolean autoResolveMissing
   ) throws IOException {
     Collection<MavenArtifact> missing = new HashSet<>();
@@ -145,7 +152,7 @@ public class MavenArtifactURLCache {
 
         if(artifactURI != null) {
           // Found the artifact
-          foundURI = artifactURI;
+          foundURI = resolveFullURI ? artifactURI : baseURI;
           break;
         }
       }
@@ -164,7 +171,8 @@ public class MavenArtifactURLCache {
       return resolveMissing(
           out,
           artifacts,
-          remoteRepositories
+          remoteRepositories,
+          resolveFullURI
       );
     } else {
       return missing;
@@ -177,20 +185,24 @@ public class MavenArtifactURLCache {
    * @param out                The map to store resolved artifacts into
    * @param artifacts          The artifacts to resolve
    * @param remoteRepositories The repositories to resolve the artifacts from
+   * @param resolveFullURI     If {@code true}, the full artifact URI will be returned, if {@code false}, the maven
+   *                           repository base URI will be returned
    * @return All artifacts which could not be resolved
    * @throws IOException If an I/O error occurs
    */
   private Collection<MavenArtifact> resolveMissing(
       Map<MavenArtifact, URI> out,
       Collection<MavenArtifact> artifacts,
-      Collection<RemoteMavenRepository> remoteRepositories
+      Collection<RemoteMavenRepository> remoteRepositories,
+      boolean resolveFullURI
   ) throws IOException {
     return lock((cacheChannel) -> {
       // Reload the cache file, we now have a lock on it
       load(cacheChannel);
 
       // Now that we have reloaded the cache file, try to resolve again
-      Collection<MavenArtifact> stillMissing = resolveInternal(out, artifacts, remoteRepositories, false);
+      Collection<MavenArtifact> stillMissing = resolveInternal(
+          out, artifacts, remoteRepositories, resolveFullURI, false);
       if(stillMissing.isEmpty()) {
         // All dependencies resolved after reload, nothing left to do
         return Collections.emptySet();
@@ -217,7 +229,7 @@ public class MavenArtifactURLCache {
           // Resolved the artifact
           RemoteMavenRepository remoteMavenRepository = (RemoteMavenRepository) result.getFirst();
           getOrCreateCacheEntry(missing).put(remoteMavenRepository.getBaseURI(), result.getSecond());
-          out.put(missing, result.getSecond());
+          out.put(missing, resolveFullURI ? result.getSecond() : remoteMavenRepository.getBaseURI());
         } else {
           // Failed to resolve the artifact
           unresolvable.add(missing);

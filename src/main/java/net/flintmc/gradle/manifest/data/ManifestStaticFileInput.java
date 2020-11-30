@@ -8,6 +8,7 @@ import org.gradle.api.NamedDomainObjectContainer;
 import org.gradle.api.Project;
 import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.InputFiles;
+import org.gradle.api.tasks.Internal;
 
 import java.io.*;
 import java.net.URI;
@@ -20,7 +21,10 @@ import java.util.Set;
  * Cacheable listing of static file entries.
  */
 public class ManifestStaticFileInput {
+  @Internal
   private final Set<ManifestStaticFile> remoteFiles;
+
+  @Internal
   private final Map<File, ManifestStaticFile> localFiles;
 
   public ManifestStaticFileInput() {
@@ -71,13 +75,11 @@ public class ManifestStaticFileInput {
     return Util.concatURI(projectMavenURI, name);
   }
 
-  @Input
   public Set<ManifestStaticFile> getRemoteFiles() {
     return remoteFiles;
   }
 
-  @InputFiles
-  public Set<File> getLocalFiles() {
-    return localFiles.keySet();
+  public Map<File, ManifestStaticFile> getLocalFiles() {
+    return localFiles;
   }
 }
