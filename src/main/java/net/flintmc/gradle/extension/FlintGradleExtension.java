@@ -2,6 +2,7 @@ package net.flintmc.gradle.extension;
 
 import groovy.lang.Closure;
 import net.flintmc.gradle.FlintGradlePlugin;
+import net.flintmc.gradle.util.Util;
 import org.gradle.api.Action;
 import org.gradle.api.NamedDomainObjectContainer;
 import org.gradle.api.Project;
@@ -128,7 +129,7 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
    */
   @Deprecated
   public void staticFileEntry(Path from, Path to, String upstreamName) {
-    plugin.getProject().getLogger().warn(
+    Util.nagDeprecated(plugin.getProject(),
         "The staticFileEntry method of the flint extension is deprecated, use the staticFiles configuration instead");
 
     NamedDomainObjectContainer<FlintStaticFileDescription> staticFileDescriptions =
@@ -149,7 +150,7 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
    */
   @Deprecated
   public void urlFileEntry(URL url, Path to) throws URISyntaxException {
-    plugin.getProject().getLogger().warn(
+    Util.nagDeprecated(plugin.getProject(),
         "The urlFileEntry method of the flint extension is deprecated, use the staticFiles configuration instead");
 
     NamedDomainObjectContainer<FlintStaticFileDescription> staticFileDescriptions =

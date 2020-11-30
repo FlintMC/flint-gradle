@@ -347,7 +347,7 @@ public class Util {
    *
    * @param file The file to read the package model from
    * @return The read package model, or {@code null}, if the file is not a jar or does not contain a manifest
-   * @throws IOException If an I/O error occurs
+   * @throws IOException            If an I/O error occurs
    * @throws JsonConverterException If the {@code manifest.json} can't be read as a {@link PackageModel}
    */
   public static PackageModel getPackageModelFromJar(File file) throws IOException, JsonConverterException {
@@ -376,5 +376,15 @@ public class Util {
   public static File getProjectCacheDir(Project project) {
     File buildDir = project.getBuildDir();
     return new File(buildDir, "flint/" + DigestUtils.md5Hex(project.getPath()));
+  }
+
+  /**
+   * Prints a deprecation warning with a stacktrace.
+   *
+   * @param project The project executing the deprecated thing
+   * @param message The message to print
+   */
+  public static void nagDeprecated(Project project, String message) {
+    project.getLogger().warn("Deprecation warning:", new Throwable(message));
   }
 }
