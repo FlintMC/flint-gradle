@@ -3,7 +3,6 @@ package net.flintmc.gradle.manifest.tasks;
 import net.flintmc.gradle.FlintGradleException;
 import net.flintmc.gradle.extension.FlintGradleExtension;
 import net.flintmc.gradle.json.JsonConverter;
-import net.flintmc.gradle.manifest.ManifestConfigurator;
 import net.flintmc.gradle.manifest.cache.BoundMavenDependencies;
 import net.flintmc.gradle.manifest.cache.StaticFileChecksums;
 import net.flintmc.gradle.manifest.data.*;

@@ -1,13 +1,16 @@
 package net.flintmc.gradle.manifest.data;
 
 import net.flintmc.gradle.FlintGradleException;
+import net.flintmc.gradle.extension.FlintGradleExtension;
 import net.flintmc.gradle.json.JsonConverterException;
+import net.flintmc.gradle.property.FlintPluginProperties;
 import net.flintmc.gradle.util.Util;
 import net.flintmc.installer.impl.repository.models.PackageModel;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.ResolvedArtifact;
 import org.gradle.api.artifacts.component.ComponentIdentifier;
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier;
+import org.gradle.api.artifacts.component.ProjectComponentIdentifier;
 import org.gradle.api.tasks.Input;
 
 import java.io.File;
@@ -61,6 +64,39 @@ public class ManifestPackageDependencyInput {
             packageModel.getName(),
             packageModel.getVersion(),
             packageModel.getChannel()
+        ));
+      } else if(componentIdentifier instanceof ProjectComponentIdentifier) {
+        ProjectComponentIdentifier projectComponent = (ProjectComponentIdentifier) componentIdentifier;
+
+        // Try to get the dependency project
+        Project dependencyProject = project.getRootProject().findProject(projectComponent.getProjectPath());
+        if(dependencyProject == null) {
+          project.getLogger().warn("Project {} depends on project {}, " +
+                  "but it failed to resolve and thus will be excluded from the manifest dependencies",
+              project.getDisplayName(),
+              projectComponent.getProjectPath()
+          );
+          project.getLogger().warn("You will need to make sure the project is available at runtime yourself!");
+          continue;
+        }
+
+        if(dependencyProject.getExtensions().findByType(FlintGradleExtension.class) == null) {
+          // The dependency is not a flint project
+          project.getLogger().warn(
+              "Project {} depends on project {} which is not a flint project, " +
+                  "thus it will be excluded from the manifest dependencies",
+              project.getDisplayName(),
+              dependencyProject.getDisplayName()
+          );
+          project.getLogger().warn("You will need to make sure the project is available at runtime yourself!");
+          continue;
+        }
+
+        // Index the dependency
+        dependencies.add(new ManifestPackageDependency(
+            dependencyProject.getName(),
+            dependencyProject.getVersion().toString(),
+            FlintPluginProperties.DISTRIBUTOR_CHANNEL.require(dependencyProject)
         ));
       }
     }
