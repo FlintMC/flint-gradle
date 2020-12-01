@@ -1,5 +1,6 @@
 package net.flintmc.gradle.manifest.tasks;
 
+import net.flintmc.gradle.FlintGradleException;
 import net.flintmc.gradle.manifest.cache.StaticFileChecksums;
 import net.flintmc.gradle.manifest.data.ManifestStaticFile;
 import net.flintmc.gradle.manifest.data.ManifestStaticFileInput;
@@ -17,6 +18,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URLConnection;
 import java.nio.file.Files;
 import java.util.HashSet;
 import java.util.Set;
@@ -109,19 +112,24 @@ public class GenerateStaticFileChecksumsTask extends DefaultTask {
     if(httpClient != null) {
       // Calculate the checksums for remote files
       for(URI remoteFile : getRemoteFiles()) {
-        // Download the file
-        HttpGet get = new HttpGet(remoteFile);
-        HttpResponse response = httpClient.execute(get);
+        if(remoteFile.getScheme().equals("jar")) {
+          String checksum = calculateChecksumForJarURI(remoteFile);
+          checksums.add(remoteFile, checksum);
+        } else {
+          // Download the file
+          HttpGet get = new HttpGet(remoteFile);
+          HttpResponse response = httpClient.execute(get);
 
-        StatusLine status = response.getStatusLine();
-        if(status.getStatusCode() != 200) {
-          throw new IOException("Failed to calculate checksum for " + remoteFile.toASCIIString() +
-              ", server returned " + status.getStatusCode() + " (" + status.getReasonPhrase() + ")");
-        }
+          StatusLine status = response.getStatusLine();
+          if(status.getStatusCode() != 200) {
+            throw new IOException("Failed to calculate checksum for " + remoteFile.toASCIIString() +
+                ", server returned " + status.getStatusCode() + " (" + status.getReasonPhrase() + ")");
+          }
 
-        // Calculate the checksum
-        try(InputStream stream = response.getEntity().getContent()) {
-          checksums.add(remoteFile, DigestUtils.md5Hex(stream));
+          // Calculate the checksum
+          try(InputStream stream = response.getEntity().getContent()) {
+            checksums.add(remoteFile, DigestUtils.md5Hex(stream));
+          }
         }
       }
     } else {
@@ -137,5 +145,30 @@ public class GenerateStaticFileChecksumsTask extends DefaultTask {
 
     // Save the checksum cache
     checksums.save(cacheFile);
+  }
+
+  /**
+   * Calculates the checksum for a file with {@code jar:something} URI.
+   * <p>
+   * <b>Please note that this is a workaround and not something that should stay forever!</b>
+   *
+   * @param uri The URI to calculate the checksum for
+   * @return The calculated checksum
+   */
+  private String calculateChecksumForJarURI(URI uri) {
+    try {
+      // Can't use the HTTP client, it does not support `jar:` URLs
+      URLConnection connection = uri.toURL().openConnection();
+
+      // Calculate the checksum by reading the stream
+      String digest;
+      try(InputStream stream = connection.getInputStream()) {
+        digest = DigestUtils.md5Hex(stream);
+      }
+
+      return digest;
+    } catch(IOException e) {
+      throw new FlintGradleException("Failed to calculate checksum for `jar:` URL", e);
+    }
   }
 }
