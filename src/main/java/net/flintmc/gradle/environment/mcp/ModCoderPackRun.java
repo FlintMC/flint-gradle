@@ -15,6 +15,8 @@ import org.gradle.api.logging.Logging;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -31,11 +33,10 @@ public class ModCoderPackRun {
   private final MavenPom serverJar;
   private final DeobfuscationUtilities utilities;
   private final Path mcpPath;
-  private final Path mappingsPath;
   private final Path stepsPath;
 
   public ModCoderPackRun(
-      MavenPom clientJar, MavenPom serverJar, DeobfuscationUtilities utilities, Path mcpPath, Path mappingsPath) {
+      MavenPom clientJar, MavenPom serverJar, DeobfuscationUtilities utilities, Path mcpPath) {
     this.variables = new HashMap<>();
     this.javaFunctions = new HashMap<>();
     this.steps = new HashMap<>();
@@ -44,7 +45,6 @@ public class ModCoderPackRun {
     this.serverJar = serverJar;
     this.utilities = utilities;
     this.mcpPath = mcpPath;
-    this.mappingsPath = mappingsPath;
     this.stepsPath = mcpPath.resolve("steps");
   }
 
@@ -138,8 +138,9 @@ public class ModCoderPackRun {
    * Reads the functions map from the config json.
    *
    * @param functionsMap The node containing the functions map
+   * @throws IOException If parsing an URI fails
    */
-  private void processJavaFunctions(JsonNode functionsMap) {
+  private void processJavaFunctions(JsonNode functionsMap) throws IOException {
     // Iterate over every function name
     for (Iterator<String> it = functionsMap.fieldNames(); it.hasNext(); ) {
       // Extract key and value
@@ -167,8 +168,15 @@ public class ModCoderPackRun {
         }
       }
 
+      URI repoURI;
+      try {
+        repoURI = new URI(repo);
+      } catch(URISyntaxException e) {
+        throw new IOException("Failed to parse " + repo + " as a URI", e);
+      }
+
       // Add the function to the found functions
-      javaFunctions.put(functionName, new JavaExecutionTemplate(repo, artifact, args, jvmArgs));
+      javaFunctions.put(functionName, new JavaExecutionTemplate(repoURI, artifact, args, jvmArgs));
     }
   }
 

@@ -2,18 +2,18 @@ package net.flintmc.gradle.extension;
 
 import groovy.lang.Closure;
 import net.flintmc.gradle.FlintGradlePlugin;
+import net.flintmc.gradle.util.Util;
 import org.gradle.api.Action;
+import org.gradle.api.NamedDomainObjectContainer;
 import org.gradle.api.Project;
 import org.gradle.util.Configurable;
 import org.gradle.util.ConfigureUtil;
 
 import javax.annotation.Nonnull;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Path;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Predicate;
 
 /**
@@ -24,6 +24,7 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
 
   private final FlintGradlePlugin plugin;
   private final FlintRunsExtension runsExtension;
+  private final FlintStaticFilesExtension staticFilesExtension;
 
   private boolean configured;
 
@@ -34,8 +35,8 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
   private boolean disableInternalSourceSet;
   private Type type = Type.PACKAGE;
   private String flintVersion;
-  private Collection<FlintStaticFileEntry> staticFileEntries;
-  private Collection<FlintUrlFileEntry> flintUrlFileEntries;
+  private boolean enablePublishing;
+  private boolean autoConfigurePublishing;
 
   /**
    * Creates a new {@link FlintGradleExtension} with default values.
@@ -48,13 +49,13 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
     this.minecraftVersions = new HashSet<>();
     this.projectFilter = p -> p.getPluginManager().hasPlugin("java");
     this.runsExtension = new FlintRunsExtension();
-    this.staticFileEntries = new HashSet<>();
-    this.flintUrlFileEntries = new HashSet<>();
+    this.staticFilesExtension = new FlintStaticFilesExtension(plugin.getProject());
+    this.enablePublishing = true;
+    this.autoConfigurePublishing = true;
   }
 
   /**
-   * Creates a new {@link FlintGradleExtension} with values copied from a parent
-   * extension.
+   * Creates a new {@link FlintGradleExtension} with values copied from a parent extension.
    *
    * @param plugin The plugin owning this extension
    * @param parent The parent extension
@@ -64,19 +65,12 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
     this.minecraftVersions = new HashSet<>(parent.minecraftVersions);
     this.projectFilter = parent.projectFilter;
     this.runsExtension = new FlintRunsExtension(parent.runsExtension);
+    this.staticFilesExtension = new FlintStaticFilesExtension(plugin.getProject()); // TODO: Should static files be inherited too?
     this.type = parent.type;
     this.authors = parent.authors != null ? Arrays.copyOf(parent.authors, parent.authors.length) : new String[]{};
     this.flintVersion = parent.flintVersion;
-    this.staticFileEntries = new HashSet<>();
-    this.flintUrlFileEntries = new HashSet<>();
-
-    parent.staticFileEntries.stream()
-        .map(FlintStaticFileEntry::new)
-        .forEach(this.staticFileEntries::add);
-
-    parent.flintUrlFileEntries.stream()
-        .map(FlintUrlFileEntry::new)
-        .forEach(this.flintUrlFileEntries::add);
+    this.enablePublishing = parent.enablePublishing;
+    this.autoConfigurePublishing = parent.autoConfigurePublishing;
   }
 
   /**
@@ -107,24 +101,64 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
     this.minecraftVersions = minecraftVersions;
   }
 
+  /**
+   * Overwrites the flint version this project targets.
+   *
+   * @param flintVersion The flint version this project targets
+   */
   public void setFlintVersion(String flintVersion) {
     this.flintVersion = flintVersion;
   }
 
+  /**
+   * Retrieves the flint version this project targets.
+   *
+   * @return The flint version this project targets
+   */
   public String getFlintVersion() {
     return flintVersion;
   }
 
+  /**
+   * Adds a static file to this project configuration.
+   *
+   * @param from         The path to get the file from
+   * @param to           The path to store the file to
+   * @param upstreamName The name of the object in the repository
+   * @deprecated Use the {@link #staticFiles(Action)} method instead.
+   */
+  @Deprecated
   public void staticFileEntry(Path from, Path to, String upstreamName) {
-    this.staticFileEntries.add(new FlintStaticFileEntry(from, to, upstreamName));
+    Util.nagDeprecated(plugin.getProject(),
+        "The staticFileEntry method of the flint extension is deprecated, use the staticFiles configuration instead");
+
+    NamedDomainObjectContainer<FlintStaticFileDescription> staticFileDescriptions =
+        this.staticFilesExtension.getStaticFileDescriptions();
+
+    FlintStaticFileDescription description = staticFileDescriptions.create(upstreamName);
+    description.from(from.toUri());
+    description.to(to);
   }
 
-  public void urlFileEntry(URL url, Path to) {
-    this.flintUrlFileEntries.add(new FlintUrlFileEntry(to, url));
-  }
+  /**
+   * Adds a static file to this project configuration.
+   *
+   * @param url The url to retrieve the file from
+   * @param to  The path to store the file to
+   * @throws URISyntaxException If the URL can't be converted to an URI
+   * @deprecated Use the {@link #staticFiles(Action)} method instead.
+   */
+  @Deprecated
+  public void urlFileEntry(URL url, Path to) throws URISyntaxException {
+    Util.nagDeprecated(plugin.getProject(),
+        "The urlFileEntry method of the flint extension is deprecated, use the staticFiles configuration instead");
 
-  public Collection<FlintUrlFileEntry> getFlintUrlFileEntries() {
-    return flintUrlFileEntries;
+    NamedDomainObjectContainer<FlintStaticFileDescription> staticFileDescriptions =
+        this.staticFilesExtension.getStaticFileDescriptions();
+
+    FlintStaticFileDescription description = staticFileDescriptions.create(to.getFileName().toString());
+    description.from(url.toURI());
+    description.to(to);
   }
 
   /**
@@ -137,8 +171,8 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
   }
 
   /**
-   * Overwrites the project filter with the given predicate. The project filter determines which sub projects
-   * the plugin should automatically apply itself to.
+   * Overwrites the project filter with the given predicate. The project filter determines which sub projects the plugin
+   * should automatically apply itself to.
    *
    * @param projectFilter The filter to test sub projects against
    * @see #setProjectFilter(Predicate)
@@ -147,17 +181,27 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
     setProjectFilter(projectFilter);
   }
 
+  /**
+   * Retrieves the project authors.
+   *
+   * @return The project authors
+   */
   public String[] getAuthors() {
     return authors;
   }
 
+  /**
+   * Overwrites the project authors.
+   *
+   * @param authors The new project authors
+   */
   public void setAuthors(String[] authors) {
     this.authors = authors;
   }
 
   /**
-   * Overwrites the project filter with the given predicate. The project filter determines which sub projects
-   * the plugin should automatically apply itself to.
+   * Overwrites the project filter with the given predicate. The project filter determines which sub projects the plugin
+   * should automatically apply itself to.
    *
    * @param projectFilter The filter to test sub projects against
    */
@@ -183,10 +227,20 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
     return this.disableInternalSourceSet;
   }
 
+  /**
+   * Sets the package type of this project.
+   *
+   * @param type The new package type of this project
+   */
   public void setType(@Nonnull Type type) {
     this.type = type;
   }
 
+  /**
+   * Retrieves the package type of this project.
+   *
+   * @return The package type of this project
+   */
   public Type getType() {
     return type;
   }
@@ -201,14 +255,34 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
   }
 
   /**
-   * Configures the runs extension of this extension with the given closure.
+   * Configures the runs extension of this extension with the given action.
    *
-   * @param closure The closure to use for configuration
+   * @param action The action to use for configuration
    * @return The configured runs extension of this extension
    */
-  public FlintRunsExtension runs(Action<FlintRunsExtension> closure) {
-    closure.execute(this.runsExtension);
+  public FlintRunsExtension runs(Action<FlintRunsExtension> action) {
+    action.execute(this.runsExtension);
     return this.runsExtension;
+  }
+
+  /**
+   * Retrieves the static files extension of this extension.
+   *
+   * @return The static files extension of this extension
+   */
+  public FlintStaticFilesExtension getStaticFiles() {
+    return this.staticFilesExtension;
+  }
+
+  /**
+   * Configures the static files extension of this extension with the given action.
+   *
+   * @param action The action to use for configuration
+   * @return The configured static files extension of this extension
+   */
+  public FlintStaticFilesExtension staticFiles(Action<NamedDomainObjectContainer<FlintStaticFileDescription>> action) {
+    action.execute(this.staticFilesExtension.getStaticFileDescriptions());
+    return this.staticFilesExtension;
   }
 
   /**
@@ -221,7 +295,7 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
   @Override
   @Nonnull
   public FlintGradleExtension configure(@Nonnull Closure closure) {
-    if (configured) {
+    if(configured) {
       throw new IllegalStateException("The flint extension can only be configured once");
     }
 
@@ -232,14 +306,14 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
   }
 
   /**
-   * Triggers the {@link FlintGradlePlugin#onExtensionConfigured()} method. This method is meant to be called from
-   * build scripts which need the extension to configure the plugin early without changing values on the extension
-   * itself. This method may only be called if the extension has not been configured by other means.
+   * Triggers the {@link FlintGradlePlugin#onExtensionConfigured()} method. This method is meant to be called from build
+   * scripts which need the extension to configure the plugin early without changing values on the extension itself.
+   * This method may only be called if the extension has not been configured by other means.
    *
    * @throws IllegalStateException If the extension has been configured already
    */
   public void configureNow() {
-    if (configured) {
+    if(configured) {
       throw new IllegalStateException(
           "Please only call configureNow() if you don't configure the extension by other means");
     }
@@ -253,7 +327,7 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
    * already.
    */
   public void ensureConfigured() {
-    if (configured) {
+    if(configured) {
       return;
     }
 
@@ -261,12 +335,8 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
     plugin.onExtensionConfigured();
   }
 
-  public Collection<FlintStaticFileEntry> getStaticFileEntries() {
-    return staticFileEntries;
-  }
-
   /**
-   * Sets the Authorization Bearer publish token to authorize for publishment at the lm-distributor.
+   * Sets the Authorization Bearer publish token used for authorizing at the lm-distributor.
    *
    * @param publishToken The Bearer token
    */
@@ -275,84 +345,53 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
   }
 
   /**
-   * @return The Authorization Bearer publish token to authorize for publishment at the lm-distributor.
+   * Retrieves the Authorization Bearer publish token used for authorizing at the lm-distributor.
+   *
+   * @return The bearer token
    */
   public String getPublishToken() {
     return publishToken;
   }
 
+  /**
+   * Overwrites whether the publishing tasks should be created.
+   *
+   * @param enablePublishing If {@code true}, the plugin will create a few publish tasks
+   */
+  public void enablePublishing(boolean enablePublishing) {
+    this.enablePublishing = enablePublishing;
+  }
+
+  /**
+   * Determines whether the publish tasks should be created.
+   *
+   * @return {@code true} if the publish tasks should be created, {@code false} otherwise
+   */
+  public boolean shouldEnablePublishing() {
+    return enablePublishing;
+  }
+
+  /**
+   * Overwrites whether the {@link org.gradle.api.publish.PublishingExtension} should be automatically configured if
+   * found.
+   *
+   * @param autoConfigurePublishing If {@code true}, the plugin will automatically set up publishing
+   */
+  public void autoConfigurePublishing(boolean autoConfigurePublishing) {
+    this.autoConfigurePublishing = autoConfigurePublishing;
+  }
+
+  /**
+   * Determines if the plugin should automatically configure the publishing extension.
+   *
+   * @return {@code true} if the plugin should automatically configure the extension, {@code false} otherwise
+   */
+  public boolean shouldAutoConfigurePublishing() {
+    return autoConfigurePublishing;
+  }
+
   public enum Type {
-    LIBRARY, PACKAGE
+    LIBRARY,
+    PACKAGE
   }
-
-  public static class FlintUrlFileEntry {
-    private Path to;
-    private URL from;
-
-    public FlintUrlFileEntry(FlintUrlFileEntry flintUrlFileEntry) {
-      this.to = flintUrlFileEntry.to;
-      this.from = flintUrlFileEntry.from;
-    }
-
-    public FlintUrlFileEntry(Path to, URL from) {
-      this.to = to;
-      this.from = from;
-    }
-
-    public Path getTo() {
-      return to;
-    }
-
-    public URL getFrom() {
-      return from;
-    }
-  }
-
-
-  public static class FlintStaticFileEntry {
-    private Path to;
-    private Path from;
-    private String upstreamName;
-
-    public FlintStaticFileEntry(FlintStaticFileEntry parent) {
-      this.to = parent.to;
-      this.from = parent.from;
-      this.upstreamName = parent.upstreamName;
-    }
-
-    public FlintStaticFileEntry(Path from, Path to, String upstreamName) {
-      this.from = from;
-      this.to = to;
-      this.setUpstreamName(upstreamName);
-    }
-
-    public void setFrom(Path from) {
-      this.from = from;
-    }
-
-    public void setTo(Path to) {
-      this.to = to;
-    }
-
-    public void setUpstreamName(String upstreamName) {
-      if (upstreamName.isEmpty())
-        throw new IllegalArgumentException("Upstream name must not be empty");
-      if (!upstreamName.matches("^([a-zA-Z0-9)]|\\.||_|-)+$"))
-        throw new IllegalArgumentException("Can only use 'a-z', 'A-Z', '0-9', '_', '-' and '.'] in upstream name");
-      this.upstreamName = upstreamName;
-    }
-
-    public Path getFrom() {
-      return from;
-    }
-
-    public Path getTo() {
-      return to;
-    }
-
-    public String getUpstreamName() {
-      return upstreamName;
-    }
-  }
-
 }

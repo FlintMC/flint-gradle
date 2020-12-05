@@ -1,5 +1,6 @@
-package net.flintmc.gradle.util;
+package net.flintmc.gradle.io;
 
+import net.flintmc.gradle.util.Util;
 import org.apache.http.Header;
 import org.apache.http.HttpResponse;
 import org.apache.http.StatusLine;

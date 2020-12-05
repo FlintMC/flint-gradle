@@ -262,7 +262,7 @@ public class RunConfigurationProvider {
    *
    * @param names         The names to resolve
    * @param sourceSets    The source set container with all available source sets
-   * @param sourceProject
+   * @param sourceProject The project the source set originate from
    * @return The resolved source sets
    * @throws IllegalArgumentException If a name can't be resolved
    */

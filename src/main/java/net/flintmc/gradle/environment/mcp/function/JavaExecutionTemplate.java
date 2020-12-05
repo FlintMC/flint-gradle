@@ -2,13 +2,14 @@ package net.flintmc.gradle.environment.mcp.function;
 
 import net.flintmc.gradle.maven.pom.MavenArtifact;
 
+import java.net.URI;
 import java.util.List;
 
 /**
  * Represents a java MCP execution template.
  */
 public class JavaExecutionTemplate {
-  private final String executionArtifactRepo;
+  private final URI executionArtifactRepo;
   private final MavenArtifact executionArtifact;
   private final List<String> args;
   private final List<String> jvmArgs;
@@ -22,7 +23,7 @@ public class JavaExecutionTemplate {
    * @param jvmArgs               The argument passed to the JVM executing the artifact
    */
   public JavaExecutionTemplate(
-      String executionArtifactRepo,
+      URI executionArtifactRepo,
       MavenArtifact executionArtifact,
       List<String> args,
       List<String> jvmArgs
@@ -38,7 +39,7 @@ public class JavaExecutionTemplate {
    *
    * @return The base URL of the repository of this execution
    */
-  public String getExecutionArtifactRepo() {
+  public URI getExecutionArtifactRepo() {
     return executionArtifactRepo;
   }
 

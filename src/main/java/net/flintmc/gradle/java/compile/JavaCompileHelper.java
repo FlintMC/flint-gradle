@@ -89,8 +89,8 @@ public class JavaCompileHelper {
         // Save the summary
         compilerResult = new JavaExecutionResult(
             exitCode,
-            new String(compileOutputStream.toByteArray(), StandardCharsets.UTF_8),
-            new String(compileErrorStream.toByteArray(), StandardCharsets.UTF_8)
+            compileOutputStream.toString("UTF-8"),
+            compileErrorStream.toString("UTF-8")
         );
 
         if (exitCode != 0) {

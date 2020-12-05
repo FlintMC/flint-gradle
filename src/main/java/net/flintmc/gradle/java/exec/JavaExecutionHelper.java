@@ -72,8 +72,8 @@ public class JavaExecutionHelper {
       // Collect results and return them to the caller
       return new JavaExecutionResult(
           result.getExitValue(),
-          new String(standardOutput.toByteArray()),
-          new String(standardError.toByteArray())
+          standardOutput.toString(),
+          standardError.toString()
       );
     }
   }

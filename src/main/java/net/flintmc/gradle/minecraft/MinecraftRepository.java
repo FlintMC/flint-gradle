@@ -24,7 +24,7 @@ import net.flintmc.gradle.minecraft.data.version.VersionManifest;
 import net.flintmc.gradle.minecraft.data.version.VersionedDownload;
 import net.flintmc.gradle.minecraft.data.version.VersionedLibrary;
 import net.flintmc.gradle.util.RuleChainResolver;
-import net.flintmc.gradle.util.TimeStampedFile;
+import net.flintmc.gradle.io.TimeStampedFile;
 import net.flintmc.gradle.util.Util;
 import org.apache.http.client.HttpClient;
 import org.gradle.api.Project;

@@ -38,6 +38,7 @@ public class RuleChainResolver {
    * @param rules The rule chain to test
    * @return {@code true} if the rule chain matches or is {@code null}, false otherwise
    */
+  @SuppressWarnings("BooleanMethodIsAlwaysInverted")
   public static boolean testRuleChain(List<VersionedRule> rules) {
     return testRuleChain(rules, Collections.emptyMap());
   }
