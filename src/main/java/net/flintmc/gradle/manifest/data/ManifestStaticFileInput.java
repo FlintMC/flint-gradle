@@ -6,8 +6,6 @@ import net.flintmc.gradle.manifest.ManifestConfigurator;
 import net.flintmc.gradle.util.Util;
 import org.gradle.api.NamedDomainObjectContainer;
 import org.gradle.api.Project;
-import org.gradle.api.tasks.Input;
-import org.gradle.api.tasks.InputFiles;
 import org.gradle.api.tasks.Internal;
 
 import java.io.*;

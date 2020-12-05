@@ -15,7 +15,6 @@ import org.apache.http.client.HttpClient;
 import org.gradle.api.Project;
 import org.gradle.api.Task;
 import org.gradle.api.artifacts.repositories.MavenArtifactRepository;
-import org.gradle.api.component.SoftwareComponent;
 import org.gradle.api.credentials.HttpHeaderCredentials;
 import org.gradle.api.publish.PublishingExtension;
 import org.gradle.api.publish.maven.MavenPublication;
@@ -54,7 +53,6 @@ public class ManifestConfigurator {
     }
 
     FlintGradleExtension extension = project.getExtensions().getByType(FlintGradleExtension.class);
-    MavenPublication publication = null;
 
     if(extension.shouldAutoConfigurePublishing() && extension.shouldEnablePublishing()) {
       // Auto configuration is enabled
@@ -67,7 +65,7 @@ public class ManifestConfigurator {
 
       if(publishingExtension != null) {
         // Found a publishing extension, automatically set the publish target
-        publication = publishingExtension.getPublications().create("flint", MavenPublication.class);
+        MavenPublication publication = publishingExtension.getPublications().create("flint", MavenPublication.class);
 
         // Configure the publication
         publication.setGroupId(project.getGroup().toString());

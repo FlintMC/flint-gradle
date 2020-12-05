@@ -7,7 +7,6 @@ import org.gradle.api.logging.Logging;
 
 import java.io.File;
 import java.net.URI;
-import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 

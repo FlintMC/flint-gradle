@@ -5,11 +5,9 @@ import net.flintmc.gradle.maven.pom.MavenPom;
 import net.flintmc.gradle.maven.pom.io.PomReader;
 import net.flintmc.gradle.maven.pom.io.PomWriter;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
-import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -144,6 +142,7 @@ public class SimpleMavenRepository implements ReadableMavenRepository {
    * @param artifact The artifact to check for
    * @return {@code true} if the artifact is installed already, {@code false} otherwise
    */
+  @SuppressWarnings("BooleanMethodIsAlwaysInverted")
   public boolean isInstalled(MavenArtifact artifact) {
     return Files.isRegularFile(getArtifactPath(artifact));
   }

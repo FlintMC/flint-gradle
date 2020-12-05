@@ -1,7 +1,5 @@
 package net.flintmc.gradle.jar;
 
-import net.flintmc.gradle.FlintGradleException;
-import net.flintmc.gradle.FlintGradlePlugin;
 import net.flintmc.gradle.extension.FlintGradleExtension;
 import org.gradle.api.GradleException;
 import org.gradle.api.Project;
@@ -17,14 +15,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 public class JarTaskProvider {
-
-
-  private final FlintGradlePlugin flintGradlePlugin;
-
-  public JarTaskProvider(FlintGradlePlugin flintGradlePlugin) {
-    this.flintGradlePlugin = flintGradlePlugin;
-  }
-
   /**
    * Creates jar and publish tasks for the minecraft sourcesets.
    *
@@ -85,7 +75,7 @@ public class JarTaskProvider {
       serviceInputDirs = new ArrayList<>();
       mainJarTaskProperties.set("serviceInputDirs", serviceInputDirs);
 
-      // Lamda workaround to make variables final
+      // Lambda workaround to make variables final
       File finalServiceMergeDir = serviceMergeDir;
       List<File> finalServiceInputDirs = serviceInputDirs;
 

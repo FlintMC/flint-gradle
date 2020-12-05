@@ -68,8 +68,6 @@ public class FlintGradlePlugin implements Plugin<Project> {
       });
     }
 
-    project.afterEvaluate(p -> onAfterEvaluate());
-
     Project parent = project;
     while((parent = parent.getParent()) != null) {
       FlintGradlePlugin parentPlugin = parent.getPlugins().findPlugin(getClass());
@@ -83,14 +81,6 @@ public class FlintGradlePlugin implements Plugin<Project> {
     this.interaction = new JavaPluginInteraction(project);
 
     if(this.parentPlugin == null) {
-
-      System.setProperty("org.apache.commons.logging.Log", "org.apache.commons.logging.impl.SimpleLog");
-
-      System.setProperty("org.apache.commons.logging.simplelog.showdatetime", "true");
-      System.setProperty("org.apache.commons.logging.simplelog.log.httpclient.wire", "debug");
-      System.setProperty("org.apache.commons.logging.simplelog.log.org.apache.commons.httpclient", "debug");
-
-
       Gradle gradle = project.getGradle();
       httpClient = gradle.getStartParameter().isOffline() ? null :
           HttpClientBuilder.create().useSystemProperties().build();
@@ -129,7 +119,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
 
       this.runConfigurationProvider = new RunConfigurationProvider(
           project, minecraftRepository, minecraftCache.resolve("run"), authenticator);
-      this.jarTaskProvider = new JarTaskProvider(this);
+      this.jarTaskProvider = new JarTaskProvider();
       this.mavenArtifactURLCache = new MavenArtifactURLCache(flintGradlePath.resolve("maven-artifact-urls"), httpClient == null);
       try {
         this.mavenArtifactURLCache.setup();
@@ -190,9 +180,6 @@ public class FlintGradlePlugin implements Plugin<Project> {
     manifestConfigurator.configure();
   }
 
-  public void onAfterEvaluate() {
-  }
-
   /**
    * Handles the given minecraft version and sets up all of the required steps for using it with gradle.
    *
@@ -251,6 +238,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
    * @param repository The repository to check in
    * @return {@code true} if all given artifacts are installed, {@code false} otherwise
    */
+  @SuppressWarnings("BooleanMethodIsAlwaysInverted")
   private boolean allInstalled(Collection<MavenArtifact> artifacts, SimpleMavenRepository repository) {
     for(MavenArtifact artifact : artifacts) {
       if(!repository.isInstalled(artifact)) {
@@ -278,10 +266,6 @@ public class FlintGradlePlugin implements Plugin<Project> {
    */
   public MavenArtifactURLCache getMavenArtifactURLCache() {
     return mavenArtifactURLCache;
-  }
-
-  public FlintGradleExtension getExtension() {
-    return extension;
   }
 
   public Project getProject() {

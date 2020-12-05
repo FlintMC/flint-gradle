@@ -33,11 +33,10 @@ public class ModCoderPackRun {
   private final MavenPom serverJar;
   private final DeobfuscationUtilities utilities;
   private final Path mcpPath;
-  private final Path mappingsPath;
   private final Path stepsPath;
 
   public ModCoderPackRun(
-      MavenPom clientJar, MavenPom serverJar, DeobfuscationUtilities utilities, Path mcpPath, Path mappingsPath) {
+      MavenPom clientJar, MavenPom serverJar, DeobfuscationUtilities utilities, Path mcpPath) {
     this.variables = new HashMap<>();
     this.javaFunctions = new HashMap<>();
     this.steps = new HashMap<>();
@@ -46,7 +45,6 @@ public class ModCoderPackRun {
     this.serverJar = serverJar;
     this.utilities = utilities;
     this.mcpPath = mcpPath;
-    this.mappingsPath = mappingsPath;
     this.stepsPath = mcpPath.resolve("steps");
   }
 

@@ -76,8 +76,7 @@ public class ModCoderPackEnvironment implements DeobfuscationEnvironment {
         clientPom,
         serverPom,
         utilities,
-        mcpConfigOutput,
-        mappingsOutput
+        mcpConfigOutput
     );
 
     try {

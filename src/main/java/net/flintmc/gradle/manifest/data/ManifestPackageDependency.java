@@ -67,7 +67,7 @@ public class ManifestPackageDependency implements Externalizable {
   }
 
   @Override
-  public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+  public void readExternal(ObjectInput in) throws IOException {
     name = in.readUTF();
     version = in.readUTF();
     channel = in.readUTF();

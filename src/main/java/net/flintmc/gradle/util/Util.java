@@ -7,7 +7,6 @@ import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.JsonNode;
 import net.flintmc.gradle.json.JsonConverter;
 import net.flintmc.gradle.json.JsonConverterException;
-import net.flintmc.installer.impl.repository.models.InternalModelSerializer;
 import net.flintmc.installer.impl.repository.models.PackageModel;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.http.HttpResponse;
@@ -279,49 +278,6 @@ public class Util {
   @SuppressWarnings("unchecked")
   public static <T> T forceCast(Object in) {
     return (T) in;
-  }
-
-  /**
-   * Serializes a collection into an {@link ObjectOutput}.
-   *
-   * @param collection   The collection to serialize
-   * @param objectOutput The output to write to
-   * @throws IOException If an I/O error occurs while writing
-   */
-  public static void serializeCollection(Collection<?> collection, ObjectOutput objectOutput) throws IOException {
-    objectOutput.write(collection.size());
-
-    for(Object value : collection) {
-      objectOutput.writeObject(value);
-    }
-  }
-
-  /**
-   * Deserializes a collection from an {@link ObjectInput}.
-   *
-   * @param collection  The collection to deserialize
-   * @param objectInput The input to read from
-   * @throws IOException            If an I/O error occurs while reading
-   * @throws ClassNotFoundException If the original collection contained a class which now can't be found
-   */
-  public static void deserializeCollection(Collection<?> collection, ObjectInput objectInput)
-      throws IOException, ClassNotFoundException {
-    int size = objectInput.readInt();
-
-    for(int i = 0; i < size; i++) {
-      Object value = objectInput.readObject();
-      collection.add(forceCast(value)); // forceCast required, can't cast back to `?`
-    }
-  }
-
-  /**
-   * Converts an Object to a string or {@code "undefined"} if the object is null. Used to mimic Gradle's behavior.
-   *
-   * @param value The object to convert
-   * @return The object as a string
-   */
-  public static String toStringOrUndefined(Object value) {
-    return value == null ? "undefined" : value.toString();
   }
 
   /**
