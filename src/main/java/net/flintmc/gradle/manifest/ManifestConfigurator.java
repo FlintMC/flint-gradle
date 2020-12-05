@@ -18,7 +18,9 @@ import org.gradle.api.artifacts.repositories.MavenArtifactRepository;
 import org.gradle.api.credentials.HttpHeaderCredentials;
 import org.gradle.api.publish.PublishingExtension;
 import org.gradle.api.publish.maven.MavenPublication;
+import org.gradle.api.tasks.Copy;
 import org.gradle.authentication.http.HttpHeaderAuthentication;
+import org.gradle.language.jvm.tasks.ProcessResources;
 
 import java.io.File;
 import java.net.URI;
@@ -140,6 +142,13 @@ public class ManifestConfigurator {
     generateFlintManifestTask.setGroup("publishing");
     generateFlintManifestTask.setDescription("Generates the flint manifest.json and caches it");
     generateFlintManifestTask.dependsOn(resolveArtifactURLsTask, generateStaticFileChecksumsTask);
+
+    // Retrieve the process resources task so we can include the manifest
+    // The processResources task is a copy task, and as the ProcessResources class is marked unstable,
+    // we cast it to a copy task
+    Copy processResourcesTask = (Copy) project.getTasks().getByName("processResources");
+    processResourcesTask.from(manifestFile);
+    processResourcesTask.dependsOn(generateFlintManifestTask);
 
     if(extension.shouldEnablePublishing()) {
       // Generate the URI to publish the manifest to
