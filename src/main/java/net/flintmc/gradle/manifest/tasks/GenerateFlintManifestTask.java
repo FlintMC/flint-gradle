@@ -9,6 +9,7 @@ import net.flintmc.gradle.manifest.data.*;
 import net.flintmc.gradle.maven.pom.MavenArtifact;
 import net.flintmc.gradle.property.FlintPluginProperties;
 import net.flintmc.installer.impl.repository.models.DependencyDescriptionModel;
+import net.flintmc.installer.impl.repository.models.InternalModelSerializer;
 import net.flintmc.installer.impl.repository.models.PackageModel;
 import net.flintmc.installer.impl.repository.models.install.DownloadFileDataModel;
 import net.flintmc.installer.impl.repository.models.install.DownloadMavenDependencyDataModel;
@@ -23,6 +24,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.*;
 
 /**
@@ -303,9 +306,10 @@ public class GenerateFlintManifestTask extends DefaultTask {
       throw new FlintGradleException("Failed to create directory " + manifestParentDir.getAbsolutePath());
     }
 
-    // Write the manifest
-    try(OutputStream stream = new FileOutputStream(manifestFile)) {
-      JsonConverter.OBJECT_MAPPER.writeValue(stream, model);
+    // Serialize and write the manifest file
+    String json = new InternalModelSerializer().toString(model);
+    try {
+      Files.write(manifestFile.toPath(), json.getBytes(StandardCharsets.UTF_8));
     } catch(IOException e) {
       throw new FlintGradleException("Failed to write manifest file", e);
     }
@@ -363,7 +367,7 @@ public class GenerateFlintManifestTask extends DefaultTask {
     if(getExtension().getType() == FlintGradleExtension.Type.LIBRARY) {
       // If the jar is a library, put it into the libraries folder
       targetPath = "${FLINT_LIBRARY_DIR}/" +
-          getProjectGroup().replace('.', '/') +
+          getProjectGroup().replace('.', '/') + "/" +
           getProjectName() + "/" +
           getProjectVersion() + "/" +
           getProjectName() + "-" + getProjectVersion() + ".jar";
@@ -378,8 +382,8 @@ public class GenerateFlintManifestTask extends DefaultTask {
             getProjectGroup(),
             getProjectName(),
             getProjectVersion(),
-            "${FLINT_DISTRIBUTOR_URL}" + getChannel(),
             null,
+            "${FLINT_DISTRIBUTOR_URL}" + getChannel(),
             targetPath
         )
     );

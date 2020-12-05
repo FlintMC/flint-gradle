@@ -177,28 +177,6 @@ public class JarTaskProvider {
   }
 
   /**
-   * Creates publish tasks for the minecraft sourcesets.
-   *
-   * @param project the project to install the tasks in
-   */
-  public void createPublishTask(Project project) {
-    project.getTasks().create("flintArtifactPublish", jarTask -> {
-      jarTask.setGroup("publish");
-      jarTask.dependsOn("jar");
-      jarTask.doLast(task -> {
-        Jar buildTask = (Jar) project.getTasks().getByName("jar");
-        File outputFile = buildTask.getOutputs().getFiles().getSingleFile();
-        try {
-          if (outputFile.exists())
-            this.flintGradlePlugin.getAssetPublisher().publish(outputFile, project.getName(), project.getVersion().toString(), flintGradlePlugin.getExtension().getPublishToken());
-        } catch (FileNotFoundException e) {
-          throw new FlintGradleException("file " + outputFile.getName() + " is not found.", e);
-        }
-      });
-    });
-  }
-
-  /**
    * Installs gradle task to compile a given sourceSet in a given project.
    *
    * @param sourceSet The sourceSet to obtain classpath from for compilation

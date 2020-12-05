@@ -6,15 +6,14 @@ import net.flintmc.gradle.manifest.data.ManifestMavenDependencyInput;
 import net.flintmc.gradle.manifest.data.ManifestPackageDependencyInput;
 import net.flintmc.gradle.manifest.data.ManifestRepositoryInput;
 import net.flintmc.gradle.manifest.data.ManifestStaticFileInput;
-import net.flintmc.gradle.manifest.tasks.GenerateFlintManifestTask;
-import net.flintmc.gradle.manifest.tasks.GenerateStaticFileChecksumsTask;
-import net.flintmc.gradle.manifest.tasks.ResolveArtifactURLsTask;
+import net.flintmc.gradle.manifest.tasks.*;
 import net.flintmc.gradle.maven.cache.MavenArtifactURLCache;
 import net.flintmc.gradle.property.FlintPluginProperties;
 import net.flintmc.gradle.util.MaybeNull;
 import net.flintmc.gradle.util.Util;
 import org.apache.http.client.HttpClient;
 import org.gradle.api.Project;
+import org.gradle.api.Task;
 import org.gradle.api.artifacts.repositories.MavenArtifactRepository;
 import org.gradle.api.component.SoftwareComponent;
 import org.gradle.api.credentials.HttpHeaderCredentials;
@@ -25,6 +24,7 @@ import org.gradle.authentication.http.HttpHeaderAuthentication;
 import java.io.File;
 import java.net.URI;
 import java.util.Arrays;
+import java.util.Collections;
 
 public class ManifestConfigurator {
   private final Project project;
@@ -42,8 +42,10 @@ public class ManifestConfigurator {
     this.mavenArtifactURLCache = plugin.getMavenArtifactURLCache();
   }
 
+  private URI projectPublishURI;
   private URI distributorMavenURI;
   private URI projectMavenURI;
+  private HttpHeaderCredentials publishCredentials;
 
   /**
    * Installs the required gradle tasks to generate the flint manifests.
@@ -54,6 +56,7 @@ public class ManifestConfigurator {
     }
 
     FlintGradleExtension extension = project.getExtensions().getByType(FlintGradleExtension.class);
+    MavenPublication publication = null;
 
     if(extension.shouldAutoConfigurePublishing() && extension.shouldEnablePublishing()) {
       // Auto configuration is enabled
@@ -64,19 +67,9 @@ public class ManifestConfigurator {
           "Set enablePublishing to false in the flint extension",
           "Set shouldAutoConfigurePublishing to false in the flint extension");
 
-      // Retrieve either a bearer or publish token
-      String bearerToken = FlintPluginProperties.DISTRIBUTOR_BEARER_TOKEN.resolve(project);
-      String publishToken = null;
-      if(bearerToken == null) {
-        publishToken = FlintPluginProperties.DISTRIBUTOR_PUBLISH_TOKEN
-            .require(project, "Set enablePublishing to false in the flint extension",
-                "Set shouldAutoConfigurePublishing to false in the flint extension");
-      }
-
       if(publishingExtension != null) {
         // Found a publishing extension, automatically set the publish target
-        MavenPublication publication =
-            publishingExtension.getPublications().create("flint", MavenPublication.class);
+        publication = publishingExtension.getPublications().create("flint", MavenPublication.class);
 
         // Configure the publication
         publication.setGroupId(project.getGroup().toString());
@@ -92,18 +85,17 @@ public class ManifestConfigurator {
         MavenArtifactRepository repository =
             publishingExtension.getRepositories().maven((repo) -> repo.setName("Flint Distributor"));
         repository.setUrl(distributorUrl);
+
+        // Gradle does not allow setting the credentials instance directly, so copy it
         HttpHeaderCredentials credentials = repository.getCredentials(HttpHeaderCredentials.class);
+        HttpHeaderCredentials values = getPublishCredentials(
+            "Set enablePublishing to false in the flint extension",
+            "Set shouldAutoConfigurePublishing to false in the flint extension"
+        );
 
-        if(bearerToken != null) {
-          // User has selected bearer authorization
-          credentials.setName("Authorization");
-          credentials.setValue("Bearer " + bearerToken);
-        } else {
-          // User has selected publish token authorization
-          credentials.setName("Publish-Token");
-          credentials.setValue(publishToken);
-        }
-
+        credentials.setName(values.getName());
+        credentials.setValue(values.getValue());
+        
         // Set the authentication, no further configuration required
         repository.getAuthentication().create("header", HttpHeaderAuthentication.class);
       }
@@ -153,7 +145,53 @@ public class ManifestConfigurator {
     );
     generateFlintManifestTask.setGroup("publishing");
     generateFlintManifestTask.setDescription("Generates the flint manifest.json and caches it");
-    generateFlintManifestTask.setDependsOn(Arrays.asList(resolveArtifactURLsTask, generateStaticFileChecksumsTask));
+    generateFlintManifestTask.dependsOn(resolveArtifactURLsTask, generateStaticFileChecksumsTask);
+
+    if(extension.shouldEnablePublishing()) {
+      // Add the publish tasks
+      if(publication != null) {
+        // There is a maven publication, add the generated jar to it
+        // Gradle is able to infer the jar to publish based on the task
+        publication.artifact(project.getTasks().getByName("jar"));
+      }
+
+      // Generate the URI to publish the manifest to
+      URI manifestURI = Util.concatURI(
+          getProjectPublishURI("Set enablePublishing to false in the flint extension"),
+          "manifest.json"
+      );
+
+      // Create the manifest publish task
+      PublishFileTask publishManifestTask = project.getTasks().create(
+          "publishFlintManifest",
+          PublishFileTask.class,
+          this,
+          new MaybeNull<>(httpClient),
+          manifestFile,
+          manifestURI
+      );
+      publishManifestTask.setGroup("publishing");
+      publishManifestTask.setDescription("Publishes the flint manifest.json to the distributor");
+      publishManifestTask.dependsOn(generateFlintManifestTask);
+
+      // Create the static files publish task
+      PublishStaticFilesTask publishStaticFilesTask = project.getTasks().create(
+          "publishFlintStaticFiles",
+          PublishStaticFilesTask.class,
+          this,
+          new MaybeNull<>(httpClient),
+          staticFileInput
+      );
+      publishStaticFilesTask.setGroup("publishing");
+      publishStaticFilesTask.setDescription("Publishes the static files to the distributor");
+      publishStaticFilesTask.dependsOn(generateStaticFileChecksumsTask);
+
+      // Create a compound task
+      Task publishFlintPackageTask = project.getTasks().create("publishFlintPackage");
+      publishFlintPackageTask.setGroup("publishing");
+      publishFlintPackageTask.setDescription("Compound task which depends on other publish tasks");
+      publishFlintPackageTask.dependsOn(publishManifestTask, publishStaticFilesTask);
+    }
   }
 
   /**
@@ -168,6 +206,27 @@ public class ManifestConfigurator {
   }
 
   /**
+   * Retrieves the base URI of the distributor publish endpoint including the project namespace.
+   *
+   * @param notAvailableSolutions Messages to display as a solution in case the URI can't be computed
+   * @return The base URI of the distributor publish endpoint including the project namespace
+   */
+  public URI getProjectPublishURI(String... notAvailableSolutions) {
+    if(projectPublishURI == null) {
+      projectPublishURI = Util.concatURI(
+          FlintPluginProperties.DISTRIBUTOR_URL.require(project, notAvailableSolutions),
+          "api/v1/publish",
+          FlintPluginProperties.DISTRIBUTOR_CHANNEL.require(project, notAvailableSolutions),
+          project.getGroup().toString().replace('.', '/'),
+          project.getName(),
+          project.getVersion().toString()
+      );
+    }
+
+    return projectPublishURI;
+  }
+
+  /**
    * Retrieves the base URI of the distributor repository.
    *
    * @param notAvailableSolution Messages to display as a solution in case URI can't be computed
@@ -178,7 +237,7 @@ public class ManifestConfigurator {
       distributorMavenURI = Util.concatURI(
           FlintPluginProperties.DISTRIBUTOR_URL
               .require(project, notAvailableSolution),
-          "maven",
+          "api/v1/maven",
           FlintPluginProperties.DISTRIBUTOR_CHANNEL
               .require(project, notAvailableSolution)
       );
@@ -206,5 +265,31 @@ public class ManifestConfigurator {
     }
 
     return projectMavenURI;
+  }
+
+  /**
+   * Retrieves the HTTP header credentials used for publishing.
+   *
+   * @param notAvailableSolution Messages to display as a solution in case the credentials can't be computed
+   * @return The HTTP header credentials used for publishing
+   */
+  public HttpHeaderCredentials getPublishCredentials(String... notAvailableSolution) {
+    if(publishCredentials == null) {
+      publishCredentials = project.getObjects().newInstance(HttpHeaderCredentials.class);
+
+      // Retrieve either a bearer or publish token
+      String bearerToken = FlintPluginProperties.DISTRIBUTOR_BEARER_TOKEN.resolve(project);
+      if(bearerToken != null) {
+        publishCredentials.setName("Authorization");
+        publishCredentials.setValue("Bearer " + bearerToken);
+      } else {
+        String publishToken = FlintPluginProperties.DISTRIBUTOR_PUBLISH_TOKEN
+            .require(project, notAvailableSolution);
+        publishCredentials.setName("Publish-Token");
+        publishCredentials.setValue(publishToken);
+      }
+    }
+
+    return publishCredentials;
   }
 }
