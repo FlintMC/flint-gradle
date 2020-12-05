@@ -23,8 +23,6 @@ import org.gradle.authentication.http.HttpHeaderAuthentication;
 
 import java.io.File;
 import java.net.URI;
-import java.util.Arrays;
-import java.util.Collections;
 
 public class ManifestConfigurator {
   private final Project project;
@@ -77,13 +75,11 @@ public class ManifestConfigurator {
         publication.setVersion(project.getVersion().toString());
 
         // Add all components to the publication
-        for(SoftwareComponent component : project.getComponents()) {
-          publication.from(component);
-        }
+        publication.from(project.getComponents().getByName("java"));
 
         // Configure the repository
         MavenArtifactRepository repository =
-            publishingExtension.getRepositories().maven((repo) -> repo.setName("Flint Distributor"));
+            publishingExtension.getRepositories().maven((repo) -> repo.setName("FlintDistributor"));
         repository.setUrl(distributorUrl);
 
         // Gradle does not allow setting the credentials instance directly, so copy it
@@ -148,13 +144,6 @@ public class ManifestConfigurator {
     generateFlintManifestTask.dependsOn(resolveArtifactURLsTask, generateStaticFileChecksumsTask);
 
     if(extension.shouldEnablePublishing()) {
-      // Add the publish tasks
-      if(publication != null) {
-        // There is a maven publication, add the generated jar to it
-        // Gradle is able to infer the jar to publish based on the task
-        publication.artifact(project.getTasks().getByName("jar"));
-      }
-
       // Generate the URI to publish the manifest to
       URI manifestURI = Util.concatURI(
           getProjectPublishURI("Set enablePublishing to false in the flint extension"),
@@ -187,10 +176,13 @@ public class ManifestConfigurator {
       publishStaticFilesTask.dependsOn(generateStaticFileChecksumsTask);
 
       // Create a compound task
-      Task publishFlintPackageTask = project.getTasks().create("publishFlintPackage");
-      publishFlintPackageTask.setGroup("publishing");
-      publishFlintPackageTask.setDescription("Compound task which depends on other publish tasks");
-      publishFlintPackageTask.dependsOn(publishManifestTask, publishStaticFilesTask);
+      Task publishFlintPackageMetaTask = project.getTasks().create("publishFlintPackageMeta");
+      publishFlintPackageMetaTask.setGroup("publishing");
+      publishFlintPackageMetaTask.setDescription("Compound task which depends on other publish tasks");
+      publishFlintPackageMetaTask.dependsOn(publishManifestTask, publishStaticFilesTask);
+
+      // Add dependency for the publish task
+      project.getTasks().getByName("publish").dependsOn(publishFlintPackageMetaTask);
     }
   }
 

@@ -2,7 +2,6 @@ package net.flintmc.gradle.manifest.tasks;
 
 import net.flintmc.gradle.FlintGradleException;
 import net.flintmc.gradle.extension.FlintGradleExtension;
-import net.flintmc.gradle.json.JsonConverter;
 import net.flintmc.gradle.manifest.cache.BoundMavenDependencies;
 import net.flintmc.gradle.manifest.cache.StaticFileChecksums;
 import net.flintmc.gradle.manifest.data.*;
@@ -20,9 +19,7 @@ import org.gradle.api.tasks.*;
 
 import javax.inject.Inject;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -71,6 +68,7 @@ public class GenerateFlintManifestTask extends DefaultTask {
    *
    * @return The file to write the generated manifest to
    */
+  @SuppressWarnings("unused") // Required for @InputFile on `manifestFile`
   public File getManifestFile() {
     return manifestFile;
   }
