@@ -22,6 +22,8 @@ public class ManifestRepositoryInput {
   private final Set<ManifestRepository> repositories;
   private final List<String> warnings;
 
+  private boolean computed;
+
   public ManifestRepositoryInput() {
     repositories = new HashSet<>();
     warnings = new ArrayList<>();
@@ -33,6 +35,10 @@ public class ManifestRepositoryInput {
    * @param project The project to compute the input for
    */
   public void compute(Project project) {
+    if(computed) {
+      return;
+    }
+
     for(ArtifactRepository repository : project.getRepositories()) {
       if(repository instanceof MavenArtifactRepository) {
         // Found a maven repository, the only type we currently process
@@ -74,6 +80,8 @@ public class ManifestRepositoryInput {
         ));
       }
     }
+
+    computed = true;
   }
 
   /**
@@ -83,6 +91,10 @@ public class ManifestRepositoryInput {
    */
   @Internal
   public List<String> getWarnings() {
+    if(!computed) {
+      throw new IllegalStateException("Input has not been computed yet");
+    }
+
     return warnings;
   }
 
@@ -93,6 +105,10 @@ public class ManifestRepositoryInput {
    */
   @Input
   public Set<ManifestRepository> getRepositories() {
+    if(!computed) {
+      throw new IllegalStateException("Input has not been computed yet");
+    }
+
     return repositories;
   }
 }

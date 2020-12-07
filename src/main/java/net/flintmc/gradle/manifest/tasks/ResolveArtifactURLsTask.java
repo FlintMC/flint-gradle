@@ -63,6 +63,7 @@ public class ResolveArtifactURLsTask extends DefaultTask {
    */
   @SuppressWarnings("unused") // Required for @Nested on `repositoryInput`
   public ManifestRepositoryInput getRepositoryInput() {
+    repositoryInput.compute(getProject());
     return repositoryInput;
   }
 
@@ -73,6 +74,7 @@ public class ResolveArtifactURLsTask extends DefaultTask {
    */
   @SuppressWarnings("unused") // Required for @Nested on `dependencyInput`
   public ManifestMavenDependencyInput getDependencyInput() {
+    dependencyInput.compute(getProject());
     return dependencyInput;
   }
 
@@ -100,6 +102,9 @@ public class ResolveArtifactURLsTask extends DefaultTask {
     if(!parentDir.exists() && !parentDir.mkdirs()) {
       throw new IOException("Failed to create directory " + parentDir.getAbsolutePath());
     }
+
+    repositoryInput.compute(getProject());
+    dependencyInput.compute(getProject());
 
     // Collect all artifacts that need to be resolved
     Set<MavenArtifact> artifactsToResolve = new HashSet<>();

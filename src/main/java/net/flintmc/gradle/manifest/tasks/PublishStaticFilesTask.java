@@ -52,6 +52,7 @@ public class PublishStaticFilesTask extends PublishTaskBase {
   // NOTE: This method is only required for gradle to correctly calculate the up-to-date state of this task
   @Input
   public Collection<ManifestStaticFile> getStaticFiles() {
+    staticFiles.compute(getProject());
     return staticFiles.getLocalFiles().values();
   }
 
@@ -76,6 +77,8 @@ public class PublishStaticFilesTask extends PublishTaskBase {
     if(!getStaticFilesChecksumsCacheFile().isFile()) {
       throw new IllegalStateException("Missing static file checksum cache file");
     }
+
+    staticFiles.compute(getProject());
 
     // Load cached checksums
     StaticFileChecksums checksums;

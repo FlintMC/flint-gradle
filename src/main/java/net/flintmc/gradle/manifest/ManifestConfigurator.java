@@ -100,14 +100,8 @@ public class ManifestConfigurator {
     // Create the task inputs
     ManifestMavenDependencyInput mavenDependencyInput = new ManifestMavenDependencyInput();
     ManifestRepositoryInput repositoryInput = new ManifestRepositoryInput();
-    ManifestStaticFileInput staticFileInput = new ManifestStaticFileInput();
+    ManifestStaticFileInput staticFileInput = new ManifestStaticFileInput(this);
     ManifestPackageDependencyInput packageDependencyInput = new ManifestPackageDependencyInput();
-
-    // Compute the inputs
-    mavenDependencyInput.compute(project);
-    repositoryInput.compute(project);
-    staticFileInput.compute(project, this);
-    packageDependencyInput.compute(project);
 
     // Create the tasks
     ResolveArtifactURLsTask resolveArtifactURLsTask = project.getTasks().create(

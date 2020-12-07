@@ -25,18 +25,31 @@ public class ManifestStaticFileInput {
   @Internal
   private final Map<File, ManifestStaticFile> localFiles;
 
-  public ManifestStaticFileInput() {
+  private final ManifestConfigurator configurator;
+
+  private boolean computed;
+
+  /**
+   * Creates a new static file input, but does not compute it.
+   *
+   * @param configurator The configurator currently computing the inputs
+   */
+  public ManifestStaticFileInput(ManifestConfigurator configurator) {
     remoteFiles = new HashSet<>();
     this.localFiles = new HashMap<>();
+    this.configurator = configurator;
   }
 
   /**
    * Computes the static files for the manifest input.
    *
-   * @param project      The project to compute the files for
-   * @param configurator The configurator currently computing the inputs
+   * @param project The project to compute the files for
    */
-  public void compute(Project project, ManifestConfigurator configurator) {
+  public void compute(Project project) {
+    if(computed) {
+      return;
+    }
+
     NamedDomainObjectContainer<FlintStaticFileDescription> staticFileDescriptions =
         project.getExtensions().getByType(FlintGradleExtension.class).getStaticFiles().getStaticFileDescriptions();
 
@@ -57,6 +70,8 @@ public class ManifestStaticFileInput {
         localFiles.put(staticFileDescription.getSourceFile(), new ManifestStaticFile(remoteURI, targetPath));
       }
     }
+
+    computed = true;
   }
 
   /**
@@ -74,10 +89,18 @@ public class ManifestStaticFileInput {
   }
 
   public Set<ManifestStaticFile> getRemoteFiles() {
+    if(!computed) {
+      throw new IllegalStateException("Input has not been computed yet");
+    }
+
     return remoteFiles;
   }
 
   public Map<File, ManifestStaticFile> getLocalFiles() {
+    if(!computed) {
+      throw new IllegalStateException("Input has not been computed yet");
+    }
+
     return localFiles;
   }
 }

@@ -54,6 +54,8 @@ public class GenerateStaticFileChecksumsTask extends DefaultTask {
    * @return The URI's to compute checksums for
    */
   public Set<URI> getRemoteFiles() {
+    staticFiles.compute(getProject());
+
     if(remoteFiles == null) {
       remoteFiles = new HashSet<>();
 
@@ -72,6 +74,8 @@ public class GenerateStaticFileChecksumsTask extends DefaultTask {
    */
   @InputFiles
   public Set<File> getLocalFiles() {
+    staticFiles.compute(getProject());
+
     return staticFiles.getLocalFiles().keySet();
   }
 
@@ -95,6 +99,8 @@ public class GenerateStaticFileChecksumsTask extends DefaultTask {
    */
   @TaskAction
   public void generate() throws IOException {
+    staticFiles.compute(getProject());
+
     File parentDir = getCacheFile().getParentFile();
     if(!parentDir.exists() && !parentDir.mkdirs()) {
       throw new IOException("Failed to create directory " + parentDir.getAbsolutePath());

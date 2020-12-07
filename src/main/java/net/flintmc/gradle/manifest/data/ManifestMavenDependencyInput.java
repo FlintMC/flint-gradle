@@ -20,6 +20,8 @@ import java.util.Set;
 public class ManifestMavenDependencyInput {
   private final Set<ManifestMavenDependency> dependencies;
 
+  private boolean computed;
+
   public ManifestMavenDependencyInput() {
     this.dependencies = new HashSet<>();
   }
@@ -30,6 +32,10 @@ public class ManifestMavenDependencyInput {
    * @param project The project to compute the input for
    */
   public void compute(Project project) {
+    if(computed) {
+      return;
+    }
+
     Set<ResolvedArtifact> runtimeClasspath =
         project.getConfigurations().getByName("runtimeClasspath").getResolvedConfiguration().getResolvedArtifacts();
 
@@ -61,6 +67,8 @@ public class ManifestMavenDependencyInput {
         )));
       }
     }
+
+    computed = true;
   }
 
   /**
@@ -70,6 +78,10 @@ public class ManifestMavenDependencyInput {
    */
   @Input
   public Set<ManifestMavenDependency> getDependencies() {
+    if(!computed) {
+      throw new IllegalStateException("Input has not been computed yet");
+    }
+
     return dependencies;
   }
 }

@@ -24,6 +24,8 @@ import java.util.Set;
 public class ManifestPackageDependencyInput {
   private final Set<ManifestPackageDependency> dependencies;
 
+  private boolean computed;
+
   public ManifestPackageDependencyInput() {
     this.dependencies = new HashSet<>();
   }
@@ -34,6 +36,10 @@ public class ManifestPackageDependencyInput {
    * @param project The project to compute the input for
    */
   public void compute(Project project) {
+    if(computed) {
+      return;
+    }
+
     Set<ResolvedArtifact> runtimeClasspath =
         project.getConfigurations().getByName("runtimeClasspath").getResolvedConfiguration().getResolvedArtifacts();
 
@@ -100,6 +106,8 @@ public class ManifestPackageDependencyInput {
         ));
       }
     }
+
+    computed = true;
   }
 
   /**
@@ -109,6 +117,10 @@ public class ManifestPackageDependencyInput {
    */
   @Input
   public Set<ManifestPackageDependency> getDependencies() {
+    if(!computed) {
+      throw new IllegalStateException("Input has not been computed yet");
+    }
+
     return dependencies;
   }
 }

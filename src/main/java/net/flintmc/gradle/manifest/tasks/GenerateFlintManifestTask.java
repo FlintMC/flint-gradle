@@ -106,6 +106,7 @@ public class GenerateFlintManifestTask extends DefaultTask {
    */
   @SuppressWarnings("unused") // Required for @Nested on `packageDependencies`
   public ManifestPackageDependencyInput getPackageDependencies() {
+    packageDependencies.compute(getProject());
     return packageDependencies;
   }
 
@@ -117,6 +118,8 @@ public class GenerateFlintManifestTask extends DefaultTask {
   // NOTE: This method is only required for gradle to correctly calculate the up-to-date state of this task
   @Input
   public Set<ManifestStaticFile> getStaticFiles() {
+    staticFiles.compute(getProject());
+
     Set<ManifestStaticFile> out = new HashSet<>();
     out.addAll(staticFiles.getRemoteFiles());
     out.addAll(staticFiles.getLocalFiles().values());
@@ -226,6 +229,9 @@ public class GenerateFlintManifestTask extends DefaultTask {
     } else if(!getStaticFilesChecksumsCacheFile().isFile()) {
       throw new IllegalStateException("Missing static file checksum cache file");
     }
+
+    staticFiles.compute(getProject());
+    packageDependencies.compute(getProject());
 
     // Load cached artifact URLs
     Map<ManifestMavenDependency, URI> dependencyURIs;
