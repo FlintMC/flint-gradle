@@ -7,10 +7,12 @@ import org.apache.http.HttpResponse;
 import org.apache.http.StatusLine;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpPut;
+import org.apache.http.util.EntityUtils;
 import org.gradle.api.DefaultTask;
 import org.gradle.api.credentials.HttpHeaderCredentials;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 
 /**
@@ -52,9 +54,10 @@ public abstract class PublishTaskBase extends DefaultTask {
     // Add the credentials header
     put.addHeader(credentials.getName(), credentials.getValue());
 
+    HttpResponse response = null;
     // Upload now...
     try {
-      HttpResponse response = httpClient.execute(put);
+       response = httpClient.execute(put);
 
       // Check the status of the upload
       StatusLine statusLine = response.getStatusLine();
@@ -62,10 +65,14 @@ public abstract class PublishTaskBase extends DefaultTask {
 
       if(code < 200 || code >= 300) {
         // Unexpected response
-        throw new IOException("Server responded with " + code + " (" + statusLine.getStatusCode() + ")");
+        throw new IOException("Server responded with " + code + " (" + statusLine.getReasonPhrase() + ")");
       }
     } catch(IOException e) {
       throw new FlintGradleException("Failed to publish file", e);
+    } finally {
+      if(response != null && response.getEntity() != null) {
+        EntityUtils.consumeQuietly(response.getEntity());
+      }
     }
   }
 }

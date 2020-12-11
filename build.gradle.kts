@@ -1,6 +1,3 @@
-import java.io.ObjectInput
-import java.io.ObjectOutput
-
 fun RepositoryHandler.flintGradlePluginRepository() {
     maven {
         setUrl("https://dist.labymod.net/api/v1/maven/release")
