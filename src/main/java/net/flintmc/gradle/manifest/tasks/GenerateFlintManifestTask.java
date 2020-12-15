@@ -38,29 +38,35 @@ public class GenerateFlintManifestTask extends DefaultTask {
   private final ManifestPackageDependencyInput packageDependencies;
 
   @InputFile
-  private File artifactURLsCacheFile;
+  private final File artifactURLsCacheFile;
 
   @InputFile
-  private File staticFilesChecksumsCacheFile;
+  private final File staticFilesChecksumsCacheFile;
 
   private FlintGradleExtension extension;
 
   /**
    * Constructs a new {@link GenerateFlintManifestTask}.
    *
-   * @param manifestFile        The file to write the generated manifest to
-   * @param staticFiles         The static files to index in the manifest
-   * @param packageDependencies The packages the manifest lists as dependencies
+   * @param manifestFile                  The file to write the generated manifest to
+   * @param staticFiles                   The static files to index in the manifest
+   * @param packageDependencies           The packages the manifest lists as dependencies
+   * @param artifactURLsCacheFile         The file to load the cached artifact URLs from
+   * @param staticFilesChecksumsCacheFile The file to load the cached static checksums from
    */
   @Inject
   public GenerateFlintManifestTask(
       File manifestFile,
       ManifestStaticFileInput staticFiles,
-      ManifestPackageDependencyInput packageDependencies
+      ManifestPackageDependencyInput packageDependencies,
+      File artifactURLsCacheFile,
+      File staticFilesChecksumsCacheFile
   ) {
     this.manifestFile = manifestFile;
     this.staticFiles = staticFiles;
     this.packageDependencies = packageDependencies;
+    this.artifactURLsCacheFile = artifactURLsCacheFile;
+    this.staticFilesChecksumsCacheFile = staticFilesChecksumsCacheFile;
   }
 
   /**
@@ -79,10 +85,6 @@ public class GenerateFlintManifestTask extends DefaultTask {
    * @return The file this task reads the maven artifact URL's from
    */
   public File getArtifactURLsCacheFile() {
-    if(artifactURLsCacheFile == null) {
-      artifactURLsCacheFile = BoundMavenDependencies.getCacheFile(getProject());
-    }
-
     return artifactURLsCacheFile;
   }
 
@@ -92,10 +94,6 @@ public class GenerateFlintManifestTask extends DefaultTask {
    * @return The file this task reads the static file checksums from
    */
   public File getStaticFilesChecksumsCacheFile() {
-    if(staticFilesChecksumsCacheFile == null) {
-      staticFilesChecksumsCacheFile = StaticFileChecksums.getCacheFile(getProject());
-    }
-
     return staticFilesChecksumsCacheFile;
   }
 

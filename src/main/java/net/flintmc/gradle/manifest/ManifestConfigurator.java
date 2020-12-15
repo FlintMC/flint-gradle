@@ -131,7 +131,9 @@ public class ManifestConfigurator {
         GenerateFlintManifestTask.class,
         manifestFile,
         staticFileInput,
-        packageDependencyInput
+        packageDependencyInput,
+        resolveArtifactURLsTask.getCacheFile(),
+        generateStaticFileChecksumsTask.getCacheFile()
     );
     generateFlintManifestTask.setGroup("publishing");
     generateFlintManifestTask.setDescription("Generates the flint manifest.json and caches it");
@@ -170,7 +172,8 @@ public class ManifestConfigurator {
           PublishStaticFilesTask.class,
           this,
           new MaybeNull<>(httpClient),
-          staticFileInput
+          staticFileInput,
+          generateStaticFileChecksumsTask.getCacheFile()
       );
       publishStaticFilesTask.setGroup("publishing");
       publishStaticFilesTask.setDescription("Publishes the static files to the distributor");

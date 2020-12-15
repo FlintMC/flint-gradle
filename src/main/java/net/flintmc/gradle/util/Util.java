@@ -330,8 +330,7 @@ public class Util {
    * @return The per project unique cache directory
    */
   public static File getProjectCacheDir(Project project) {
-    File buildDir = project.getBuildDir();
-    return new File(buildDir, "flint/" + DigestUtils.md5Hex(project.getPath()));
+    return new File(project.getProjectDir(), ".flint/" + DigestUtils.md5Hex(project.getPath()));
   }
 
   /**

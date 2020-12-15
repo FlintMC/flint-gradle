@@ -25,23 +25,26 @@ public class PublishStaticFilesTask extends PublishTaskBase {
   private final ManifestStaticFileInput staticFiles;
 
   @InputFile
-  private File staticFilesChecksumsCacheFile;
+  private final File staticFilesChecksumsCacheFile;
 
   /**
    * Constructs a new {@link PublishStaticFilesTask} for publishing static files to the distributor.
    *
-   * @param configurator The manifest configurator creating this task
-   * @param httpClient   The HTTP client to use for uploading the file
-   * @param staticFiles  The static files to upload
+   * @param configurator                  The manifest configurator creating this task
+   * @param httpClient                    The HTTP client to use for uploading the file
+   * @param staticFiles                   The static files to upload
+   * @param staticFilesChecksumsCacheFile The file to load the cached checksums from
    */
   @Inject
   public PublishStaticFilesTask(
       ManifestConfigurator configurator,
       MaybeNull<HttpClient> httpClient,
-      ManifestStaticFileInput staticFiles
+      ManifestStaticFileInput staticFiles,
+      File staticFilesChecksumsCacheFile
   ) {
     super(configurator, httpClient.get());
     this.staticFiles = staticFiles;
+    this.staticFilesChecksumsCacheFile = staticFilesChecksumsCacheFile;
   }
 
   /**
@@ -62,10 +65,6 @@ public class PublishStaticFilesTask extends PublishTaskBase {
    * @return The file this task reads the static file checksums from
    */
   public File getStaticFilesChecksumsCacheFile() {
-    if(staticFilesChecksumsCacheFile == null) {
-      staticFilesChecksumsCacheFile = StaticFileChecksums.getCacheFile(getProject());
-    }
-
     return staticFilesChecksumsCacheFile;
   }
 
