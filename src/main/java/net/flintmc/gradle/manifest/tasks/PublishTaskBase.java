@@ -12,7 +12,6 @@ import org.gradle.api.DefaultTask;
 import org.gradle.api.credentials.HttpHeaderCredentials;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URI;
 
 /**
@@ -49,6 +48,7 @@ public abstract class PublishTaskBase extends DefaultTask {
     put.setEntity(entity);
 
     HttpHeaderCredentials credentials = configurator.getPublishCredentials(
+        true,
         "Set enablePublishing to false in the flint extension");
 
     // Add the credentials header
@@ -57,7 +57,7 @@ public abstract class PublishTaskBase extends DefaultTask {
     HttpResponse response = null;
     // Upload now...
     try {
-       response = httpClient.execute(put);
+      response = httpClient.execute(put);
 
       // Check the status of the upload
       StatusLine statusLine = response.getStatusLine();
