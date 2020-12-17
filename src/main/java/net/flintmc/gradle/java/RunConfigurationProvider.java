@@ -140,9 +140,6 @@ public class RunConfigurationProvider {
         runTask.setMain(mainClassOverride);
       }
 
-      // Set the list of log config transformers
-      runTask.setLogConfigTransformers(extension.getLogConfigTransformers());
-
       // Set up the authenticator
       runTask.setAuthenticator(authenticator);
 

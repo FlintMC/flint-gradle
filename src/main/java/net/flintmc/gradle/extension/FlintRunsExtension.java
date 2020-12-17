@@ -1,7 +1,6 @@
 package net.flintmc.gradle.extension;
 
 import groovy.lang.Closure;
-import net.flintmc.gradle.minecraft.LogConfigTransformer;
 import org.gradle.util.Configurable;
 import org.gradle.util.ConfigureUtil;
 
@@ -12,7 +11,6 @@ public class FlintRunsExtension implements Configurable<FlintRunsExtension> {
   private final Set<String> allIncludedConfigurations;
   private final Map<String, Set<String>> includedSourceSets;
   private final Map<String, Set<String>> excludedSourceSets;
-  private final List<LogConfigTransformer> logConfigTransformers;
   private final Map<String, String> mainClassOverrides;
   private String generalMainClassOverride;
 
@@ -24,7 +22,6 @@ public class FlintRunsExtension implements Configurable<FlintRunsExtension> {
     this.allIncludedConfigurations.add("main");
     this.includedSourceSets = new HashMap<>();
     this.excludedSourceSets = new HashMap<>();
-    this.logConfigTransformers = new ArrayList<>();
     this.mainClassOverrides = new HashMap<>();
     this.generalMainClassOverride = null;
   }
@@ -38,7 +35,6 @@ public class FlintRunsExtension implements Configurable<FlintRunsExtension> {
     this.allIncludedConfigurations = new HashSet<>(parent.allIncludedConfigurations);
     this.includedSourceSets = new HashMap<>(parent.includedSourceSets);
     this.excludedSourceSets = new HashMap<>(parent.excludedSourceSets);
-    this.logConfigTransformers = parent.logConfigTransformers;
 
     // The following can only be configured in the root project
     this.mainClassOverrides = null;
@@ -128,24 +124,6 @@ public class FlintRunsExtension implements Configurable<FlintRunsExtension> {
    */
   public Map<String, Set<String>> getIncludedSourceSets() {
     return includedSourceSets;
-  }
-
-  /**
-   * Adds a log4j config transformer to the list of transformers.
-   *
-   * @param transformer The transformer to add
-   */
-  public void transformLogConfig(LogConfigTransformer transformer) {
-    this.logConfigTransformers.add(transformer);
-  }
-
-  /**
-   * Retrieves the list of log config transformers.
-   *
-   * @return The list of log config transformers
-   */
-  public List<LogConfigTransformer> getLogConfigTransformers() {
-    return Collections.unmodifiableList(logConfigTransformers);
   }
 
   /**
