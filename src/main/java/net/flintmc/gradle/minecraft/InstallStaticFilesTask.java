@@ -200,7 +200,7 @@ public class InstallStaticFilesTask extends DefaultTask {
 
     @Override
     public void install(File target) throws IOException {
-      if(target.getParentFile().isDirectory() && !target.getParentFile().mkdirs()) {
+      if(!target.getParentFile().isDirectory() && !target.getParentFile().mkdirs()) {
         throw new IOException("Failed to create directory " + target.getParentFile().getAbsolutePath());
       }
 

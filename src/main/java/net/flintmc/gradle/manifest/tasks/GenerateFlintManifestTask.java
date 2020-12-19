@@ -232,9 +232,6 @@ public class GenerateFlintManifestTask extends DefaultTask {
     staticFiles.compute(getProject());
     packageDependencies.compute(getProject());
 
-    // Index the static files for
-    DevelopmentStaticFiles.register(getProject(), staticFiles);
-
     // Load cached artifact URLs
     Map<ManifestMavenDependency, URI> dependencyURIs;
     try {

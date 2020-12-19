@@ -18,26 +18,13 @@ public class DevelopmentStaticFiles {
   /**
    * Registers a project and its static files.
    *
-   * @param source          The project which the static files belong to
-   * @param staticFileInput The static files to register, they must have been computed already
+   * @param source The project which the static files belong to
+   * @param path   The path the file will be installed to
+   * @param file   The local file to install
    */
-  public static void register(Project source, ManifestStaticFileInput staticFileInput) {
-    // Register the project based on its dependency notation
+  public static void register(Project source, String path, File file) {
     String dependencyNotation = dependencyNotation(source);
-    if(LOCAL_FILES.containsKey(dependencyNotation)) {
-      throw new IllegalStateException("There are already static files registered for the project " + source + ", " +
-          "project might be in the build twice or some projects have duplicate names");
-    }
-
-    LOCAL_FILES.put(dependencyNotation, new HashMap<>());
-
-    for(Map.Entry<File, ManifestStaticFile> entry : staticFileInput.getLocalFiles().entrySet()) {
-      // Map the local path to the file
-      File file = entry.getKey();
-      ManifestStaticFile description = entry.getValue();
-
-      LOCAL_FILES.get(dependencyNotation).put(description.getPath(), file);
-    }
+    LOCAL_FILES.computeIfAbsent(dependencyNotation, (x) -> new HashMap<>()).put(path, file);
   }
 
   /**
@@ -47,7 +34,7 @@ public class DevelopmentStaticFiles {
    * @return The generated dependency notation
    */
   private static String dependencyNotation(Project project) {
-    return dependencyNotation(project.getName(), project.getGroup().toString(), project.getVersion().toString());
+    return dependencyNotation(project.getGroup().toString(), project.getName(), project.getVersion().toString());
   }
 
   /**
@@ -78,13 +65,6 @@ public class DevelopmentStaticFiles {
       return null;
     }
 
-    File file = localFiles.get(path);
-    if(file == null) {
-      // Sanity check, hopefully no-op
-      throw new IllegalStateException("Manifest for " + dependencyNotation + " required a static, local file for path " +
-          path + ", but the project in the build did not add such file");
-    }
-
-    return file;
+    return localFiles.get(path);
   }
 }

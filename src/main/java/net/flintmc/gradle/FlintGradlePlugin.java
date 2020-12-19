@@ -2,10 +2,12 @@ package net.flintmc.gradle;
 
 import net.flintmc.gradle.environment.DeobfuscationEnvironment;
 import net.flintmc.gradle.extension.FlintGradleExtension;
+import net.flintmc.gradle.extension.FlintStaticFileDescription;
 import net.flintmc.gradle.jar.JarTaskProvider;
 import net.flintmc.gradle.java.JavaPluginInteraction;
 import net.flintmc.gradle.java.RunConfigurationProvider;
 import net.flintmc.gradle.manifest.ManifestConfigurator;
+import net.flintmc.gradle.manifest.dev.DevelopmentStaticFiles;
 import net.flintmc.gradle.maven.MavenArtifactDownloader;
 import net.flintmc.gradle.maven.RemoteMavenRepository;
 import net.flintmc.gradle.maven.SimpleMavenRepository;
@@ -151,6 +153,13 @@ public class FlintGradlePlugin implements Plugin<Project> {
 
     for(String version : extension.getMinecraftVersions()) {
       handleVersion(version);
+    }
+
+    for(FlintStaticFileDescription staticFileDescription : extension.getStaticFiles().getStaticFileDescriptions()) {
+      if(!staticFileDescription.isRemote()) {
+        DevelopmentStaticFiles.register(
+            project, staticFileDescription.getTarget(), staticFileDescription.getSourceFile());
+      }
     }
 
     project.getRepositories().maven(repo -> {
