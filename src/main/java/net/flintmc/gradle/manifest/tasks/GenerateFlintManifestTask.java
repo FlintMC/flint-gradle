@@ -5,6 +5,7 @@ import net.flintmc.gradle.extension.FlintGradleExtension;
 import net.flintmc.gradle.manifest.cache.BoundMavenDependencies;
 import net.flintmc.gradle.manifest.cache.StaticFileChecksums;
 import net.flintmc.gradle.manifest.data.*;
+import net.flintmc.gradle.manifest.dev.DevelopmentStaticFiles;
 import net.flintmc.gradle.maven.pom.MavenArtifact;
 import net.flintmc.gradle.property.FlintPluginProperties;
 import net.flintmc.installer.impl.repository.models.DependencyDescriptionModel;
@@ -230,6 +231,9 @@ public class GenerateFlintManifestTask extends DefaultTask {
 
     staticFiles.compute(getProject());
     packageDependencies.compute(getProject());
+
+    // Index the static files for
+    DevelopmentStaticFiles.register(getProject(), staticFiles);
 
     // Load cached artifact URLs
     Map<ManifestMavenDependency, URI> dependencyURIs;

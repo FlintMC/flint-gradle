@@ -2,6 +2,7 @@ package net.flintmc.gradle.manifest.tasks;
 
 import net.flintmc.gradle.FlintGradleException;
 import net.flintmc.gradle.manifest.ManifestConfigurator;
+import net.flintmc.gradle.util.Util;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.StatusLine;
@@ -47,7 +48,8 @@ public abstract class PublishTaskBase extends DefaultTask {
     HttpPut put = new HttpPut(uri);
     put.setEntity(entity);
 
-    HttpHeaderCredentials credentials = configurator.getPublishCredentials(
+    HttpHeaderCredentials credentials = Util.getPublishCredentials(
+        getProject(),
         true,
         "Set enablePublishing to false in the flint extension");
 

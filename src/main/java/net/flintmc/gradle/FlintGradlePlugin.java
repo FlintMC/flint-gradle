@@ -118,7 +118,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
       }
 
       this.runConfigurationProvider = new RunConfigurationProvider(
-          project, minecraftRepository, minecraftCache.resolve("run"), authenticator);
+          project, minecraftRepository, minecraftCache.resolve("run"), authenticator, httpClient);
       this.jarTaskProvider = new JarTaskProvider();
       this.mavenArtifactURLCache = new MavenArtifactURLCache(flintGradlePath.resolve("maven-artifact-urls"), httpClient == null);
       try {

@@ -231,7 +231,7 @@ public class MinecraftRepository extends SimpleMavenRepository {
     Path targetPath = getArtifactPath("net.minecraft", variant, manifest.getId());
     if (!Files.exists(targetPath)) {
       LOGGER.lifecycle("Downloading minecraft {} {}", variant, manifest.getId());
-      Util.download(httpClient, download.getUrl().toExternalForm(), targetPath);
+      Util.download(httpClient, download.getUrl(), targetPath);
     }
 
     MavenPom pom = createPom(manifest, variant, includeDependencies);

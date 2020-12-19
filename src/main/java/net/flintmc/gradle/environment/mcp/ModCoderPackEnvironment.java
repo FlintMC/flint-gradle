@@ -15,6 +15,8 @@ import org.gradle.api.logging.Logging;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -332,8 +334,8 @@ public class ModCoderPackEnvironment implements DeobfuscationEnvironment {
 
       try {
         LOGGER.lifecycle("Downloading {}", outputName);
-        Util.download(httpClient, url, outputZip);
-      } catch (IOException e) {
+        Util.download(httpClient, new URI(url), outputZip);
+      } catch (IOException | URISyntaxException e) {
         throw new DeobfuscationException("Failed to download " + outputName, e);
       }
     }

@@ -16,7 +16,7 @@ import java.util.stream.Collectors;
 
 public class JarTaskProvider {
   /**
-   * Creates jar and publish tasks for the minecraft sourcesets.
+   * Creates jar and publish tasks for the minecraft source sets.
    *
    * @param project   the project to install the tasks in
    * @param extension flint gradle extension to fetch data from
@@ -38,7 +38,6 @@ public class JarTaskProvider {
             this.installCompileTask(sourceSet, project);
           }
         });
-//    this.createPublishTask(project);
   }
 
   /**

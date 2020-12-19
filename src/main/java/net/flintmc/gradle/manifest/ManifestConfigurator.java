@@ -8,8 +8,8 @@ import net.flintmc.gradle.manifest.data.ManifestRepositoryInput;
 import net.flintmc.gradle.manifest.data.ManifestStaticFileInput;
 import net.flintmc.gradle.manifest.tasks.*;
 import net.flintmc.gradle.maven.cache.MavenArtifactURLCache;
+import net.flintmc.gradle.minecraft.InstallStaticFilesTask;
 import net.flintmc.gradle.property.FlintPluginProperties;
-import net.flintmc.gradle.property.FlintPluginProperty;
 import net.flintmc.gradle.util.MaybeNull;
 import net.flintmc.gradle.util.Util;
 import org.apache.http.client.HttpClient;
@@ -44,7 +44,6 @@ public class ManifestConfigurator {
   private URI projectPublishURI;
   private URI distributorMavenURI;
   private URI projectMavenURI;
-  private HttpHeaderCredentials publishCredentials;
 
   /**
    * Installs the required gradle tasks to generate the flint manifests.
@@ -83,7 +82,7 @@ public class ManifestConfigurator {
         repository.setUrl(distributorUrl);
 
         // Try to retrieve authentication, it might not be available
-        HttpHeaderCredentials values = getPublishCredentials(false);
+        HttpHeaderCredentials values = Util.getPublishCredentials(project, false);
 
         if(values != null) {
           // Gradle does not allow setting the credentials instance directly, so copy it
@@ -263,37 +262,4 @@ public class ManifestConfigurator {
     return projectMavenURI;
   }
 
-  /**
-   * Retrieves the HTTP header credentials used for publishing.
-   *
-   * @param required             If {@code true}, this method will abort the build if no authorization is configured
-   * @param notAvailableSolution Messages to display as a solution in case the credentials can't be computed
-   * @return The HTTP header credentials used for publishing
-   */
-  public HttpHeaderCredentials getPublishCredentials(boolean required, String... notAvailableSolution) {
-    if(publishCredentials == null) {
-      publishCredentials = project.getObjects().newInstance(HttpHeaderCredentials.class);
-
-      // Retrieve either a bearer or publish token
-      String bearerToken = FlintPluginProperties.DISTRIBUTOR_BEARER_TOKEN.resolve(project);
-      if(bearerToken != null) {
-        publishCredentials.setName("Authorization");
-        publishCredentials.setValue("Bearer " + bearerToken);
-      } else {
-        FlintPluginProperty<String> publishTokenProperty = FlintPluginProperties.DISTRIBUTOR_PUBLISH_TOKEN;
-        String publishToken = required ?
-            publishTokenProperty.require(project, notAvailableSolution) :
-            publishTokenProperty.resolve(project);
-
-        if(publishToken == null) {
-          return null;
-        }
-
-        publishCredentials.setName("Publish-Token");
-        publishCredentials.setValue(publishToken);
-      }
-    }
-
-    return publishCredentials;
-  }
 }

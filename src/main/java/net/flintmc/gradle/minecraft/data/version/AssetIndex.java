@@ -1,6 +1,6 @@
 package net.flintmc.gradle.minecraft.data.version;
 
-import java.net.URL;
+import java.net.URI;
 import java.util.Objects;
 
 public class AssetIndex {
@@ -8,7 +8,7 @@ public class AssetIndex {
   private String sha1;
   private long size;
   private long totalSize;
-  private URL url;
+  private URI url;
 
   public String getId() {
     return id;
@@ -26,7 +26,7 @@ public class AssetIndex {
     return totalSize;
   }
 
-  public URL getUrl() {
+  public URI getUrl() {
     return url;
   }
 

@@ -1,12 +1,12 @@
 package net.flintmc.gradle.minecraft.data.version;
 
-import java.net.URL;
+import java.net.URI;
 import java.util.Objects;
 
 public class VersionedDownload {
   private String sha1;
   private long size;
-  private URL url;
+  private URI url;
 
   public String getSha1() {
     return sha1;
@@ -16,7 +16,7 @@ public class VersionedDownload {
     return size;
   }
 
-  public URL getUrl() {
+  public URI getUrl() {
     return url;
   }
 

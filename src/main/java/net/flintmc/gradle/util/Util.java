@@ -7,6 +7,8 @@ import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.JsonNode;
 import net.flintmc.gradle.json.JsonConverter;
 import net.flintmc.gradle.json.JsonConverterException;
+import net.flintmc.gradle.property.FlintPluginProperties;
+import net.flintmc.gradle.property.FlintPluginProperty;
 import net.flintmc.installer.impl.repository.models.PackageModel;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.http.HttpResponse;
@@ -14,9 +16,13 @@ import org.apache.http.StatusLine;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.gradle.api.Project;
+import org.gradle.api.credentials.HttpHeaderCredentials;
+import org.gradle.api.file.FileCollection;
 
 import java.io.*;
 import java.net.URI;
+import java.net.URL;
+import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.CopyOption;
 import java.nio.file.Files;
@@ -85,29 +91,84 @@ public class Util {
   }
 
   /**
-   * Downloads the given url to the given path. The parent directories are created as required.
+   * Opens a stream to read from the given URL.
+   *
+   * @param client The {@link HttpClient} to use for opening the connection
+   * @param uri    The URI to open
+   * @return An input stream to read the data from
+   * @throws IOException If an I/O error occurs while opening the connection
+   */
+  public static InputStream getURLStream(HttpClient client, URI uri) throws IOException {
+    return getURLStream(client, uri, null);
+  }
+
+  /**
+   * Opens a stream to read from the given URL.
+   *
+   * @param client  The {@link HttpClient} to use for opening the connection
+   * @param uri     The URI to open
+   * @param project The project to use for resolving authentication, or {@code null}, if authentication can be ignored
+   * @return An input stream to read the data from
+   * @throws IOException If an I/O error occurs while opening the connection
+   */
+  public static InputStream getURLStream(HttpClient client, URI uri, Project project) throws IOException {
+    if(uri.getScheme().equals("jar") || uri.getScheme().equals("file")) {
+      return uri.toURL().openStream();
+    } else {
+      HttpGet getRequest = new HttpGet(uri);
+      if(project != null) {
+        URI distributorURI = FlintPluginProperties.DISTRIBUTOR_URL.resolve(project);
+        if(distributorURI.getHost().equals(uri.getHost())) {
+          // Reaching out to the distributor, add the authorization
+          HttpHeaderCredentials credentials = getPublishCredentials(project, false);
+          if(credentials != null) {
+            getRequest.setHeader(credentials.getName(), credentials.getValue());
+          }
+        }
+      }
+
+      HttpResponse response = client.execute(getRequest);
+
+      StatusLine status = response.getStatusLine();
+      if(status.getStatusCode() != 200) {
+        throw new IOException("Failed to download file from " + uri + ", server responded with "
+            + status.getStatusCode() + " (" + status.getReasonPhrase() + ")");
+      }
+
+      return response.getEntity().getContent();
+    }
+  }
+
+  /**
+   * Downloads the given URI to the given path. The parent directories are created as required.
    *
    * @param client  The {@link HttpClient} to use for downloading
-   * @param url     The url to download
+   * @param uri     The URI to download
    * @param output  The target path
    * @param options Options specifying how to handle conflicts and symlinks
    * @throws IOException If the file can't be downloaded or created
    */
-  public static void download(HttpClient client, String url, Path output, CopyOption... options) throws IOException {
+  public static void download(HttpClient client, URI uri, Path output, CopyOption... options) throws IOException {
+    download(client, uri, output, null, options);
+  }
+
+  /**
+   * Downloads the given URI to the given path. The parent directories are created as required.
+   *
+   * @param client  The {@link HttpClient} to use for downloading
+   * @param uri     The URI to download
+   * @param output  The target path
+   * @param project The project to use for resolving authentication, or {@code null}, if authentication can be ignored
+   * @param options Options specifying how to handle conflicts and symlinks
+   * @throws IOException If the file can't be downloaded or created
+   */
+  public static void download(
+      HttpClient client, URI uri, Path output, Project project, CopyOption... options) throws IOException {
     if(!Files.isDirectory(output.getParent())) {
       Files.createDirectories(output.getParent());
     }
 
-    HttpGet getRequest = new HttpGet(url);
-    HttpResponse response = client.execute(getRequest);
-
-    StatusLine status = response.getStatusLine();
-    if(status.getStatusCode() != 200) {
-      throw new IOException("Failed to download file from " + url + ", server responded with "
-          + status.getStatusCode() + " (" + status.getReasonPhrase() + ")");
-    }
-
-    try(InputStream stream = response.getEntity().getContent()) {
+    try(InputStream stream = getURLStream(client, uri, project)) {
       Files.copy(stream, output, options);
     }
   }
@@ -319,7 +380,7 @@ public class Util {
       }
 
       try(InputStream stream = jarFile.getInputStream(entry)) {
-        return JsonConverter.streamToObject(stream, PackageModel.class);
+        return JsonConverter.PACKAGE_MODEL_SERIALIZER.fromString(readAll(stream), PackageModel.class);
       }
     }
   }
@@ -341,5 +402,80 @@ public class Util {
    */
   public static void nagDeprecated(Project project, String message) {
     project.getLogger().warn("Deprecation warning:", new Throwable(message));
+  }
+
+  /**
+   * Creates a file collection with all duplicates removed.
+   *
+   * @param project     The project to create the file collection with
+   * @param collections The collections to combine to a new collection without duplicates
+   * @return The collection without any duplicates
+   */
+  public static FileCollection deduplicatedFileCollection(Project project, FileCollection... collections) {
+    Set<File> files = new HashSet<>();
+
+    // Iterate all collections
+    for(FileCollection collection : collections) {
+      if(collection == null) {
+        // Skip collections which are null
+        continue;
+      }
+
+      for(File file : collection.getFiles()) {
+        // Make sure every path is absolute to reliably detect duplicates
+        files.add(file.getAbsoluteFile());
+      }
+    }
+
+    // Use the project to create a new file collection out of a set of files
+    return project.files(files);
+  }
+
+  /**
+   * Reads an entire stream as UTF-8.
+   *
+   * @param stream The stream to read
+   * @return The read data as UTF-8
+   * @throws IOException If an I/O error occurs while reading
+   */
+  public static String readAll(InputStream stream) throws IOException {
+    try(ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+      copyStream(stream, out);
+      return out.toString("UTF-8");
+    }
+  }
+
+  /**
+   * Retrieves the HTTP header credentials used for publishing.
+   *
+   * @param project              The project to use for resolving the properties
+   * @param required             If {@code true}, this method will abort the build if no authorization is configured
+   * @param notAvailableSolution Messages to display as a solution in case the credentials can't be computed
+   * @return The HTTP header credentials used for publishing
+   */
+  public static HttpHeaderCredentials getPublishCredentials(
+      Project project, boolean required, String... notAvailableSolution) {
+    HttpHeaderCredentials publishCredentials = project.getObjects().newInstance(HttpHeaderCredentials.class);
+
+    // Retrieve either a bearer or publish token
+    String bearerToken = FlintPluginProperties.DISTRIBUTOR_BEARER_TOKEN.resolve(project);
+    if(bearerToken != null) {
+      publishCredentials.setName("Authorization");
+      publishCredentials.setValue("Bearer " + bearerToken);
+    } else {
+      FlintPluginProperty<String> publishTokenProperty = FlintPluginProperties.DISTRIBUTOR_PUBLISH_TOKEN;
+      String publishToken = required ?
+          publishTokenProperty.require(project, notAvailableSolution) :
+          publishTokenProperty.resolve(project);
+
+      if(publishToken == null) {
+        return null;
+      }
+
+      publishCredentials.setName("Publish-Token");
+      publishCredentials.setValue(publishToken);
+    }
+
+    return publishCredentials;
   }
 }

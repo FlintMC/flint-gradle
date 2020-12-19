@@ -1,8 +1,5 @@
 package net.flintmc.gradle.minecraft;
 
-import groovy.util.XmlSlurper;
-import groovy.util.slurpersupport.GPathResult;
-import groovy.xml.XmlUtil;
 import net.flintmc.gradle.FlintGradleException;
 import net.flintmc.gradle.minecraft.data.version.ArgumentString;
 import net.flintmc.gradle.minecraft.data.version.VersionedArguments;
@@ -13,15 +10,8 @@ import net.flintmc.gradle.minecraft.yggdrasil.YggdrasilAuthenticator;
 import net.flintmc.gradle.property.FlintPluginProperties;
 import net.flintmc.gradle.util.RuleChainResolver;
 import net.flintmc.gradle.util.Util;
-import org.gradle.api.Project;
-import org.gradle.api.file.FileCollection;
-import org.gradle.api.tasks.Input;
-import org.gradle.api.tasks.JavaExec;
-import org.gradle.api.tasks.SourceSet;
-import org.gradle.api.tasks.TaskAction;
-import org.xml.sax.SAXException;
+import org.gradle.api.tasks.*;
 
-import javax.xml.parsers.ParserConfigurationException;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -48,7 +38,7 @@ public class MinecraftRunTask extends JavaExec {
   private String version;
   private String versionType;
   private VersionedArguments versionedArguments;
-  private Map<SourceSet, Project> potentialClasspath;
+  private PotentialMinecraftClasspath potentialClasspath;
   private String assetIndex;
   private Path assetsPath;
   private Path nativesDirectory;
@@ -96,8 +86,8 @@ public class MinecraftRunTask extends JavaExec {
    *
    * @return The potential classpath
    */
-  @Input
-  public Map<SourceSet, Project> getPotentialClasspath() {
+  @Internal
+  public PotentialMinecraftClasspath getPotentialClasspath() {
     return potentialClasspath;
   }
 
@@ -107,7 +97,7 @@ public class MinecraftRunTask extends JavaExec {
    *
    * @param potentialClasspath The potential classpath
    */
-  public void setPotentialClasspath(Map<SourceSet, Project> potentialClasspath) {
+  public void setPotentialClasspath(PotentialMinecraftClasspath potentialClasspath) {
     this.potentialClasspath = potentialClasspath;
   }
 
@@ -199,32 +189,19 @@ public class MinecraftRunTask extends JavaExec {
     args(programArgs);
     args("--game-version", version);
 
-    FileCollection additionalClasspath = getProject().files();
-
-    // Iterate the potential classpath
-    for(SourceSet sourceSet : potentialClasspath.keySet()) {
-      // Retrieve the minecraft version extension
-      Object minecraftVersionExtension = sourceSet.getExtensions().findByName("minecraftVersion");
-
-      // If the extension is null or equals the version, add it to the classpath
-      if(minecraftVersionExtension == null || minecraftVersionExtension.toString().equals(version)) {
-        // Make sure to always retrieve a valid file collection without any duplicates
-        additionalClasspath = deduplicatedFileCollection(additionalClasspath, sourceSet.getRuntimeClasspath());
-      }
-    }
-
     // Add the classpath
-    classpath(additionalClasspath);
+    classpath(potentialClasspath.getRealClasspath(getProject(), version));
 
     try {
       super.exec();
     } finally {
-      try {
+      // TODO: This would delete a user supplied file!
+      /* try {
         // Delete the temporary configuration file, it will be regenerated on next run
         Files.delete(log4jConfiguration);
       } catch(IOException e) {
         getLogger().warn("Failed to delete temporary log4j configuration", e);
-      }
+      } */
     }
   }
 
@@ -275,32 +252,6 @@ public class MinecraftRunTask extends JavaExec {
     }
 
     return output;
-  }
-
-  /**
-   * Creates a file collection with all duplicates removed.
-   *
-   * @param collections The collections to combine to a new collection without duplicates
-   * @return The collection without any duplicates
-   */
-  private FileCollection deduplicatedFileCollection(FileCollection... collections) {
-    Set<File> files = new HashSet<>();
-
-    // Iterate all collections
-    for(FileCollection collection : collections) {
-      if(collection == null) {
-        // Skip collections which are null
-        continue;
-      }
-
-      for(File file : collection.getFiles()) {
-        // Make sure every path is absolute to reliably detect duplicates
-        files.add(file.getAbsoluteFile());
-      }
-    }
-
-    // Use the project to create a new file collection out of a set of files
-    return getProject().files(files);
   }
 
   /**
