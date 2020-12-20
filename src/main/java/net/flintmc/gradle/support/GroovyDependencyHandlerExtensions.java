@@ -2,9 +2,9 @@ package net.flintmc.gradle.support;
 
 import groovy.lang.Closure;
 import net.flintmc.gradle.FlintGradleException;
-import net.flintmc.gradle.util.JavaClosure;
 import org.codehaus.groovy.runtime.InvokerHelper;
 import org.gradle.api.Project;
+import org.gradle.api.artifacts.dsl.DependencyHandler;
 import org.gradle.api.plugins.ExtensionContainer;
 
 import java.lang.reflect.Method;
@@ -32,7 +32,9 @@ public class GroovyDependencyHandlerExtensions {
           // Ignore if added already due to overload
             dependencyExtensions.findByName(method.getName()) != null ||
                 // Ignore methods which are not static or public
-                (method.getModifiers() & (Modifier.STATIC | Modifier.PUBLIC)) == 0
+                (method.getModifiers() & (Modifier.STATIC | Modifier.PUBLIC)) == 0 ||
+                // Ignore methods which are not extension functions of DependencyHandler.class
+                method.getParameterCount() > 0 && method.getParameterTypes()[0] != DependencyHandler.class
         ) {
           continue;
         }
