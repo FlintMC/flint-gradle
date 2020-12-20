@@ -2,6 +2,7 @@ package net.flintmc.gradle.util;
 
 import groovy.lang.Closure;
 
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -42,6 +43,23 @@ public abstract class JavaClosure<T> extends Closure<T> {
       @SuppressWarnings("unused") // Called by groovy
       public void doCall(C param) {
         consumer.accept(param);
+      }
+    };
+  }
+
+  /**
+   * Wraps a Java {@link BiConsumer} as a groovy closure.
+   *
+   * @param consumer The consumer to wrap
+   * @param <C1>     The parameter type of the first parameter
+   * @param <C2>     The parameter type of the second parameter
+   * @return The consumer wrapper as a groovy closure
+   */
+  public static <C1, C2> JavaClosure<Void> of(BiConsumer<C1, C2> consumer) {
+    return new JavaClosure<Void>(consumer, null) {
+      @SuppressWarnings("unused") // Called by groovy
+      public void doCall(C1 param1, C2 param2) {
+        consumer.accept(param1, param2);
       }
     };
   }

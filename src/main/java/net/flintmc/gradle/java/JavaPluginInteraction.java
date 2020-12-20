@@ -1,7 +1,12 @@
 package net.flintmc.gradle.java;
 
+import groovy.lang.Closure;
+import net.flintmc.gradle.FlintGradleException;
 import net.flintmc.gradle.extension.FlintGradleExtension;
 import net.flintmc.gradle.maven.pom.MavenArtifact;
+import net.flintmc.gradle.support.GroovyDependencyHandlerExtensions;
+import net.flintmc.gradle.util.JavaClosure;
+import org.codehaus.groovy.runtime.InvokerHelper;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.artifacts.dsl.DependencyHandler;
@@ -21,9 +26,23 @@ public class JavaPluginInteraction {
   }
 
   /**
-   * Configures the source sets depending on how the extension has been configured.
-   * Versioned setup is handled by the {@link #setupVersioned(FlintGradleExtension, Collection, Collection, String)}
-   * method.
+   * Configures things that the plugin provides regardless of the extension setup.
+   */
+  public void preconfigure() {
+    VersionedDependencyAdder dependencyAdder = new VersionedDependencyAdder();
+
+    // Add the extension for use by DSL specific extensions
+    project.getDependencies().getExtensions().add(
+        "versionedDependencyAdder",
+        dependencyAdder
+    );
+
+    GroovyDependencyHandlerExtensions.install(project);
+  }
+
+  /**
+   * Configures the source sets depending on how the extension has been configured. Versioned setup is handled by the
+   * {@link #setupVersioned(FlintGradleExtension, Collection, Collection, String)} method.
    *
    * @param extension The configured extension
    */
@@ -31,7 +50,7 @@ public class JavaPluginInteraction {
     SourceSetContainer sourceSets = project.getExtensions().getByType(SourceSetContainer.class);
     DependencyHandler dependencies = project.getDependencies();
 
-    if (!extension.shouldDisableInternalSourceSet()) {
+    if(!extension.shouldDisableInternalSourceSet()) {
       // The internal source set is not disabled, create it and set it
       // as the source set containing the implementation
       SourceSet internalSourceSet = sourceSets.maybeCreate("internal");
@@ -52,21 +71,10 @@ public class JavaPluginInteraction {
       dependencies.add("internal", internalSourceSet.getOutput());
       dependencies.add("internal", internalSourceSet.getCompileClasspath());
     }
-
-    for (String configurationName : project.getConfigurations().getAsMap().keySet()) {
-      configurationName = Character.toUpperCase(configurationName.charAt(0)) + configurationName.substring(1);
-
-      // Create the syntactic sugar helper to allow invocation of `version<configurationName>("<version>")`
-      dependencies.getExtensions().add(
-          "versioned" + configurationName,
-          new VersionedDependencyAdder(this, configurationName, dependencies)
-      );
-    }
   }
 
   /**
-   * Configures the source sets depending the dependencies and how the extension has been
-   * configured.
+   * Configures the source sets depending the dependencies and how the extension has been configured.
    *
    * @param extension           The configured extension
    * @param compileDependencies The versioned compile dependencies
@@ -96,17 +104,17 @@ public class JavaPluginInteraction {
     String compileOnlyConfiguration = versionedSourceSet.getCompileOnlyConfigurationName();
     String runtimeOnlyConfiguration = versionedSourceSet.getRuntimeOnlyConfigurationName();
 
-    for (MavenArtifact compileDependency : compileDependencies) {
+    for(MavenArtifact compileDependency : compileDependencies) {
       // Add all compile dependencies to compileOnly
       project.getDependencies().add(compileOnlyConfiguration, compileDependency.toIdentifier());
     }
 
-    for (MavenArtifact runtimeDependency : runtimeDependencies) {
+    for(MavenArtifact runtimeDependency : runtimeDependencies) {
       // Add all runtime dependencies to runtimeOnly
       project.getDependencies().add(runtimeOnlyConfiguration, runtimeDependency.toIdentifier());
     }
 
-    for (MavenArtifact runtimeDependency : runtimeDependencies) {
+    for(MavenArtifact runtimeDependency : runtimeDependencies) {
       // Add all runtime dependencies to runtimeOnly
       project.getDependencies().add(runtimeOnlyConfiguration, runtimeDependency.toIdentifier());
     }
@@ -143,7 +151,7 @@ public class JavaPluginInteraction {
     // Initially set the combined one as the base
     FileCollection combined = base;
 
-    for (FileCollection collection : collections) {
+    for(FileCollection collection : collections) {
       // Chain all of them together, the plus method creates a copy
       combined = combined.plus(collection);
     }

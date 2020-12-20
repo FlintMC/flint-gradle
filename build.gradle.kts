@@ -28,6 +28,7 @@ fun RepositoryHandler.flintRepository() {
 
 plugins {
     id("java-gradle-plugin")
+    `kotlin-dsl`
     id("maven-publish")
     id("maven")
 }

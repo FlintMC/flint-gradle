@@ -59,6 +59,8 @@ public class FlintGradlePlugin implements Plugin<Project> {
     String[] versions = {"v1.15.2", "v1.16.3", "internal"};
     project.getPlugins().apply("maven-publish");
 
+    // Apply precompiled script plugins
+    // project.getPlugins().apply("net.flintmc.gradle.precompiled.dependency-handler-extensions");
 
     for(String version : versions) {
       project.getConfigurations().maybeCreate(String.format("%sAnnotationProcessor", version.replace('.', '_')));
@@ -142,6 +144,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
     }
 
     this.manifestConfigurator = new ManifestConfigurator(this);
+    this.interaction.preconfigure();
     project.afterEvaluate((p) -> extension.ensureConfigured());
   }
 

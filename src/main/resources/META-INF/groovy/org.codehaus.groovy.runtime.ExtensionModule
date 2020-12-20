@@ -1,0 +1,3 @@
+moduleName=flint-gradle-extensions
+moduleVersion=2.6.1
+extensionClasses=DependencyHandlerExtensionsKt
