@@ -56,10 +56,8 @@ public abstract class PublishTaskBase extends DefaultTask {
     // Add the credentials header
     put.header(credentials.getName(), credentials.getValue());
 
-    Response response = null;
-    // Upload now...
-    try {
-      response = httpClient.newCall(put.build()).execute();
+    try (Response response = httpClient.newCall(put.build()).execute()) {
+      // Upload now...
 
       // Check the status of the upload
       int code = response.code();
