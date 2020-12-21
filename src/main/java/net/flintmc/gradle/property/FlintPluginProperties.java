@@ -34,7 +34,7 @@ public final class FlintPluginProperties {
   public static final FlintPluginProperty<URI> DISTRIBUTOR_URL = FlintPluginProperty.builder()
       .name("net.flint.distributor.url")
       .environment("FLINT_DISTRIBUTOR_URL")
-      .complete(URI.class);
+      .complete(URI.class, URI.create("https://dist.labymod.net"));
 
   /**
    * Determines the release channel of the flint distributor.

@@ -7,7 +7,7 @@ package net.flintmc.gradle.util;
  * @param <T> The contained type
  */
 public class MaybeNull<T> {
-  private final T value;
+  protected T value;
 
   /**
    * Constructs a new {@link MaybeNull}.

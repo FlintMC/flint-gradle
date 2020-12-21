@@ -13,6 +13,7 @@ import org.gradle.api.tasks.TaskAction;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Iterator;
@@ -22,7 +23,7 @@ import java.util.Iterator;
  */
 @CacheableTask
 public class MinecraftAssetsTask extends DefaultTask {
-  private static final String ASSET_BASE_URL = "https://resources.download.minecraft.net/";
+  private static final URI ASSET_BASE_URL = URI.create("https://resources.download.minecraft.net");
 
   private VersionManifest manifest;
   private Path directory;
@@ -69,7 +70,7 @@ public class MinecraftAssetsTask extends DefaultTask {
     if (!Files.exists(indexFile)) {
       // The asset index file has not been downloaded yet, do so now
       getLogger().lifecycle("Downloading assets index for " + index.getId());
-      Util.download(httpClient, index.getUrl().toExternalForm(), indexFile);
+      Util.download(httpClient, index.getUrl(), indexFile);
     }
 
     // Parse the index file
@@ -98,7 +99,7 @@ public class MinecraftAssetsTask extends DefaultTask {
       if (!Files.isRegularFile(assetTargetPath)) {
         // The asset does not exist yet, download it
         getLogger().lifecycle("Downloading asset {} ({})", objectName, assetPath);
-        Util.download(httpClient, ASSET_BASE_URL + assetPath, assetTargetPath);
+        Util.download(httpClient, Util.concatURI(ASSET_BASE_URL, assetPath), assetTargetPath);
       }
     }
   }

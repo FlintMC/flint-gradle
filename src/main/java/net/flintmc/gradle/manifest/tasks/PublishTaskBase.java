@@ -2,6 +2,7 @@ package net.flintmc.gradle.manifest.tasks;
 
 import net.flintmc.gradle.FlintGradleException;
 import net.flintmc.gradle.manifest.ManifestConfigurator;
+import net.flintmc.gradle.util.Util;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.StatusLine;
@@ -12,7 +13,6 @@ import org.gradle.api.DefaultTask;
 import org.gradle.api.credentials.HttpHeaderCredentials;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URI;
 
 /**
@@ -48,7 +48,9 @@ public abstract class PublishTaskBase extends DefaultTask {
     HttpPut put = new HttpPut(uri);
     put.setEntity(entity);
 
-    HttpHeaderCredentials credentials = configurator.getPublishCredentials(
+    HttpHeaderCredentials credentials = Util.getPublishCredentials(
+        getProject(),
+        true,
         "Set enablePublishing to false in the flint extension");
 
     // Add the credentials header
@@ -57,7 +59,7 @@ public abstract class PublishTaskBase extends DefaultTask {
     HttpResponse response = null;
     // Upload now...
     try {
-       response = httpClient.execute(put);
+      response = httpClient.execute(put);
 
       // Check the status of the upload
       StatusLine statusLine = response.getStatusLine();

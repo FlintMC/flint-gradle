@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import net.flintmc.installer.impl.repository.models.InternalModelSerializer;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -18,6 +19,7 @@ public class JsonConverter {
    * all operations done with the {@link JsonConverter} class.
    */
   public static final ObjectMapper OBJECT_MAPPER;
+  public static final InternalModelSerializer PACKAGE_MODEL_SERIALIZER = new InternalModelSerializer();
 
   static {
     OBJECT_MAPPER = new ObjectMapper();

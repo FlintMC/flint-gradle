@@ -1,8 +1,5 @@
 package net.flintmc.gradle.minecraft;
 
-import groovy.util.XmlSlurper;
-import groovy.util.slurpersupport.GPathResult;
-import groovy.xml.XmlUtil;
 import net.flintmc.gradle.FlintGradleException;
 import net.flintmc.gradle.minecraft.data.version.ArgumentString;
 import net.flintmc.gradle.minecraft.data.version.VersionedArguments;
@@ -12,19 +9,10 @@ import net.flintmc.gradle.minecraft.yggdrasil.YggdrasilAuthenticationException;
 import net.flintmc.gradle.minecraft.yggdrasil.YggdrasilAuthenticator;
 import net.flintmc.gradle.property.FlintPluginProperties;
 import net.flintmc.gradle.util.RuleChainResolver;
-import org.gradle.api.Project;
-import org.gradle.api.file.FileCollection;
-import org.gradle.api.tasks.Input;
-import org.gradle.api.tasks.JavaExec;
-import org.gradle.api.tasks.SourceSet;
-import org.gradle.api.tasks.TaskAction;
-import org.xml.sax.SAXException;
+import net.flintmc.gradle.util.Util;
+import org.gradle.api.tasks.*;
 
-import javax.xml.parsers.ParserConfigurationException;
-import java.io.File;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.io.UncheckedIOException;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -50,11 +38,10 @@ public class MinecraftRunTask extends JavaExec {
   private String version;
   private String versionType;
   private VersionedArguments versionedArguments;
-  private Map<SourceSet, Project> potentialClasspath;
+  private PotentialMinecraftClasspath potentialClasspath;
   private String assetIndex;
   private Path assetsPath;
   private Path nativesDirectory;
-  private List<LogConfigTransformer> logConfigTransformers;
   private YggdrasilAuthenticator authenticator;
 
 
@@ -99,18 +86,18 @@ public class MinecraftRunTask extends JavaExec {
    *
    * @return The potential classpath
    */
-  @Input
-  public Map<SourceSet, Project> getPotentialClasspath() {
+  @Internal
+  public PotentialMinecraftClasspath getPotentialClasspath() {
     return potentialClasspath;
   }
 
   /**
-   * Sets the potential classpath. Shortly before executing the matching source sets will be filtered, so
-   * that source sets which don't match the minecraft version don't end up on the classpath.
+   * Sets the potential classpath. Shortly before executing the matching source sets will be filtered, so that source
+   * sets which don't match the minecraft version don't end up on the classpath.
    *
    * @param potentialClasspath The potential classpath
    */
-  public void setPotentialClasspath(Map<SourceSet, Project> potentialClasspath) {
+  public void setPotentialClasspath(PotentialMinecraftClasspath potentialClasspath) {
     this.potentialClasspath = potentialClasspath;
   }
 
@@ -142,18 +129,7 @@ public class MinecraftRunTask extends JavaExec {
   }
 
   /**
-   * Sets the list of log config transformers which should be applied before running minecraft with the
-   * configuration generated.
-   *
-   * @param logConfigTransformers The list of transformers to apply to the configuration
-   */
-  public void setLogConfigTransformers(List<LogConfigTransformer> logConfigTransformers) {
-    this.logConfigTransformers = logConfigTransformers;
-  }
-
-  /**
-   * Sets the authenticator that will be used for logging in into minecraft if the user
-   * desires so.
+   * Sets the authenticator that will be used for logging in into minecraft if the user desires so.
    *
    * @param authenticator The authenticator used for logging in into minecraft
    */
@@ -169,22 +145,20 @@ public class MinecraftRunTask extends JavaExec {
   @TaskAction
   @Override
   public void exec() {
-    if (configurationName == null) {
+    if(configurationName == null) {
       throw new IllegalStateException("The configuration name has not been configured");
-    } else if (version == null) {
+    } else if(version == null) {
       throw new IllegalStateException("The version has not been configured");
-    } else if (versionedArguments == null) {
+    } else if(versionedArguments == null) {
       throw new IllegalStateException("Versioned arguments have not been configured");
-    } else if (potentialClasspath == null) {
+    } else if(potentialClasspath == null) {
       throw new IllegalStateException("The potential classpath has not been configured");
-    } else if (assetIndex == null) {
+    } else if(assetIndex == null) {
       throw new IllegalStateException("The asset index has not been configured");
-    } else if (assetsPath == null) {
+    } else if(assetsPath == null) {
       throw new IllegalStateException("The assets path has not been configured");
-    } else if (nativesDirectory == null) {
+    } else if(nativesDirectory == null) {
       throw new IllegalStateException("The natives directory has not been configured");
-    } else if (logConfigTransformers == null) {
-      throw new IllegalStateException("The list of log config transformers has not been configured");
     }
 
     // Configure variables
@@ -197,7 +171,7 @@ public class MinecraftRunTask extends JavaExec {
     variables.put("natives_directory", nativesDirectory.toString());
 
     // Set up the login
-    if (!setup(variables)) {
+    if(!setup(variables)) {
       // User cancelled run
       return;
     }
@@ -215,32 +189,19 @@ public class MinecraftRunTask extends JavaExec {
     args(programArgs);
     args("--game-version", version);
 
-    FileCollection additionalClasspath = getProject().files();
-
-    // Iterate the potential classpath
-    for (SourceSet sourceSet : potentialClasspath.keySet()) {
-      // Retrieve the minecraft version extension
-      Object minecraftVersionExtension = sourceSet.getExtensions().findByName("minecraftVersion");
-
-      // If the extension is null or equals the version, add it to the classpath
-      if (minecraftVersionExtension == null || minecraftVersionExtension.toString().equals(version)) {
-        // Make sure to always retrieve a valid file collection without any duplicates
-        additionalClasspath = deduplicatedFileCollection(additionalClasspath, sourceSet.getRuntimeClasspath());
-      }
-    }
-
     // Add the classpath
-    classpath(additionalClasspath);
+    classpath(potentialClasspath.getRealClasspath(getProject(), version));
 
     try {
       super.exec();
     } finally {
-      try {
+      // TODO: This would delete a user supplied file!
+      /* try {
         // Delete the temporary configuration file, it will be regenerated on next run
         Files.delete(log4jConfiguration);
-      } catch (IOException e) {
+      } catch(IOException e) {
         getLogger().warn("Failed to delete temporary log4j configuration", e);
-      }
+      } */
     }
   }
 
@@ -258,27 +219,27 @@ public class MinecraftRunTask extends JavaExec {
     List<String> output = new ArrayList<>();
 
     // Iterate all arguments
-    for (ArgumentString argument : arguments) {
+    for(ArgumentString argument : arguments) {
       // Test if the arguments apply to this platform, if not, skip them
-      if (!RuleChainResolver.testRuleChain(argument.getRules())) {
+      if(!RuleChainResolver.testRuleChain(argument.getRules())) {
         continue;
       }
 
       // Extract the value of the argument
       String value = argument.getValue();
-      if (stripClasspathArgs && value.equals("-cp")) {
+      if(stripClasspathArgs && value.equals("-cp")) {
         // Found -cp and strip classpath is enabled, skip the argument
         continue;
       }
 
       // Extract the variable name
       String variableName = argument.getVariableName();
-      if (variableName != null) {
+      if(variableName != null) {
         // Found a variable
-        if (stripClasspathArgs && variableName.equals("classpath")) {
+        if(stripClasspathArgs && variableName.equals("classpath")) {
           // Found the classpath variable and strip classpath is enabled, skip the argument
           continue;
-        } else if (!variables.containsKey(variableName)) {
+        } else if(!variables.containsKey(variableName)) {
           throw new IllegalArgumentException("Unknown launch variable name " + variableName);
         }
 
@@ -294,66 +255,38 @@ public class MinecraftRunTask extends JavaExec {
   }
 
   /**
-   * Creates a file collection with all duplicates removed.
-   *
-   * @param collections The collections to combine to a new collection without duplicates
-   * @return The collection without any duplicates
-   */
-  private FileCollection deduplicatedFileCollection(FileCollection... collections) {
-    Set<File> files = new HashSet<>();
-
-    // Iterate all collections
-    for (FileCollection collection : collections) {
-      if (collection == null) {
-        // Skip collections which are null
-        continue;
-      }
-
-      for (File file : collection.getFiles()) {
-        // Make sure every path is absolute to reliably detect duplicates
-        files.add(file.getAbsoluteFile());
-      }
-    }
-
-    // Use the project to create a new file collection out of a set of files
-    return getProject().files(files);
-  }
-
-  /**
    * Generates the log4j config file for the current run.
    *
    * @return The path to the generated file
    */
   private Path generateLog4jConfigFile() {
+    File logOverrideFile = getProject().file(".flint/log4j-override.xml");
+    if(logOverrideFile.exists()) {
+      // Log override exists
+      return logOverrideFile.toPath();
+    }
+
     Path outputPath;
     try {
       // Create a temporary file
       outputPath = Files.createTempFile("log4j", ".xml");
-      XmlSlurper slurper = new XmlSlurper();
 
-      // Retrieve the default XML tree
-      GPathResult rootPath = slurper.parse(getClass().getResourceAsStream("/default_log4j.xml"));
-      for (LogConfigTransformer transformer : logConfigTransformers) {
-        // Run every transformer over the node
-        transformer.transform(configurationName, rootPath);
+      try(
+          OutputStream out = Files.newOutputStream(outputPath);
+          InputStream in = getClass().getResourceAsStream("/default_log4j.xml")
+      ) {
+        Util.copyStream(in, out);
       }
-
-      try (OutputStream out = Files.newOutputStream(outputPath)) {
-        // Finally write the xml to the temporary file
-        XmlUtil.serialize(rootPath, out);
-      }
-    } catch (IOException e) {
+    } catch(IOException e) {
       throw new FlintGradleException("IO error occurred while creating logging configuration", e);
-    } catch (SAXException | ParserConfigurationException e) {
-      throw new FlintGradleException("An error occurred while creating the XML parser", e);
     }
 
     return outputPath;
   }
 
   /**
-   * Opens an {@link LoginDialog} to the user if
-   * the project has set the required properties and fills the variables for launch.
+   * Opens an {@link LoginDialog} to the user if the project has set the required properties and fills the variables for
+   * launch.
    *
    * @param variables The variables to fill for launching
    * @return {@code true} if the launch should continue, {@code false} otherwise
@@ -364,43 +297,43 @@ public class MinecraftRunTask extends JavaExec {
       return true;
     }
 
-    if (authenticator == null) {
+    if(authenticator == null) {
       getLogger().warn("Can't login because gradle is operating in offline mode!");
       return true;
     }
 
     String errorMessage = null;
     try {
-      if (!authenticator.requiresReAuth()) {
+      if(!authenticator.requiresReAuth()) {
         // There are still valid login details cached, use them
         getLogger().lifecycle("Using cached minecraft login token");
         setAuthVariables(variables);
         return true;
-      } else if (authenticator.refreshToken()) {
+      } else if(authenticator.refreshToken()) {
         // The token has been refreshed successfully
         getLogger().lifecycle("Using refreshed minecraft login token");
         setAuthVariables(variables);
         return true;
       }
-    } catch (IOException e) {
+    } catch(IOException e) {
       getLogger().error("IOException while trying to re-auth, asking auth again", e);
       errorMessage = e.getMessage();
     }
 
     String email = null;
 
-    while (true) {
+    while(true) {
       // Open the login dialog
       LoginDialog dialog = new LoginDialog(email, errorMessage);
       LoginDialogResult result = dialog.execute();
 
-      if (result == null) {
+      if(result == null) {
         // User closed window
         return false;
       }
 
       // Handle the result accordingly
-      switch (result) {
+      switch(result) {
         case ABORT:
           // User aborted launch
           return false;
@@ -414,10 +347,10 @@ public class MinecraftRunTask extends JavaExec {
             authenticator.authenticate(email, password);
             setAuthVariables(variables);  // Authentication succeeded
             return true;
-          } catch (YggdrasilAuthenticationException e) {
+          } catch(YggdrasilAuthenticationException e) {
             getLogger().error("Failed to log in into minecraft", e);
             errorMessage = e.getMessage();
-          } catch (IOException e) {
+          } catch(IOException e) {
             // This should never happen, unless some AntiVirus or something
             // like that decides to deny access to cached files
             throw new UncheckedIOException("Failed to read login cache", e);
@@ -433,8 +366,7 @@ public class MinecraftRunTask extends JavaExec {
   }
 
   /**
-   * Reads the cached login data from the authenticator and applies
-   * it to the given map.
+   * Reads the cached login data from the authenticator and applies it to the given map.
    *
    * @param variables The map to put the login data into
    * @throws IOException If an I/O error occurs while reading the cached variables

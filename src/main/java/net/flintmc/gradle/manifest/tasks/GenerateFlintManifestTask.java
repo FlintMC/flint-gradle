@@ -5,6 +5,7 @@ import net.flintmc.gradle.extension.FlintGradleExtension;
 import net.flintmc.gradle.manifest.cache.BoundMavenDependencies;
 import net.flintmc.gradle.manifest.cache.StaticFileChecksums;
 import net.flintmc.gradle.manifest.data.*;
+import net.flintmc.gradle.manifest.dev.DevelopmentStaticFiles;
 import net.flintmc.gradle.maven.pom.MavenArtifact;
 import net.flintmc.gradle.property.FlintPluginProperties;
 import net.flintmc.installer.impl.repository.models.DependencyDescriptionModel;
@@ -204,7 +205,8 @@ public class GenerateFlintManifestTask extends DefaultTask {
    */
   @Input
   public Set<String> getAuthors() {
-    return new HashSet<>(Arrays.asList(getExtension().getAuthors()));
+    String[] authors = getExtension().getAuthors();
+    return authors == null ? Collections.emptySet() : new HashSet<>(Arrays.asList(authors));
   }
 
   /**
