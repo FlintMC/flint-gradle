@@ -2,6 +2,7 @@ package net.flintmc.gradle.manifest.tasks;
 
 import net.flintmc.gradle.FlintGradleException;
 import net.flintmc.gradle.manifest.ManifestConfigurator;
+import net.flintmc.gradle.util.Util;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
@@ -42,8 +43,10 @@ public abstract class PublishTaskBase extends DefaultTask {
     }
 
     // Configure the upload
-    HttpPut put = new HttpPut(uri);
-    put.setEntity(entity);
+    Request.Builder put = new Request.Builder()
+        .url(uri.toString())
+        .put(requestBody);
+
 
     HttpHeaderCredentials credentials = Util.getPublishCredentials(
         getProject(),
@@ -51,27 +54,22 @@ public abstract class PublishTaskBase extends DefaultTask {
         "Set enablePublishing to false in the flint extension");
 
     // Add the credentials header
-    put.addHeader(credentials.getName(), credentials.getValue());
+    put.header(credentials.getName(), credentials.getValue());
 
-    HttpResponse response = null;
+    Response response = null;
     // Upload now...
     try {
-      response = httpClient.execute(put);
+      response = httpClient.newCall(put.build()).execute();
 
       // Check the status of the upload
-      StatusLine statusLine = response.getStatusLine();
-      int code = statusLine.getStatusCode();
+      int code = response.code();
 
-      if(code < 200 || code >= 300) {
+      if (code < 200 || code >= 300) {
         // Unexpected response
-        throw new IOException("Server responded with " + code + " (" + statusLine.getReasonPhrase() + ")");
+        throw new IOException("Server responded with " + code + " (" + response.message() + ")");
       }
-    } catch(IOException e) {
+    } catch (IOException e) {
       throw new FlintGradleException("Failed to publish file", e);
-    } finally {
-      if(response != null && response.getEntity() != null) {
-        EntityUtils.consumeQuietly(response.getEntity());
-      }
     }
   }
 }

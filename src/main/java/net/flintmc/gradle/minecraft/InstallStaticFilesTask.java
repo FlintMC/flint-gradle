@@ -9,15 +9,14 @@ import net.flintmc.installer.impl.repository.models.PackageModel;
 import net.flintmc.installer.impl.repository.models.install.DownloadFileDataModel;
 import net.flintmc.installer.impl.repository.models.install.InstallInstructionModel;
 import net.flintmc.installer.impl.repository.models.install.InstallInstructionTypes;
-import org.apache.commons.codec.binary.Hex;
-import org.apache.commons.codec.digest.DigestUtils;
-import org.apache.http.client.HttpClient;
+import okhttp3.OkHttpClient;
 import org.gradle.api.DefaultTask;
 import org.gradle.api.tasks.*;
 
 import javax.inject.Inject;
 import java.io.*;
 import java.net.*;
+import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.*;
 
@@ -25,7 +24,7 @@ import java.util.*;
  * Task for downloading and installing static files.
  */
 public class InstallStaticFilesTask extends DefaultTask {
-  private final HttpClient httpClient;
+  private final OkHttpClient httpClient;
   private final PotentialMinecraftClasspath potentialClasspath;
   private final String minecraftVersion;
   private final File workingDir;
@@ -40,7 +39,7 @@ public class InstallStaticFilesTask extends DefaultTask {
    */
   @Inject
   public InstallStaticFilesTask(
-      MaybeNull<HttpClient> httpClient,
+      MaybeNull<OkHttpClient> httpClient,
       PotentialMinecraftClasspath potentialClasspath,
       String minecraftVersion,
       File workingDir
@@ -71,7 +70,7 @@ public class InstallStaticFilesTask extends DefaultTask {
    */
   @Classpath
   public Set<File> getClasspath() {
-    if(classpath == null) {
+    if (classpath == null) {
       classpath = potentialClasspath.getRealClasspath(getProject(), minecraftVersion).getFiles();
     }
 
@@ -82,7 +81,7 @@ public class InstallStaticFilesTask extends DefaultTask {
    * Computes the work this task has to do.
    */
   private void compute() {
-    if(sources != null && classpath != null) {
+    if (sources != null && classpath != null) {
       return;
     }
 
@@ -91,10 +90,10 @@ public class InstallStaticFilesTask extends DefaultTask {
     URL[] classpathAsURLs = new URL[classpath.size()];
 
     int i = 0;
-    for(File file : classpath) {
+    for (File file : classpath) {
       try {
         classpathAsURLs[i++] = file.toURI().toURL();
-      } catch(MalformedURLException e) {
+      } catch (MalformedURLException e) {
         throw new FlintGradleException("Failed to convert file " + file.getAbsolutePath() + " to URL", e);
       }
     }
@@ -104,27 +103,27 @@ public class InstallStaticFilesTask extends DefaultTask {
     Set<PackageModel> manifests = new HashSet<>();
 
     try {
-      for(URL url : new HashSet<>(Collections.list(loader.getResources("manifest.json")))) {
-        try(InputStream manifestStream = Util.getURLStream(httpClient, url.toURI())) {
+      for (URL url : new HashSet<>(Collections.list(loader.getResources("manifest.json")))) {
+        try (InputStream manifestStream = Util.getURLStream(httpClient, url.toURI())) {
           // Read the manifest
           manifests.add(
               JsonConverter.PACKAGE_MODEL_SERIALIZER.fromString(Util.readAll(manifestStream), PackageModel.class));
-        } catch(IOException e) {
+        } catch (IOException e) {
           System.out.println(url.toExternalForm());
           e.printStackTrace();
           throw new FlintGradleException("Failed to read manifest " + url.toExternalForm(), e);
         }
       }
-    } catch(IOException | URISyntaxException e) {
+    } catch (IOException | URISyntaxException e) {
       throw new FlintGradleException("Failed to load manifests from classpath", e);
     }
 
     sources = new HashMap<>();
     // Index all manifests
-    for(PackageModel manifest : manifests) {
-      for(InstallInstructionModel installInstruction : manifest.getInstallInstructions()) {
+    for (PackageModel manifest : manifests) {
+      for (InstallInstructionModel installInstruction : manifest.getInstallInstructions()) {
         // Filter for DOWNLOAD_FILE instructions
-        if(installInstruction.getType().equals(InstallInstructionTypes.DOWNLOAD_FILE.toString())) {
+        if (installInstruction.getType().equals(InstallInstructionTypes.DOWNLOAD_FILE.toString())) {
           // Try to retrieve a development environment override
           DownloadFileDataModel data = installInstruction.getData();
           File localFile = DevelopmentStaticFiles.getFor(
@@ -133,7 +132,7 @@ public class InstallStaticFilesTask extends DefaultTask {
           // Compute where the file should be
           File target = new File(workingDir, data.getPath());
 
-          if(localFile != null) {
+          if (localFile != null) {
             // There is an override available
             sources.put(target, new LocalSource(localFile));
           } else {
@@ -153,7 +152,7 @@ public class InstallStaticFilesTask extends DefaultTask {
   @TaskAction
   public void performInstall() throws IOException {
     compute();
-    for(Map.Entry<File, StaticFileSource> entry : sources.entrySet()) {
+    for (Map.Entry<File, StaticFileSource> entry : sources.entrySet()) {
       File target = entry.getKey();
       StaticFileSource source = entry.getValue();
 
@@ -200,12 +199,12 @@ public class InstallStaticFilesTask extends DefaultTask {
 
     @Override
     public void install(File target) throws IOException {
-      if(!target.getParentFile().isDirectory() && !target.getParentFile().mkdirs()) {
+      if (!target.getParentFile().isDirectory() && !target.getParentFile().mkdirs()) {
         throw new IOException("Failed to create directory " + target.getParentFile().getAbsolutePath());
       }
 
       // Simply copy the file
-      try(
+      try (
           FileInputStream in = new FileInputStream(source);
           FileOutputStream out = new FileOutputStream(target)
       ) {
@@ -238,16 +237,16 @@ public class InstallStaticFilesTask extends DefaultTask {
     @Override
     public void install(File target) throws IOException {
       String localMD5 = null;
-      if(target.isFile()) {
+      if (target.isFile()) {
         // File exists, check MD5
-        localMD5 = Hex.encodeHexString(DigestUtils.digest(DigestUtils.getMd5Digest(), target));
-        if(localMD5.equals(model.getMd5())) {
+        localMD5 = Util.md5Hex(Files.readAllBytes(target.toPath()));
+        if (localMD5.equals(model.getMd5())) {
           // MD5 matches, skip download
           return;
         }
       }
 
-      if(httpClient == null) {
+      if (httpClient == null) {
         String errorMessage = target.isFile() ?
             "the md5 checksums " + localMD5 + " of the static file " + model.getPath() + " (" + target.getAbsolutePath()
                 + ") does not match the expected value " + model.getMd5() :

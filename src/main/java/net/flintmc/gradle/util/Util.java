@@ -10,23 +10,22 @@ import net.flintmc.gradle.json.JsonConverterException;
 import net.flintmc.gradle.property.FlintPluginProperties;
 import net.flintmc.gradle.property.FlintPluginProperty;
 import net.flintmc.installer.impl.repository.models.PackageModel;
-import org.apache.commons.codec.digest.DigestUtils;
-import org.apache.http.HttpResponse;
-import org.apache.http.StatusLine;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpGet;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 import org.gradle.api.Project;
 import org.gradle.api.credentials.HttpHeaderCredentials;
 import org.gradle.api.file.FileCollection;
 
+import javax.xml.bind.annotation.adapters.HexBinaryAdapter;
 import java.io.*;
 import java.net.URI;
-import java.net.URL;
-import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.CopyOption;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
@@ -93,62 +92,64 @@ public class Util {
   /**
    * Opens a stream to read from the given URL.
    *
-   * @param client The {@link HttpClient} to use for opening the connection
+   * @param client The {@link OkHttpClient} to use for opening the connection
    * @param uri    The URI to open
    * @return An input stream to read the data from
    * @throws IOException If an I/O error occurs while opening the connection
    */
-  public static InputStream getURLStream(HttpClient client, URI uri) throws IOException {
+  public static InputStream getURLStream(OkHttpClient client, URI uri) throws IOException {
     return getURLStream(client, uri, null);
   }
 
   /**
    * Opens a stream to read from the given URL.
    *
-   * @param client  The {@link HttpClient} to use for opening the connection
+   * @param client  The {@link OkHttpClient} to use for opening the connection
    * @param uri     The URI to open
    * @param project The project to use for resolving authentication, or {@code null}, if authentication can be ignored
    * @return An input stream to read the data from
    * @throws IOException If an I/O error occurs while opening the connection
    */
-  public static InputStream getURLStream(HttpClient client, URI uri, Project project) throws IOException {
+  public static InputStream getURLStream(OkHttpClient client, URI uri, Project project) throws IOException {
     if(uri.getScheme().equals("jar") || uri.getScheme().equals("file")) {
       return uri.toURL().openStream();
     } else {
-      HttpGet getRequest = new HttpGet(uri);
+      Request.Builder requestBuilder = new Request.Builder()
+          .url(uri.toString())
+          .get();
+
       if(project != null) {
         URI distributorURI = FlintPluginProperties.DISTRIBUTOR_URL.resolve(project);
         if(distributorURI.getHost().equals(uri.getHost())) {
           // Reaching out to the distributor, add the authorization
           HttpHeaderCredentials credentials = getPublishCredentials(project, false);
           if(credentials != null) {
-            getRequest.setHeader(credentials.getName(), credentials.getValue());
+            requestBuilder.header(credentials.getName(), credentials.getValue());
           }
         }
       }
 
-      HttpResponse response = client.execute(getRequest);
+      Response response = client.newCall(requestBuilder.build()).execute();
 
-      StatusLine status = response.getStatusLine();
-      if(status.getStatusCode() != 200) {
+      if(response.code() != 200) {
         throw new IOException("Failed to download file from " + uri + ", server responded with "
-            + status.getStatusCode() + " (" + status.getReasonPhrase() + ")");
+            + response.code()+ " (" + response.message() + ")");
       }
 
-      return response.getEntity().getContent();
+      return response.body().byteStream();
     }
   }
 
   /**
    * Downloads the given URI to the given path. The parent directories are created as required.
    *
-   * @param client  The {@link HttpClient} to use for downloading
+   * @param client  The {@link OkHttpClient} to use for downloading
    * @param uri     The URI to download
    * @param output  The target path
    * @param options Options specifying how to handle conflicts and symlinks
    * @throws IOException If the file can't be downloaded or created
    */
-  public static void download(HttpClient client, URI uri, Path output, CopyOption... options) throws IOException {
+  public static void download(OkHttpClient client, URI uri, Path output, CopyOption... options) throws IOException {
     download(client, uri, output, null, options);
   }
 
@@ -163,7 +164,7 @@ public class Util {
    * @throws IOException If the file can't be downloaded or created
    */
   public static void download(
-      HttpClient client, URI uri, Path output, Project project, CopyOption... options) throws IOException {
+      OkHttpClient client, URI uri, Path output, Project project, CopyOption... options) throws IOException {
     if(!Files.isDirectory(output.getParent())) {
       Files.createDirectories(output.getParent());
     }
@@ -391,7 +392,7 @@ public class Util {
    * @return The per project unique cache directory
    */
   public static File getProjectCacheDir(Project project) {
-    return new File(project.getProjectDir(), ".flint/" + DigestUtils.md5Hex(project.getPath()));
+    return new File(project.getProjectDir(), ".flint/" + md5Hex(project.getPath().getBytes(StandardCharsets.UTF_8)));
   }
 
   /**
@@ -477,5 +478,19 @@ public class Util {
     }
 
     return publishCredentials;
+  }
+
+  public static byte[] toByteArray(InputStream stream) throws IOException {
+    byte[] data = new byte[stream.available()];
+    stream.read(data);
+    return data;
+  }
+
+  public static String md5Hex(byte[] data) {
+    try {
+      return new HexBinaryAdapter().marshal(MessageDigest.getInstance("MD5").digest(data));
+    } catch (NoSuchAlgorithmException e) {
+      throw new IllegalStateException("MD5 digest not available");
+    }
   }
 }

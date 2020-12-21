@@ -7,10 +7,9 @@ import net.flintmc.gradle.extension.FlintRunsExtension;
 import net.flintmc.gradle.minecraft.*;
 import net.flintmc.gradle.minecraft.data.version.VersionManifest;
 import net.flintmc.gradle.minecraft.yggdrasil.YggdrasilAuthenticator;
-import net.flintmc.gradle.util.JavaClosure;
 import net.flintmc.gradle.util.MaybeNull;
 import net.flintmc.gradle.util.Pair;
-import org.apache.http.client.HttpClient;
+import okhttp3.OkHttpClient;
 import org.gradle.api.Project;
 import org.gradle.api.Task;
 import org.gradle.api.tasks.SourceSet;
@@ -22,7 +21,6 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Supplier;
 
 /**
  * Utility class for adding run configurations to the root project.
@@ -32,7 +30,7 @@ public class RunConfigurationProvider {
   private final MinecraftRepository minecraftRepository;
   private final Path runCacheDir;
   private final YggdrasilAuthenticator authenticator;
-  private final HttpClient httpClient;
+  private final OkHttpClient httpClient;
 
   private final Map<String, Pair<MinecraftRunTask, InstallStaticFilesTask>> tasks;
   private final Map<String, PotentialMinecraftClasspath> configurationClasspaths;
@@ -51,7 +49,7 @@ public class RunConfigurationProvider {
       MinecraftRepository minecraftRepository,
       Path runCacheDir,
       YggdrasilAuthenticator authenticator,
-      HttpClient httpClient
+      OkHttpClient httpClient
   ) {
     this.project = project;
     this.minecraftRepository = minecraftRepository;
@@ -83,10 +81,10 @@ public class RunConfigurationProvider {
     Map<String, Map<SourceSet, Project>> excludedSourceSetsByConfiguration =
         resolveNames(runs.getExcludedSourceSets(), sourceSets, sourceProject);
 
-    for(String configuration : allIncludedConfigurations) {
-      for(SourceSet sourceSet : sourceSets) {
+    for (String configuration : allIncludedConfigurations) {
+      for (SourceSet sourceSet : sourceSets) {
         // Test if the source set has not been explicitly excluded for the given configuration
-        if(!excludedSourceSetsByConfiguration.containsKey(configuration) ||
+        if (!excludedSourceSetsByConfiguration.containsKey(configuration) ||
             !excludedSourceSetsByConfiguration.get(configuration).containsKey(sourceSet) ||
             sourceSet.getName().equals("test") // Exclude the test source set, it can be manually included if wanted
         ) {
@@ -119,7 +117,7 @@ public class RunConfigurationProvider {
    */
   private void ensureVersionedTasksSetup(String configuration, Set<String> versions,
                                          PotentialMinecraftClasspath potentialClasspath) {
-    for(String version : versions) {
+    for (String version : versions) {
       ensureRunTaskSetup(configuration, version, potentialClasspath);
     }
   }
@@ -134,7 +132,7 @@ public class RunConfigurationProvider {
   private void ensureRunTaskSetup(String configuration, String version, PotentialMinecraftClasspath potentialClasspath) {
     // Generate a task name
     String runTaskName = "runClient" + version + getConfigurationName(configuration);
-    if(!tasks.containsKey(runTaskName)) {
+    if (!tasks.containsKey(runTaskName)) {
       // The task does not yet exist, create it
       MinecraftRunTask runTask = createRunTask(runTaskName, version);
       runTask.setConfigurationName(configuration);
@@ -147,7 +145,7 @@ public class RunConfigurationProvider {
       String mainClassOverride = overrides.containsKey(configuration) ?
           overrides.get(configuration) : extension.getGeneralMainClassOverride();
 
-      if(mainClassOverride != null) {
+      if (mainClassOverride != null) {
         // Override has been set, pass it to the task
         runTask.setMain(mainClassOverride);
       }
@@ -180,7 +178,7 @@ public class RunConfigurationProvider {
       Pair<MinecraftRunTask, InstallStaticFilesTask> tasks = this.tasks.get(runTaskName);
       tasks.getSecond().dependsOn(potentialClasspath.getTaskDependencies(version));
 
-      if(tasks.getFirst().getPotentialClasspath() != potentialClasspath) {
+      if (tasks.getFirst().getPotentialClasspath() != potentialClasspath) {
         // This means something tried to replace the set of source sets afterwards, this would break
         // the discovery mechanism
         throw new IllegalArgumentException("Can't redefine the potential classpath of a minecraft run task");
@@ -201,11 +199,11 @@ public class RunConfigurationProvider {
 
     // Build a path for the run directory
     Path runDir = project.file("run/" + version).toPath();
-    if(!Files.isDirectory(runDir)) {
+    if (!Files.isDirectory(runDir)) {
       // The run directory does not exist, try to create it
       try {
         Files.createDirectories(runDir);
-      } catch(IOException e) {
+      } catch (IOException e) {
         throw new FlintGradleException("Failed to create run directory for version " + version, e);
       }
     }
@@ -214,7 +212,7 @@ public class RunConfigurationProvider {
     VersionManifest manifest;
     try {
       manifest = minecraftRepository.getVersionManifest(version);
-    } catch(IOException e) {
+    } catch (IOException e) {
       throw new FlintGradleException("IO error while reading version manifest", e);
     }
 
@@ -222,7 +220,7 @@ public class RunConfigurationProvider {
     Path assetsPath = runCacheDir.resolve("assets-store");
     String assetTaskName = "download" + manifest.getAssetIndex().getId() + "Assets";
     MinecraftAssetsTask assetsTask = (MinecraftAssetsTask) project.getTasks().findByName(assetTaskName);
-    if(assetsTask == null) {
+    if (assetsTask == null) {
       assetsTask = project.getTasks().create(assetTaskName, MinecraftAssetsTask.class);
       assetsTask.setVersionManifest(manifest);
       assetsTask.setOutputDirectory(assetsPath);
@@ -230,11 +228,11 @@ public class RunConfigurationProvider {
 
     // Get a natives directory for the run task
     Path nativesDir = runCacheDir.resolve("natives").resolve(manifest.getId());
-    if(!Files.isDirectory(nativesDir)) {
+    if (!Files.isDirectory(nativesDir)) {
       // Try to create the natives directory if it does not exist
       try {
         Files.createDirectories(nativesDir);
-      } catch(IOException e) {
+      } catch (IOException e) {
         throw new FlintGradleException("Failed to create natives dir for " + manifest.getId(), e);
       }
     }
@@ -293,10 +291,10 @@ public class RunConfigurationProvider {
     // Iterate all configurations
     names.forEach((configuration, sourceSetsOrVersions) -> {
       // Iterate all names of the current configuration
-      for(String sourceSetOrVersion : sourceSetsOrVersions) {
+      for (String sourceSetOrVersion : sourceSetsOrVersions) {
         // Probe for a source set with the given name
         SourceSet sourceSet = sourceSets.findByName(sourceSetOrVersion);
-        if(sourceSet != null) {
+        if (sourceSet != null) {
           // A source set exactly matching this name found, add it
           output.computeIfAbsent(configuration, (k) -> new HashMap<>()).put(sourceSet, sourceProject);
           continue;
@@ -305,7 +303,7 @@ public class RunConfigurationProvider {
         // No exact match found, try to transform the source set name into a versioned source set name
         String versionedName = "v" + configuration.replace('.', '_');
         sourceSet = sourceSets.findByName(versionedName);
-        if(sourceSet == null) {
+        if (sourceSet == null) {
           // Still not found
           throw new IllegalArgumentException("Tried to resolve source set name " + sourceSetOrVersion +
               ", but no source set with the given name exists nor does a source set with the versioned " +

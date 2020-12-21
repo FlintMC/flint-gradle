@@ -120,7 +120,7 @@ public class GenerateStaticFileChecksumsTask extends DefaultTask {
       for(URI remoteFile : getRemoteFiles()) {
         // Calculate the checksum
         try(InputStream stream = Util.getURLStream(httpClient, remoteFile)) {
-          checksums.add(remoteFile, Util.md5Hex(stream));
+          checksums.add(remoteFile, Util.md5Hex(Util.toByteArray(stream)));
         }
       }
     } else {
