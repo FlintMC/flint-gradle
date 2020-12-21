@@ -1,2 +1,2 @@
-rootProject.name = "flint-gradle-plugin"
+rootProject.name = "flint-gradle"
 
