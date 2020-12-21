@@ -152,6 +152,10 @@ public class FlintGradlePlugin implements Plugin<Project> {
    * Called by the {@link FlintGradleExtension} as soon as it has been configured
    */
   public void onExtensionConfigured() {
+    if(extension.getFlintVersion() == null) {
+      throw new IllegalStateException("Please set the flintVersion property on the flint extension");
+    }
+
     interaction.setup(extension);
 
     for(String version : extension.getMinecraftVersions()) {

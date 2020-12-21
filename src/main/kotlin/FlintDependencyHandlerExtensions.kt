@@ -1,8 +1,10 @@
+import groovy.lang.Closure
 import net.flintmc.gradle.java.interop.VersionedDependencyAdder
 import org.gradle.api.Action
 import org.gradle.api.artifacts.dsl.DependencyHandler
 import org.gradle.kotlin.dsl.DependencyHandlerScope
 import org.gradle.kotlin.dsl.getByType
+import org.gradle.util.ConfigureUtil
 
 /*
 * This file contains the extension functions which can be called on the dependency handler using Kotlin.
@@ -55,8 +57,12 @@ fun DependencyHandlerScope.minecraft(vararg version: String, config: DependencyH
  *
  * @see [VersionedDependencyAdder.accept]
  */
-fun DependencyHandler.minecraft(version: String, config: Action<DependencyHandler>) = apply {
-    extensions.getByType<VersionedDependencyAdder>().accept(version, config)
+fun DependencyHandler.minecraft(version: String, config: Closure<Void>) = apply {
+    extensions.getByType<VersionedDependencyAdder>().accept(version) {
+        config.delegate = this
+        config.resolveStrategy = Closure.DELEGATE_FIRST
+        config.call(this)
+    }
 }
 
 /**
@@ -67,8 +73,12 @@ fun DependencyHandler.minecraft(version: String, config: Action<DependencyHandle
  *
  * @see [VersionedDependencyAdder.accept]
  */
-fun DependencyHandler.minecraft(version: List<String>, config: Action<DependencyHandler>) = apply {
+fun DependencyHandler.minecraft(version: List<String>, config: Closure<Void>) = apply {
     version.forEach {
-        extensions.getByType<VersionedDependencyAdder>().accept(it, config)
+        extensions.getByType<VersionedDependencyAdder>().accept(it) {
+            config.delegate = this
+            config.resolveStrategy = Closure.DELEGATE_FIRST
+            config.call(this)
+        }
     }
 }
