@@ -496,10 +496,10 @@ public class Util {
   }
 
   /**
-   * Writes a given byte array as a hex string.
+   * Hashes a given byte array and writes it as an hex string
    *
    * @param data the data to convert
-   * @return the data as a hex string
+   * @return the md5 hash as a hex string
    */
   public static String md5Hex(byte[] data) {
     try {
