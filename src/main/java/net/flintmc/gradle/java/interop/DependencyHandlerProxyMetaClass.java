@@ -8,6 +8,7 @@ import org.gradle.api.artifacts.dsl.DependencyHandler;
 /**
  * Helper class because Groovy does not properly work with Java proxies.
  */
+@SuppressWarnings({"unchecked", "RedundantSuppression"}) // The Java compiler emits warnings IDE's don't detect
 public class DependencyHandlerProxyMetaClass extends MetaClassImpl {
   private final ConfigurationContainer configurationContainer;
   private final DependencyHandlerProxy proxy;

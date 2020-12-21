@@ -66,7 +66,6 @@ gradlePlugin {
     }
 }
 
-
 publishing {
     repositories {
         flintGradlePluginRepository()
