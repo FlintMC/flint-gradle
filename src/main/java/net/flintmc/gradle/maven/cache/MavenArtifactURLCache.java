@@ -21,6 +21,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.*;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Cache for maven artifacts and their corresponding URL's.
@@ -32,6 +34,7 @@ public class MavenArtifactURLCache {
   private final Path artifactURLCacheFile;
   private final boolean offline;
   private final Map<MavenArtifact, Map<URI, URI>> cache;
+  private final Lock processLocalLock;
 
   private long lastValidation;
 
@@ -46,6 +49,8 @@ public class MavenArtifactURLCache {
     this.artifactURLCacheFile = artifactURLCacheFile;
     this.offline = offline;
     this.cache = new HashMap<>();
+
+    this.processLocalLock = new ReentrantLock();
   }
 
   /**
@@ -86,7 +91,7 @@ public class MavenArtifactURLCache {
    * @return The artifacts and their resolved URL's
    * @throws IOException If an I/O error occurs
    */
-  public synchronized Map<MavenArtifact, URI> resolve(
+  public Map<MavenArtifact, URI> resolve(
       Collection<MavenArtifact> artifacts,
       Collection<RemoteMavenRepository> remoteRepositories,
       boolean resolveFullURI
@@ -279,72 +284,77 @@ public class MavenArtifactURLCache {
    * @throws IOException If an I/O error occurs
    */
   private <T> T lock(FileLockedCallback<T> callback) throws IOException {
-    FileChannel cacheChannel = FileChannel.open(artifactURLCacheFile, StandardOpenOption.READ, StandardOpenOption.WRITE);
-
-    FileLock lock;
     try {
-      lock = FileLock.tryAcquire(cacheChannel);
-      if(lock == null) {
-        LOGGER.warn("Artifact URL cache is currently locked, are your running multiple builds at once?");
-        LOGGER.warn("Trying to acquire lock (this will block until the lock has been released by the other build!)");
-        lock = FileLock.acquire(cacheChannel);
-      }
-    } catch(IOException e) {
+      processLocalLock.lock();
+      FileChannel cacheChannel = FileChannel.open(artifactURLCacheFile, StandardOpenOption.READ, StandardOpenOption.WRITE);
+
+      FileLock lock;
       try {
-        cacheChannel.close();
-      } catch(IOException nested) {
-        e.addSuppressed(nested);
+        lock = FileLock.tryAcquire(cacheChannel);
+        if(lock == null) {
+          LOGGER.warn("Artifact URL cache is currently locked, are your running multiple builds at once?");
+          LOGGER.warn("Trying to acquire lock (this will block until the lock has been released by the other build!)");
+          lock = FileLock.acquire(cacheChannel);
+        }
+      } catch(IOException e) {
+        try {
+          cacheChannel.close();
+        } catch(IOException nested) {
+          e.addSuppressed(nested);
+        }
+        throw e;
       }
-      throw e;
-    }
 
-    Throwable originalThrowable = null;
-    try {
-      // Try to run the callback
-      return callback.execute(cacheChannel);
-    } catch(Throwable t) {
-      // Callback failed, catch the error so it can be used in the finally block
-      originalThrowable = t;
+      Throwable originalThrowable = null;
+      try {
+        // Try to run the callback
+        return callback.execute(cacheChannel);
+      } catch(Throwable t) {
+        // Callback failed, catch the error so it can be used in the finally block
+        originalThrowable = t;
 
-      // Re-throw now
-      throw t;
+        // Re-throw now
+        throw t;
+      } finally {
+        IOException inner = null;
+
+        try {
+          // Try to release the lock
+          lock.release();
+        } catch(IOException e) {
+          if(originalThrowable != null) {
+            // Releasing the lock failed, but so did the callback, suppress the unlock failure
+            originalThrowable.addSuppressed(e);
+          } else {
+            // The callback succeeded, but unlocking failed
+            inner = e;
+          }
+        }
+
+        try {
+          // Try to close the channel
+          cacheChannel.close();
+        } catch(IOException e) {
+          if(originalThrowable != null) {
+            // Closing the channel failed, but so did the callback, suppress the closing failure
+            originalThrowable.addSuppressed(e);
+          } else if(inner != null) {
+            // The callback succeeded, but unlocking failed, suppress the closing failure
+            inner.addSuppressed(e);
+          } else {
+            // The callback succeeded and so did unlocking, catch this error
+            inner = e;
+          }
+        }
+
+        if(inner != null) {
+          // Re-throw any possible resource failure
+          //noinspection ThrowFromFinallyBlock
+          throw inner;
+        }
+      }
     } finally {
-      IOException inner = null;
-
-      try {
-        // Try to release the lock
-        lock.release();
-      } catch(IOException e) {
-        if(originalThrowable != null) {
-          // Releasing the lock failed, but so did the callback, suppress the unlock failure
-          originalThrowable.addSuppressed(e);
-        } else {
-          // The callback succeeded, but unlocking failed
-          inner = e;
-        }
-      }
-
-      try {
-        // Try to close the channel
-        cacheChannel.close();
-      } catch(IOException e) {
-        if(originalThrowable != null) {
-          // Closing the channel failed, but so did the callback, suppress the closing failure
-          originalThrowable.addSuppressed(e);
-        } else if(inner != null) {
-          // The callback succeeded, but unlocking failed, suppress the closing failure
-          inner.addSuppressed(e);
-        } else {
-          // The callback succeeded and so did unlocking, catch this error
-          inner = e;
-        }
-      }
-
-      if(inner != null) {
-        // Re-throw any possible resource failure
-        //noinspection ThrowFromFinallyBlock
-        throw inner;
-      }
+      processLocalLock.unlock();
     }
   }
 
