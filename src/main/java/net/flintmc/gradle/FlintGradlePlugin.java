@@ -56,21 +56,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
   @Override
   public void apply(@Nonnull Project project) {
     this.project = project;
-    String[] versions = {"v1.15.2", "v1.16.3", "internal"};
     project.getPlugins().apply("maven-publish");
-
-    // Apply precompiled script plugins
-    // project.getPlugins().apply("net.flintmc.gradle.precompiled.dependency-handler-extensions");
-
-    for(String version : versions) {
-      project.getConfigurations().maybeCreate(String.format("%sAnnotationProcessor", version.replace('.', '_')));
-      Configuration versionedConfiguration = project.getConfigurations().maybeCreate(String.format("%sImplementation", version.replace('.', '_')));
-
-      project.beforeEvaluate((dummy) -> {
-        Configuration runtimeClasspathConfiguration = project.getConfigurations().getByName("runtimeClasspath");
-        runtimeClasspathConfiguration.extendsFrom(versionedConfiguration);
-      });
-    }
 
     Project parent = project;
     while((parent = parent.getParent()) != null) {
