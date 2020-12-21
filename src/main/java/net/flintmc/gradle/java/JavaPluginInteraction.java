@@ -23,9 +23,10 @@ public class JavaPluginInteraction {
   }
 
   /**
-   * Configures things that the plugin provides regardless of the extension setup.
+   * Sets up the plugin interaction including the internal source set and dependency handler extensions.
+   * {@link #setupVersioned(Collection, Collection, String)} method.
    */
-  public void preconfigure() {
+  public void setup() {
     VersionedDependencyAdder dependencyAdder = new VersionedDependencyAdder(project);
 
     // Add the extension for use by DSL specific extensions
@@ -36,60 +37,44 @@ public class JavaPluginInteraction {
 
     // Groovy build scripts need manual installation of the dependency handler extensions
     GroovyDependencyHandlerExtensions.install(project);
-  }
 
-  /**
-   * Configures the source sets depending on how the extension has been configured. Versioned setup is handled by the
-   * {@link #setupVersioned(FlintGradleExtension, Collection, Collection, String)} method.
-   *
-   * @param extension The configured extension
-   */
-  public void setup(FlintGradleExtension extension) {
     SourceSetContainer sourceSets = project.getExtensions().getByType(SourceSetContainer.class);
     DependencyHandler dependencies = project.getDependencies();
 
-    if(!extension.shouldDisableInternalSourceSet()) {
-      // The internal source set is not disabled, create it and set it
-      // as the source set containing the implementation
-      SourceSet internalSourceSet = sourceSets.maybeCreate("internal");
-      SourceSet mainSourceSet = sourceSets.getByName("main");
+    // Create the internal source set
+    SourceSet internalSourceSet = sourceSets.maybeCreate("internal");
+    SourceSet mainSourceSet = sourceSets.getByName("main");
 
-      // Add the output of the main source set to the internal source set
-      extendSourceSet(internalSourceSet, mainSourceSet);
+    // Add the output of the main source set to the internal source set
+    extendSourceSet(internalSourceSet, mainSourceSet);
 
-      Configuration runtimeConfiguration = project.getConfigurations().getByName("runtimeClasspath");
+    Configuration runtimeConfiguration = project.getConfigurations().getByName("runtimeClasspath");
 
-      // Create the internal configuration
-      Configuration internalConfiguration = project.getConfigurations().maybeCreate("internal");
-      internalConfiguration.extendsFrom(project.getConfigurations().getByName("implementation"));
+    // Create the internal configuration
+    Configuration internalConfiguration = project.getConfigurations().maybeCreate("internal");
+    internalConfiguration.extendsFrom(project.getConfigurations().getByName("implementation"));
 
-      runtimeConfiguration.extendsFrom(internalConfiguration);
+    runtimeConfiguration.extendsFrom(internalConfiguration);
 
-      // Add the internal configuration
-      dependencies.add("internal", internalSourceSet.getOutput());
-      dependencies.add("internal", internalSourceSet.getCompileClasspath());
-    }
+    // Add the internal configuration
+    dependencies.add("internal", internalSourceSet.getOutput());
+    dependencies.add("internal", internalSourceSet.getCompileClasspath());
   }
 
   /**
    * Configures the source sets depending the dependencies and how the extension has been configured.
    *
-   * @param extension           The configured extension
    * @param compileDependencies The versioned compile dependencies
    * @param runtimeDependencies The versioned runtime dependencies
    * @param version             The version to configure
    */
   public void setupVersioned(
-      FlintGradleExtension extension,
       Collection<MavenArtifact> compileDependencies,
       Collection<MavenArtifact> runtimeDependencies,
       String version
   ) {
     SourceSetContainer sourceSets = project.getExtensions().getByType(SourceSetContainer.class);
-
-    SourceSet implementationSourceSet = extension.shouldDisableInternalSourceSet() ?
-        sourceSets.getByName("main") : sourceSets.getByName("internal");
-
+    SourceSet implementationSourceSet = sourceSets.getByName("internal");
 
     // Create the versioned source set by prepending 'v' and replacing all '.' with '_' in the version string
     SourceSet versionedSourceSet = sourceSets.maybeCreate("v" + version.replace('.', '_'));

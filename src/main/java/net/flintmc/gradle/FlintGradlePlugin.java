@@ -144,7 +144,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
     }
 
     this.manifestConfigurator = new ManifestConfigurator(this);
-    this.interaction.preconfigure();
+    interaction.setup();
     project.afterEvaluate((p) -> extension.ensureConfigured());
   }
 
@@ -155,8 +155,6 @@ public class FlintGradlePlugin implements Plugin<Project> {
     if(extension.getFlintVersion() == null) {
       throw new IllegalStateException("Please set the flintVersion property on the flint extension");
     }
-
-    interaction.setup(extension);
 
     for(String version : extension.getMinecraftVersions()) {
       handleVersion(version);
@@ -224,7 +222,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
     }
 
     // Configure the project dependencies and configurations for the given version
-    interaction.setupVersioned(extension, compileArtifacts, runtimeArtifacts, version);
+    interaction.setupVersioned(compileArtifacts, runtimeArtifacts, version);
   }
 
   /**
