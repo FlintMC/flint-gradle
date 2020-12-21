@@ -1,4 +1,4 @@
-import net.flintmc.gradle.java.VersionedDependencyAdder
+import net.flintmc.gradle.java.interop.VersionedDependencyAdder
 import org.gradle.api.Action
 import org.gradle.api.artifacts.dsl.DependencyHandler
 import org.gradle.kotlin.dsl.DependencyHandlerScope

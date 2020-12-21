@@ -1,12 +1,9 @@
 package net.flintmc.gradle.java;
 
-import groovy.lang.Closure;
-import net.flintmc.gradle.FlintGradleException;
 import net.flintmc.gradle.extension.FlintGradleExtension;
+import net.flintmc.gradle.java.interop.VersionedDependencyAdder;
 import net.flintmc.gradle.maven.pom.MavenArtifact;
 import net.flintmc.gradle.support.GroovyDependencyHandlerExtensions;
-import net.flintmc.gradle.util.JavaClosure;
-import org.codehaus.groovy.runtime.InvokerHelper;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.artifacts.dsl.DependencyHandler;
@@ -29,7 +26,7 @@ public class JavaPluginInteraction {
    * Configures things that the plugin provides regardless of the extension setup.
    */
   public void preconfigure() {
-    VersionedDependencyAdder dependencyAdder = new VersionedDependencyAdder();
+    VersionedDependencyAdder dependencyAdder = new VersionedDependencyAdder(project);
 
     // Add the extension for use by DSL specific extensions
     project.getDependencies().getExtensions().add(
@@ -37,6 +34,7 @@ public class JavaPluginInteraction {
         dependencyAdder
     );
 
+    // Groovy build scripts need manual installation of the dependency handler extensions
     GroovyDependencyHandlerExtensions.install(project);
   }
 
