@@ -8,19 +8,20 @@ import com.fasterxml.jackson.databind.JsonNode;
 import net.flintmc.gradle.json.JsonConverter;
 import net.flintmc.gradle.json.JsonConverterException;
 import net.flintmc.installer.impl.repository.models.PackageModel;
-import org.apache.commons.codec.digest.DigestUtils;
-import org.apache.http.HttpResponse;
-import org.apache.http.StatusLine;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpGet;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 import org.gradle.api.Project;
 
+import javax.xml.bind.annotation.adapters.HexBinaryAdapter;
 import java.io.*;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.CopyOption;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
@@ -46,6 +47,12 @@ public class Util {
         (byte) (l >> 48),
         (byte) (l >> 56)
     };
+  }
+
+  public static byte[] toByteArray(InputStream inputStream) throws IOException {
+    byte[] data = new byte[inputStream.available()];
+    inputStream.read(data);
+    return data;
   }
 
   /**
@@ -87,28 +94,30 @@ public class Util {
   /**
    * Downloads the given url to the given path. The parent directories are created as required.
    *
-   * @param client  The {@link HttpClient} to use for downloading
+   * @param client  The {@link OkHttpClient} to use for downloading
    * @param url     The url to download
    * @param output  The target path
    * @param options Options specifying how to handle conflicts and symlinks
    * @throws IOException If the file can't be downloaded or created
    */
-  public static void download(HttpClient client, String url, Path output, CopyOption... options) throws IOException {
-    if(!Files.isDirectory(output.getParent())) {
+  public static void download(OkHttpClient client, String url, Path output, CopyOption... options) throws IOException {
+    if (!Files.isDirectory(output.getParent())) {
       Files.createDirectories(output.getParent());
     }
 
-    HttpGet getRequest = new HttpGet(url);
-    HttpResponse response = client.execute(getRequest);
+    try (Response response = client.newCall(
+        new Request.Builder().url(url)
+            .get()
+            .build())
+        .execute()) {
+      if (response.code() != 200) {
+        throw new IOException("Failed to download file from " + url + ", server responded with "
+            + response.code() + " (" + response.message() + ")");
+      }
 
-    StatusLine status = response.getStatusLine();
-    if(status.getStatusCode() != 200) {
-      throw new IOException("Failed to download file from " + url + ", server responded with "
-          + status.getStatusCode() + " (" + status.getReasonPhrase() + ")");
-    }
-
-    try(InputStream stream = response.getEntity().getContent()) {
-      Files.copy(stream, output, options);
+      try (InputStream stream = response.body().byteStream()) {
+        Files.copy(stream, output, options);
+      }
     }
   }
 
@@ -121,34 +130,42 @@ public class Util {
    * @throws IOException If an I/O error occurs while reading or writing files
    */
   public static void extractZip(Path zip, Path targetDir, CopyOption... options) throws IOException {
-    try(ZipFile zipFile = new ZipFile(zip.toFile())) {
+    try (ZipFile zipFile = new ZipFile(zip.toFile())) {
       // Get a list of all entries
       Enumeration<? extends ZipEntry> entries = zipFile.entries();
-      while(entries.hasMoreElements()) {
+      while (entries.hasMoreElements()) {
         ZipEntry entry = entries.nextElement();
-        if(entry.isDirectory()) {
+        if (entry.isDirectory()) {
           // Required directories will be created automatically
           continue;
         }
 
         String name = entry.getName();
-        if(name.startsWith("/")) {
+        if (name.startsWith("/")) {
           // Make sure that the entry does not start with a /, else it will corrupt
           // the Path#resolve result
           name = name.substring(1);
         }
 
         Path targetFile = targetDir.resolve(name);
-        if(!Files.exists(targetFile.getParent())) {
+        if (!Files.exists(targetFile.getParent())) {
           // Make sure the parent directories exist
           Files.createDirectories(targetFile.getParent());
         }
 
-        try(InputStream entryStream = zipFile.getInputStream(entry)) {
+        try (InputStream entryStream = zipFile.getInputStream(entry)) {
           // Copy the entire entry to the target file
           Files.copy(entryStream, targetFile, options);
         }
       }
+    }
+  }
+
+  public static String md5Hex(byte[] data) {
+    try {
+      return new HexBinaryAdapter().marshal(MessageDigest.getInstance("MD5").digest(data));
+    } catch (NoSuchAlgorithmException e) {
+      throw new IllegalStateException("MD5 digest not available");
     }
   }
 
@@ -163,7 +180,7 @@ public class Util {
     byte[] buffer = new byte[4096];
 
     int count;
-    while((count = in.read(buffer)) != -1) {
+    while ((count = in.read(buffer)) != -1) {
       out.write(buffer, 0, count);
     }
   }
@@ -183,7 +200,7 @@ public class Util {
     String line;
 
     // Read all lines until we reach the EOS
-    while((line = reader.readLine()) != null) {
+    while ((line = reader.readLine()) != null) {
       lines.add(line);
     }
 
@@ -198,7 +215,7 @@ public class Util {
    * @throws IOException If an I/O exception occurs while writing to the stream
    */
   public static void writeAllLines(List<String> lines, OutputStream out) throws IOException {
-    for(String line : lines) {
+    for (String line : lines) {
       out.write(line.getBytes(StandardCharsets.UTF_8));
       out.write('\n');
     }
@@ -225,21 +242,21 @@ public class Util {
    */
   public static void nukeDirectory(Path toNuke, boolean ignoreFailures) throws IOException {
     // Walk all files in the given dir
-    try(Stream<Path> allFiles = Files.walk(toNuke)) {
+    try (Stream<Path> allFiles = Files.walk(toNuke)) {
       // Sort them so the files come before the directories
       allFiles.sorted(Comparator.reverseOrder()).forEach((path) -> {
         try {
           // Delete the single file
           Files.delete(path);
-        } catch(IOException e) {
-          if(!ignoreFailures) {
+        } catch (IOException e) {
+          if (!ignoreFailures) {
             // If failures should not be ignore, throw an unchecked IO exception which will
             // be caught by the block later down
             throw new UncheckedIOException(e);
           }
         }
       });
-    } catch(UncheckedIOException e) {
+    } catch (UncheckedIOException e) {
       // Rethrow the cause of the exception which has been thrown above
       throw e.getCause();
     }
@@ -255,8 +272,8 @@ public class Util {
   public static URI concatURI(URI base, String... paths) {
     URI current = base;
 
-    for(String path : paths) {
-      while(path.startsWith("/")) {
+    for (String path : paths) {
+      while (path.startsWith("/")) {
         path = path.substring(1);
       }
       current = current.resolve(current.getPath() + '/' + path);
@@ -288,12 +305,12 @@ public class Util {
    * @throws IOException If an I/O error occurs
    */
   public static boolean isPackageJar(File file) throws IOException {
-    if(file.getName().endsWith(".jar")) {
+    if (file.getName().endsWith(".jar")) {
       // Needs to be a jar file
       return false;
     }
 
-    try(JarFile jarFile = new JarFile(file)) {
+    try (JarFile jarFile = new JarFile(file)) {
       return jarFile.getJarEntry("manifest.json") != null;
     }
   }
@@ -307,18 +324,18 @@ public class Util {
    * @throws JsonConverterException If the {@code manifest.json} can't be read as a {@link PackageModel}
    */
   public static PackageModel getPackageModelFromJar(File file) throws IOException, JsonConverterException {
-    if(file.getName().endsWith(".jar")) {
+    if (file.getName().endsWith(".jar")) {
       // Needs to be a jar file
       return null;
     }
 
-    try(JarFile jarFile = new JarFile(file)) {
+    try (JarFile jarFile = new JarFile(file)) {
       JarEntry entry = jarFile.getJarEntry("manifest.json");
-      if(entry == null) {
+      if (entry == null) {
         return null;
       }
 
-      try(InputStream stream = jarFile.getInputStream(entry)) {
+      try (InputStream stream = jarFile.getInputStream(entry)) {
         return JsonConverter.streamToObject(stream, PackageModel.class);
       }
     }
@@ -330,7 +347,7 @@ public class Util {
    * @return The per project unique cache directory
    */
   public static File getProjectCacheDir(Project project) {
-    return new File(project.getProjectDir(), ".flint/" + DigestUtils.md5Hex(project.getPath()));
+    return new File(project.getProjectDir(), ".flint/" + Util.md5Hex(project.getPath().getBytes(StandardCharsets.UTF_8)));
   }
 
   /**

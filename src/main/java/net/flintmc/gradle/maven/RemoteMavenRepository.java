@@ -4,12 +4,9 @@ import net.flintmc.gradle.maven.pom.MavenArtifact;
 import net.flintmc.gradle.maven.pom.MavenPom;
 import net.flintmc.gradle.maven.pom.io.PomReader;
 import net.flintmc.gradle.util.Util;
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpResponse;
-import org.apache.http.StatusLine;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpHead;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -20,7 +17,7 @@ import java.util.Objects;
  * Represents a remote maven repository hosted on some server.
  */
 public class RemoteMavenRepository implements ReadableMavenRepository {
-  private final HttpClient httpClient;
+  private final OkHttpClient httpClient;
   private final URI baseURI;
   private final String authenticationHeaderName;
   private final String authenticationHeaderValue;
@@ -31,7 +28,7 @@ public class RemoteMavenRepository implements ReadableMavenRepository {
    * @param httpClient The HTTP client to use for downloading artifacts
    * @param baseURI    The base URI of the maven repository
    */
-  public RemoteMavenRepository(HttpClient httpClient, URI baseURI) {
+  public RemoteMavenRepository(OkHttpClient httpClient, URI baseURI) {
     this.httpClient = httpClient;
     this.baseURI = baseURI;
 
@@ -48,7 +45,7 @@ public class RemoteMavenRepository implements ReadableMavenRepository {
    * @param authenticationHeaderValue The value of the header to send for authentication
    */
   public RemoteMavenRepository(
-      HttpClient httpClient,
+      OkHttpClient httpClient,
       URI baseURI,
       String authenticationHeaderName,
       String authenticationHeaderValue
@@ -69,7 +66,7 @@ public class RemoteMavenRepository implements ReadableMavenRepository {
 
   @Override
   public MavenPom getArtifactPom(MavenArtifact artifact) throws IOException {
-    try(InputStream stream = request(buildURL(buildArtifactPath(artifact, true)))) {
+    try (InputStream stream = request(buildURL(buildArtifactPath(artifact, true)))) {
       return stream == null ? null : PomReader.read(stream);
     }
   }
@@ -78,7 +75,7 @@ public class RemoteMavenRepository implements ReadableMavenRepository {
   public URI getArtifactURI(MavenArtifact artifact) throws IOException {
     URI fullURI = buildURL(buildArtifactPath(artifact, false));
 
-    if(!requestHead(fullURI)) {
+    if (!requestHead(fullURI)) {
       return null;
     }
 
@@ -120,31 +117,36 @@ public class RemoteMavenRepository implements ReadableMavenRepository {
    */
   private InputStream request(URI fullURI) throws IOException {
     // Execute the get request
-    HttpGet request = new HttpGet(fullURI);
-    if(authenticationHeaderName != null) {
-      request.setHeader(authenticationHeaderName, authenticationHeaderValue);
+    Request.Builder requestBuilder = new Request.Builder()
+        .url(fullURI.toURL())
+        .get()
+        .get();
+
+    if (authenticationHeaderName != null) {
+      requestBuilder.header(authenticationHeaderName, authenticationHeaderValue);
     }
-    HttpResponse response = httpClient.execute(request);
 
-    StatusLine status = response.getStatusLine();
-    switch(status.getStatusCode()) {
-      // 200 - Ok - Return the stream to read from
-      case 200:
-        return response.getEntity().getContent();
+    try (Response response = httpClient.newCall(requestBuilder.build()).execute()) {
 
-      // 404 - Not Found - Return null since 404 is not a fatal error for a maven repository
-      case 404: {
-        response.getEntity().getContent().close();
-        return null;
-      }
+      switch (response.code()) {
+        // 200 - Ok - Return the stream to read from
+        case 200:
+          return response.body().byteStream();
 
-      // Every other status code would indicate an error, the 2** codes except 200 itself should never
-      // occur on a maven repository, 3** codes should be handled by the http client and everything else
-      // is an error per HTTP definition.
-      default: {
-        response.getEntity().getContent().close();
-        throw new IOException("Maven repository at " + baseURI + " responded with " +
-            status.getStatusCode() + " (" + status.getReasonPhrase() + ")");
+        // 404 - Not Found - Return null since 404 is not a fatal error for a maven repository
+        case 404: {
+          response.body().close();
+          return null;
+        }
+
+        // Every other status code would indicate an error, the 2** codes except 200 itself should never
+        // occur on a maven repository, 3** codes should be handled by the http client and everything else
+        // is an error per HTTP definition.
+        default: {
+          response.body().close();
+          throw new IOException("Maven repository at " + baseURI + " responded with " +
+              response.code() + " (" + response.message() + ")");
+        }
       }
     }
   }
@@ -158,42 +160,39 @@ public class RemoteMavenRepository implements ReadableMavenRepository {
    */
   private boolean requestHead(URI fullURI) throws IOException {
     // Execute the get request
-    HttpHead request = new HttpHead(fullURI);
-    if(authenticationHeaderName != null) {
-      request.setHeader(authenticationHeaderName, authenticationHeaderValue);
+    Request.Builder requestBuilder = new Request.Builder()
+        .url(fullURI.toString());
+
+    if (authenticationHeaderName != null) {
+      requestBuilder.header(authenticationHeaderName, authenticationHeaderValue);
     }
 
-    HttpResponse response = httpClient.execute(request);
-    HttpEntity entity = response.getEntity();
-    if(entity != null) {
-      entity.getContent().close();
-    }
+    try (Response response = httpClient.newCall(requestBuilder.build()).execute()) {
+      switch (response.code()) {
+        // 200 - Ok - Return the stream to read from
+        case 200:
+          return true;
 
-    StatusLine status = response.getStatusLine();
-    switch(status.getStatusCode()) {
-      // 200 - Ok - Return the stream to read from
-      case 200:
-        return true;
-
-      // 404 - Not Found - Return null since 404 is not a fatal error for a maven repository
-      case 404: {
-        return false;
-      }
-
-      // 400 - Bad Request - Some repositories don't implement HEAD requests
-      case 400: {
-        // Fall back to a normal GET request
-        try(InputStream stream = request(fullURI)) {
-          return stream != null;
+        // 404 - Not Found - Return null since 404 is not a fatal error for a maven repository
+        case 404: {
+          return false;
         }
-      }
 
-      // Every other status code would indicate an error, the 2** codes except 200 itself should never
-      // occur on a maven repository, 3** codes should be handled by the http client and everything else
-      // is an error per HTTP definition.
-      default: {
-        throw new IOException("Maven repository at " + baseURI + " responded with " +
-            status.getStatusCode() + " (" + status.getReasonPhrase() + ")");
+        // 400 - Bad Request - Some repositories don't implement HEAD requests
+        case 400: {
+          // Fall back to a normal GET request
+          try (InputStream stream = request(fullURI)) {
+            return stream != null;
+          }
+        }
+
+        // Every other status code would indicate an error, the 2** codes except 200 itself should never
+        // occur on a maven repository, 3** codes should be handled by the http client and everything else
+        // is an error per HTTP definition.
+        default: {
+          throw new IOException("Maven repository at " + baseURI + " responded with " +
+              response.code() + " (" + response.message() + ")");
+        }
       }
     }
   }

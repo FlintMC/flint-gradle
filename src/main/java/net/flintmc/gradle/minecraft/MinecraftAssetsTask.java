@@ -6,7 +6,7 @@ import net.flintmc.gradle.json.JsonConverter;
 import net.flintmc.gradle.minecraft.data.version.AssetIndex;
 import net.flintmc.gradle.minecraft.data.version.VersionManifest;
 import net.flintmc.gradle.util.Util;
-import org.apache.http.client.HttpClient;
+import okhttp3.OkHttpClient;
 import org.gradle.api.DefaultTask;
 import org.gradle.api.tasks.CacheableTask;
 import org.gradle.api.tasks.TaskAction;
@@ -64,7 +64,7 @@ public class MinecraftAssetsTask extends DefaultTask {
 
     // Calculate the target path of the index json
     Path indexFile = directory.resolve("indexes").resolve(index.getId() + ".json");
-    HttpClient httpClient = getProject().getPlugins().getPlugin(FlintGradlePlugin.class).getHttpClient();
+    OkHttpClient httpClient = getProject().getPlugins().getPlugin(FlintGradlePlugin.class).getHttpClient();
 
     if (!Files.exists(indexFile)) {
       // The asset index file has not been downloaded yet, do so now

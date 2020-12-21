@@ -6,9 +6,9 @@ import net.flintmc.gradle.manifest.cache.StaticFileChecksums;
 import net.flintmc.gradle.manifest.data.ManifestStaticFile;
 import net.flintmc.gradle.manifest.data.ManifestStaticFileInput;
 import net.flintmc.gradle.util.MaybeNull;
-import org.apache.http.client.HttpClient;
-import org.apache.http.entity.FileEntity;
-import org.apache.http.entity.StringEntity;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.RequestBody;
 import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.InputFile;
 import org.gradle.api.tasks.TaskAction;
@@ -38,7 +38,7 @@ public class PublishStaticFilesTask extends PublishTaskBase {
   @Inject
   public PublishStaticFilesTask(
       ManifestConfigurator configurator,
-      MaybeNull<HttpClient> httpClient,
+      MaybeNull<OkHttpClient> httpClient,
       ManifestStaticFileInput staticFiles,
       File staticFilesChecksumsCacheFile
   ) {
@@ -100,16 +100,12 @@ public class PublishStaticFilesTask extends PublishTaskBase {
       URI publishURI = description.getURI();
 
       // Publish file
-      publish(publishURI, new FileEntity(file));
+      publish(publishURI, RequestBody.create(file, MediaType.get("application/octet-stream")));
 
       // Add .md5 to the end of the URI
       URI md5URI = publishURI.resolve(publishURI.getPath() + ".md5");
-      try {
-        // Upload the hash
-        publish(md5URI, new StringEntity(checksums.get(file)));
-      } catch(UnsupportedEncodingException e) {
-        throw new FlintGradleException("Failed to encode md5 hash", e);
-      }
+      // Upload the hash
+      publish(md5URI, RequestBody.create(checksums.get(file), MediaType.get("application/octet-stream")));
     }
   }
 }

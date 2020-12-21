@@ -13,8 +13,7 @@ import net.flintmc.gradle.maven.cache.MavenArtifactURLCache;
 import net.flintmc.gradle.maven.pom.MavenArtifact;
 import net.flintmc.gradle.minecraft.MinecraftRepository;
 import net.flintmc.gradle.minecraft.yggdrasil.YggdrasilAuthenticator;
-import org.apache.http.client.HttpClient;
-import org.apache.http.impl.client.HttpClientBuilder;
+import okhttp3.OkHttpClient;
 import org.gradle.api.GradleException;
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;
@@ -36,7 +35,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
 
   private Project project;
 
-  private HttpClient httpClient;
+  private OkHttpClient httpClient;
   private MavenArtifactDownloader downloader;
   private MavenArtifactURLCache mavenArtifactURLCache;
 
@@ -58,7 +57,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
     project.getPlugins().apply("maven-publish");
 
 
-    for(String version : versions) {
+    for (String version : versions) {
       project.getConfigurations().maybeCreate(String.format("%sAnnotationProcessor", version.replace('.', '_')));
       Configuration versionedConfiguration = project.getConfigurations().maybeCreate(String.format("%sImplementation", version.replace('.', '_')));
 
@@ -69,9 +68,9 @@ public class FlintGradlePlugin implements Plugin<Project> {
     }
 
     Project parent = project;
-    while((parent = parent.getParent()) != null) {
+    while ((parent = parent.getParent()) != null) {
       FlintGradlePlugin parentPlugin = parent.getPlugins().findPlugin(getClass());
-      if(parentPlugin == null) {
+      if (parentPlugin == null) {
         continue;
       }
       this.parentPlugin = parentPlugin;
@@ -80,14 +79,14 @@ public class FlintGradlePlugin implements Plugin<Project> {
 
     this.interaction = new JavaPluginInteraction(project);
 
-    if(this.parentPlugin == null) {
+    if (this.parentPlugin == null) {
       Gradle gradle = project.getGradle();
       httpClient = gradle.getStartParameter().isOffline() ? null :
-          HttpClientBuilder.create().useSystemProperties().build();
+          new OkHttpClient.Builder().build();
 
       downloader = new MavenArtifactDownloader();
 
-      if(httpClient != null) {
+      if (httpClient != null) {
         downloader.addSource(new RemoteMavenRepository(httpClient, URI.create(MINECRAFT_MAVEN)));
         downloader.addSource(new RemoteMavenRepository(httpClient, URI.create(MAVEN_CENTRAL)));
       }
@@ -105,7 +104,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
         );
 
         this.internalRepository = new SimpleMavenRepository(flintGradlePath.resolve("internal-repository"));
-      } catch(IOException e) {
+      } catch (IOException e) {
         throw new UncheckedIOException("Failed to create minecraft repository", e);
       }
 
@@ -113,7 +112,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
         this.authenticator = httpClient != null ?
             new YggdrasilAuthenticator(httpClient, flintGradlePath.resolve("yggdrasil")) :
             null;
-      } catch(IOException e) {
+      } catch (IOException e) {
         throw new UncheckedIOException("Failed to create Yggdrasil authenticator", e);
       }
 
@@ -123,7 +122,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
       this.mavenArtifactURLCache = new MavenArtifactURLCache(flintGradlePath.resolve("maven-artifact-urls"), httpClient == null);
       try {
         this.mavenArtifactURLCache.setup();
-      } catch(IOException e) {
+      } catch (IOException e) {
         throw new UncheckedIOException("Failed to setup artifact URL cache", e);
       }
     } else {
@@ -149,7 +148,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
   public void onExtensionConfigured() {
     interaction.setup(extension);
 
-    for(String version : extension.getMinecraftVersions()) {
+    for (String version : extension.getMinecraftVersions()) {
       handleVersion(version);
     }
 
@@ -163,8 +162,8 @@ public class FlintGradlePlugin implements Plugin<Project> {
       repo.setUrl(minecraftRepository.getBaseDir());
     });
 
-    for(Project subProject : project.getSubprojects()) {
-      if(!extension.getProjectFilter().test(subProject)) {
+    for (Project subProject : project.getSubprojects()) {
+      if (!extension.getProjectFilter().test(subProject)) {
         continue;
       }
       subProject.getRepositories().maven(repo -> {
@@ -197,12 +196,12 @@ public class FlintGradlePlugin implements Plugin<Project> {
     Collection<MavenArtifact> compileArtifacts = environment.getCompileArtifacts(client, server);
     Collection<MavenArtifact> runtimeArtifacts = environment.getRuntimeArtifacts(client, server);
 
-    if(!allInstalled(compileArtifacts, minecraftRepository) ||
+    if (!allInstalled(compileArtifacts, minecraftRepository) ||
         !allInstalled(runtimeArtifacts, minecraftRepository)) {
       try {
         // Some artifacts are missing, request installation with the given environment
         minecraftRepository.install(version, environment, internalRepository, downloader, project);
-      } catch(IOException e) {
+      } catch (IOException e) {
         throw new GradleException("Failed to install minecraft version " + version, e);
       }
     }
@@ -240,8 +239,8 @@ public class FlintGradlePlugin implements Plugin<Project> {
    */
   @SuppressWarnings("BooleanMethodIsAlwaysInverted")
   private boolean allInstalled(Collection<MavenArtifact> artifacts, SimpleMavenRepository repository) {
-    for(MavenArtifact artifact : artifacts) {
-      if(!repository.isInstalled(artifact)) {
+    for (MavenArtifact artifact : artifacts) {
+      if (!repository.isInstalled(artifact)) {
         // Avoid further check to save time
         return false;
       }
@@ -255,7 +254,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
    *
    * @return The HTTP client of this plugin, or {@code null}, when using the offline mode
    */
-  public HttpClient getHttpClient() {
+  public OkHttpClient getHttpClient() {
     return httpClient;
   }
 

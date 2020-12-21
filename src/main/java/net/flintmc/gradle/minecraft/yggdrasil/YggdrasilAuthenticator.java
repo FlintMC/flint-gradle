@@ -6,11 +6,7 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import net.flintmc.gradle.json.JsonConverter;
 import net.flintmc.gradle.util.Util;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.entity.ContentType;
-import org.apache.http.entity.StringEntity;
+import okhttp3.*;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -23,13 +19,15 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import static javax.swing.text.DefaultStyledDocument.ElementSpec.ContentType;
+
 /**
  * Utility class for accessing minecraft logins.
  */
 public class YggdrasilAuthenticator {
   private static final String BASE_URL = "https://authserver.mojang.com/";
 
-  private final HttpClient httpClient;
+  private final OkHttpClient httpClient;
 
   private final Path accessTokenPath;
   private final Path playerNamePath;
@@ -43,7 +41,7 @@ public class YggdrasilAuthenticator {
    * @param cacheDir   The directory to store the auth cache in
    * @throws IOException If the reading/generation of the client token fails
    */
-  public YggdrasilAuthenticator(HttpClient httpClient, Path cacheDir) throws IOException {
+  public YggdrasilAuthenticator(OkHttpClient httpClient, Path cacheDir) throws IOException {
     this.httpClient = httpClient;
 
     if (!Files.isDirectory(cacheDir)) {
@@ -95,49 +93,51 @@ public class YggdrasilAuthenticator {
     String payload = JsonConverter.OBJECT_MAPPER.writeValueAsString(payloadData);
 
     // Form and execute the post request
-    HttpPost request = new HttpPost(BASE_URL + "refresh");
-    request.setHeader("Content-Type", "application/json");
-    request.setEntity(new StringEntity(payload));
+    try (Response response = httpClient.newCall(
+        new Request.Builder()
+            .url(BASE_URL + "refresh")
+            .header("Content-Type", "application/json")
+            .post(RequestBody.create(payload, MediaType.get("application/json")))
+            .build()).execute()) {
 
-    // Execute the request and retrieve the status
-    HttpResponse response = httpClient.execute(request);
-    int statusCode = response.getStatusLine().getStatusCode();
 
-    if (statusCode == 200) {
-      // Refresh has been successful
-      ObjectNode rootNode;
+      if (response.code() == 200) {
+        // Refresh has been successful
+        ObjectNode rootNode;
 
-      try (InputStream stream = request.getEntity().getContent()) {
-        // Read the value into a node
-        rootNode = JsonConverter.OBJECT_MAPPER.readValue(stream, ObjectNode.class);
+        try (InputStream stream = response.body().byteStream()) {
+          // Read the value into a node
+          rootNode = JsonConverter.OBJECT_MAPPER.readValue(stream, ObjectNode.class);
+        }
+
+        // Extract the required values from the Json structure
+        String accessToken = rootNode.get("accessToken").requireNonNull().asText();
+
+        // Checks whether the selectedProfile field is located in the node
+        if (rootNode.has("selectedProfile")) {
+          UUID playerUUID = readUUIDFromString(
+              rootNode.get("selectedProfile")
+                  .get("id")
+                  .requireNonNull()
+                  .asText()
+          );
+          String playerName = rootNode.get("selectedProfile").get("name").requireNonNull().asText();
+
+          // Save selected profile values
+          saveUUID(uuidPath, playerUUID);
+          saveString(playerNamePath, playerName);
+        }
+
+        // Save access token
+        saveString(accessTokenPath, accessToken);
+
+        return true;
+      } else {
+        // Refresh failed
+        return false;
       }
-
-      // Extract the required values from the Json structure
-      String accessToken = rootNode.get("accessToken").requireNonNull().asText();
-
-      // Checks whether the selectedProfile field is located in the node
-      if (rootNode.has("selectedProfile")) {
-        UUID playerUUID = readUUIDFromString(
-            rootNode.get("selectedProfile")
-                .get("id")
-                .requireNonNull()
-                .asText()
-        );
-        String playerName = rootNode.get("selectedProfile").get("name").requireNonNull().asText();
-
-        // Save selected profile values
-        saveUUID(uuidPath, playerUUID);
-        saveString(playerNamePath, playerName);
-      }
-
-      // Save access token
-      saveString(accessTokenPath, accessToken);
-
-      return true;
-    } else {
-      // Refresh failed
-      return false;
     }
+
   }
 
   /**
@@ -167,24 +167,29 @@ public class YggdrasilAuthenticator {
       String payload = JsonConverter.OBJECT_MAPPER.writeValueAsString(payloadData);
 
       // Send the web request for authentication
-      HttpPost request = new HttpPost(BASE_URL + "authenticate");
-      request.setEntity(new StringEntity(payload, ContentType.APPLICATION_JSON));
-      HttpResponse response = httpClient.execute(request);
+      try (Response response = httpClient.newCall(
+          new Request.Builder()
+              .url(BASE_URL + "authenticate")
+              .post(RequestBody.create(payload, MediaType.get("application/json")))
+              .build())
+          .execute()) {
 
-      // Extract the response status
-      int statusCode = response.getStatusLine().getStatusCode();
-      String statusMessage = response.getStatusLine().getReasonPhrase();
+        // Extract the response status
+        int statusCode = response.code();
+        String statusMessage = response.message();
 
-      try (InputStream stream = response.getEntity().getContent()) {
-        if (stream == null) {
-          // If the server did not send a response, it is probably a server error
-          throw new YggdrasilAuthenticationException("Server responded with " + statusCode + " (" +
-              statusMessage + ") and no content");
+        try (InputStream stream = response.body().byteStream()) {
+          if (stream == null) {
+            // If the server did not send a response, it is probably a server error
+            throw new YggdrasilAuthenticationException("Server responded with " + statusCode + " (" +
+                statusMessage + ") and no content");
+          }
+
+          // Read the response as Json
+          responseNode = JsonConverter.OBJECT_MAPPER.readValue(stream, ObjectNode.class);
         }
-
-        // Read the response as Json
-        responseNode = JsonConverter.OBJECT_MAPPER.readValue(stream, ObjectNode.class);
       }
+
     } catch (JsonParseException | JsonMappingException e) {
       throw new YggdrasilAuthenticationException("Failed to parse Json response from server", e);
     } catch (JsonProcessingException e) {
@@ -285,12 +290,16 @@ public class YggdrasilAuthenticator {
     String payload = JsonConverter.OBJECT_MAPPER.writeValueAsString(payloadData);
 
     // Form and execute the post request
-    HttpPost request = new HttpPost(BASE_URL + "validate");
-    request.setEntity(new StringEntity(payload, ContentType.APPLICATION_JSON));
+    try (Response response = httpClient.newCall(
+        new Request.Builder()
+            .url(BASE_URL + "validate")
+            .post(RequestBody.create(payload, MediaType.get("application/json")))
+            .build())
+        .execute()) {
+      int statusCode = response.code();
+      return statusCode >= 200 && statusCode < 300;
+    }
 
-    HttpResponse response = httpClient.execute(request);
-    int statusCode = response.getStatusLine().getStatusCode();
-    return statusCode >= 200 && statusCode < 300;
   }
 
   /**

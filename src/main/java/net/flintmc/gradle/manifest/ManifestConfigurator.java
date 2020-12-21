@@ -11,7 +11,7 @@ import net.flintmc.gradle.maven.cache.MavenArtifactURLCache;
 import net.flintmc.gradle.property.FlintPluginProperties;
 import net.flintmc.gradle.util.MaybeNull;
 import net.flintmc.gradle.util.Util;
-import org.apache.http.client.HttpClient;
+import okhttp3.OkHttpClient;
 import org.gradle.api.Project;
 import org.gradle.api.Task;
 import org.gradle.api.artifacts.repositories.MavenArtifactRepository;
@@ -20,14 +20,13 @@ import org.gradle.api.publish.PublishingExtension;
 import org.gradle.api.publish.maven.MavenPublication;
 import org.gradle.api.tasks.Copy;
 import org.gradle.authentication.http.HttpHeaderAuthentication;
-import org.gradle.language.jvm.tasks.ProcessResources;
 
 import java.io.File;
 import java.net.URI;
 
 public class ManifestConfigurator {
   private final Project project;
-  private final HttpClient httpClient;
+  private final OkHttpClient httpClient;
   private final MavenArtifactURLCache mavenArtifactURLCache;
 
   /**
