@@ -1,7 +1,6 @@
 package net.flintmc.gradle.java;
 
-import net.flintmc.gradle.extension.FlintGradleExtension;
-import net.flintmc.gradle.java.interop.VersionedDependencyAdder;
+import net.flintmc.gradle.java.interop.FlintDependencyAdder;
 import net.flintmc.gradle.maven.pom.MavenArtifact;
 import net.flintmc.gradle.support.GroovyDependencyHandlerExtensions;
 import org.gradle.api.Project;
@@ -27,11 +26,11 @@ public class JavaPluginInteraction {
    * {@link #setupVersioned(Collection, Collection, String)} method.
    */
   public void setup() {
-    VersionedDependencyAdder dependencyAdder = new VersionedDependencyAdder(project);
+    FlintDependencyAdder dependencyAdder = new FlintDependencyAdder(project);
 
     // Add the extension for use by DSL specific extensions
     project.getDependencies().getExtensions().add(
-        "versionedDependencyAdder",
+        "flintDependencyAdder",
         dependencyAdder
     );
 

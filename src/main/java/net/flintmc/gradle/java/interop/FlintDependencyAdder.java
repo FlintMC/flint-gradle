@@ -12,27 +12,28 @@ import java.util.function.BiConsumer;
 /**
  * Utility class for adding dependencies using a versioned name
  */
-public class VersionedDependencyAdder implements BiConsumer<String, Action<DependencyHandler>> {
+public class FlintDependencyAdder implements BiConsumer<String, Action<DependencyHandler>> {
   private final Project project;
   private final Map<String, DependencyHandler> proxiedDependencyHandlers;
+  private final FlintGradleExtension extension;
 
   /**
-   * Constructs a new {@link VersionedDependencyAdder} and initializes it with an empty map of proxied handlers.
+   * Constructs a new {@link FlintDependencyAdder} and initializes it with an empty map of proxied handlers.
    *
    * @param project The project to create the dependency adder for
    */
-  public VersionedDependencyAdder(Project project) {
+  public FlintDependencyAdder(Project project) {
     this.project = project;
     this.proxiedDependencyHandlers = new HashMap<>();
+    this.extension = project.getExtensions().getByType(FlintGradleExtension.class);
   }
 
   @Override
   public void accept(String version, Action<DependencyHandler> dependencyHandlerAction) {
     // The extension needs be configured by now
-    FlintGradleExtension flintGradleExtension = project.getExtensions().getByType(FlintGradleExtension.class);
-    flintGradleExtension.ensureConfigured();
+    extension.ensureConfigured();
 
-    if(!flintGradleExtension.getMinecraftVersions().contains(version)) {
+    if(!extension.getMinecraftVersions().contains(version)) {
       throw new IllegalArgumentException("Can't define dependencies for a minecraft version not part of the project");
     }
 
@@ -49,5 +50,15 @@ public class VersionedDependencyAdder implements BiConsumer<String, Action<Depen
    */
   private DependencyHandler createProxy(String version) {
     return DependencyHandlerProxy.of(project.getDependencies(), project.getConfigurations(), version);
+  }
+
+  /**
+   * Retrieves the flint version this project is using.
+   *
+   * @return Retrieves the flint version this project is using
+   */
+  public String getFlintVersion() {
+    extension.ensureConfigured();
+    return extension.getFlintVersion();
   }
 }

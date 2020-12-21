@@ -278,7 +278,7 @@ public class MavenArtifactURLCache {
    * @return The return value of the callback
    * @throws IOException If an I/O error occurs
    */
-  private synchronized <T> T lock(FileLockedCallback<T> callback) throws IOException {
+  private <T> T lock(FileLockedCallback<T> callback) throws IOException {
     FileChannel cacheChannel = FileChannel.open(artifactURLCacheFile, StandardOpenOption.READ, StandardOpenOption.WRITE);
 
     FileLock lock;

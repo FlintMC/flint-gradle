@@ -1,5 +1,6 @@
 import groovy.lang.Closure
-import net.flintmc.gradle.java.interop.VersionedDependencyAdder
+import net.flintmc.gradle.java.interop.FlintDependencyAdder
+import org.gradle.api.artifacts.Dependency
 import org.gradle.api.artifacts.dsl.DependencyHandler
 import org.gradle.kotlin.dsl.DependencyHandlerScope
 import org.gradle.kotlin.dsl.getByType
@@ -21,10 +22,10 @@ import org.gradle.kotlin.dsl.getByType
  * @param version The version to configure the dependencies for
  * @param config The handler to use for configuration
  *
- * @see [VersionedDependencyAdder.accept]
+ * @see [FlintDependencyAdder.accept]
  */
 fun DependencyHandlerScope.minecraft(version: String, config: DependencyHandlerScope.() -> Unit) = apply {
-    (extensions.getByName("versionedDependencyAdder") as VersionedDependencyAdder).accept(version) {
+    extensions.getByType<FlintDependencyAdder>().accept(version) {
         DependencyHandlerScope.of(this).invoke(config)
     }
 }
@@ -35,15 +36,23 @@ fun DependencyHandlerScope.minecraft(version: String, config: DependencyHandlerS
  * @param version The versions to configure the dependencies for
  * @param config The handler to use for configuration
  *
- * @see [VersionedDependencyAdder.accept]
+ * @see [FlintDependencyAdder.accept]
  */
 fun DependencyHandlerScope.minecraft(vararg version: String, config: DependencyHandlerScope.() -> Unit) = apply {
     version.forEach {
-        extensions.getByType<VersionedDependencyAdder>().accept(it) {
+        extensions.getByType<FlintDependencyAdder>().accept(it) {
             DependencyHandlerScope.of(this).invoke(config)
         }
     }
 }
+
+/**
+ * Creates a flint API dependency for the given module.
+ *
+ * @param module The module to create the dependency for
+ */
+fun DependencyHandlerScope.flintApi(module: String): Dependency =
+    this.create("net.flintmc:$module:${extensions.getByType<FlintDependencyAdder>().flintVersion}")
 
 // ================= Groovy compatible extensions ================= //
 
@@ -53,10 +62,10 @@ fun DependencyHandlerScope.minecraft(vararg version: String, config: DependencyH
  * @param version The version to configure the dependencies for
  * @param config The handler to use for configuration
  *
- * @see [VersionedDependencyAdder.accept]
+ * @see [FlintDependencyAdder.accept]
  */
 fun DependencyHandler.minecraft(version: String, config: Closure<Void>) = apply {
-    extensions.getByType<VersionedDependencyAdder>().accept(version) {
+    extensions.getByType<FlintDependencyAdder>().accept(version) {
         config.boundCall(this)
     }
 }
@@ -67,15 +76,23 @@ fun DependencyHandler.minecraft(version: String, config: Closure<Void>) = apply 
  * @param version The versions to configure the dependencies for
  * @param config The handler to use for configuration
  *
- * @see [VersionedDependencyAdder.accept]
+ * @see [FlintDependencyAdder.accept]
  */
 fun DependencyHandler.minecraft(version: List<String>, config: Closure<Void>) = apply {
     version.forEach {
-        extensions.getByType<VersionedDependencyAdder>().accept(it) {
+        extensions.getByType<FlintDependencyAdder>().accept(it) {
             config.boundCall(this)
         }
     }
 }
+
+/**
+ * Creates a flint API dependency for the given module.
+ *
+ * @param module The module to create the dependency for
+ */
+fun DependencyHandler.flintApi(module: String): Dependency =
+    this.create("net.flintmc:$module:${extensions.getByType<FlintDependencyAdder>().flintVersion}")
 
 /**
  * Calls a [Closure] bound with the given object resolving all properties accessed in the closure
