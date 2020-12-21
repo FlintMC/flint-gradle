@@ -1,10 +1,8 @@
 import groovy.lang.Closure
 import net.flintmc.gradle.java.interop.VersionedDependencyAdder
-import org.gradle.api.Action
 import org.gradle.api.artifacts.dsl.DependencyHandler
 import org.gradle.kotlin.dsl.DependencyHandlerScope
 import org.gradle.kotlin.dsl.getByType
-import org.gradle.util.ConfigureUtil
 
 /*
 * This file contains the extension functions which can be called on the dependency handler using Kotlin.
@@ -59,9 +57,7 @@ fun DependencyHandlerScope.minecraft(vararg version: String, config: DependencyH
  */
 fun DependencyHandler.minecraft(version: String, config: Closure<Void>) = apply {
     extensions.getByType<VersionedDependencyAdder>().accept(version) {
-        config.delegate = this
-        config.resolveStrategy = Closure.DELEGATE_FIRST
-        config.call(this)
+        config.boundCall(this)
     }
 }
 
@@ -76,9 +72,19 @@ fun DependencyHandler.minecraft(version: String, config: Closure<Void>) = apply 
 fun DependencyHandler.minecraft(version: List<String>, config: Closure<Void>) = apply {
     version.forEach {
         extensions.getByType<VersionedDependencyAdder>().accept(it) {
-            config.delegate = this
-            config.resolveStrategy = Closure.DELEGATE_FIRST
-            config.call(this)
+            config.boundCall(this)
         }
     }
+}
+
+/**
+ * Calls a [Closure] bound with the given object resolving all properties accessed in the closure
+ * on the bound first before continuing with outer scopes.
+ *
+ * @param bound The object to call the closure with
+ */
+private fun <T> Closure<T>.boundCall(bound: Any?): T? {
+    delegate = bound
+    resolveStrategy = Closure.DELEGATE_FIRST
+    return call(bound)
 }
