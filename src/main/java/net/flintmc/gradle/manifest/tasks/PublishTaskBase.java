@@ -41,27 +41,37 @@ public abstract class PublishTaskBase extends DefaultTask {
       throw new FlintGradleException("Tried to publish file while gradle was in offline mode");
     }
 
-    HttpHeaderCredentials credentials = configurator.getPublishCredentials(
+    // Configure the upload
+    HttpPut put = new HttpPut(uri);
+    put.setEntity(entity);
+
+    HttpHeaderCredentials credentials = Util.getPublishCredentials(
+        getProject(),
+        true,
         "Set enablePublishing to false in the flint extension");
 
-    // Configure the upload
-    try (Response response = httpClient.newCall(new Request.Builder()
-        .url(uri.toURL())
-        .put(requestBody)
-        .header(credentials.getName(), credentials.getValue()).build()).execute()) {
+    // Add the credentials header
+    put.addHeader(credentials.getName(), credentials.getValue());
+
+    HttpResponse response = null;
+    // Upload now...
+    try {
+      response = httpClient.execute(put);
 
       // Check the status of the upload
-      int code = response.code();
+      StatusLine statusLine = response.getStatusLine();
+      int code = statusLine.getStatusCode();
 
-
-      if (code < 200 || code >= 300) {
+      if(code < 200 || code >= 300) {
         // Unexpected response
-        throw new IOException("Server responded with " + code + " (" + response.message() + ")");
+        throw new IOException("Server responded with " + code + " (" + statusLine.getReasonPhrase() + ")");
       }
-
-
-    } catch (IOException e) {
+    } catch(IOException e) {
       throw new FlintGradleException("Failed to publish file", e);
+    } finally {
+      if(response != null && response.getEntity() != null) {
+        EntityUtils.consumeQuietly(response.getEntity());
+      }
     }
   }
 }

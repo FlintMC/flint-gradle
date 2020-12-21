@@ -2,10 +2,12 @@ package net.flintmc.gradle;
 
 import net.flintmc.gradle.environment.DeobfuscationEnvironment;
 import net.flintmc.gradle.extension.FlintGradleExtension;
+import net.flintmc.gradle.extension.FlintStaticFileDescription;
 import net.flintmc.gradle.jar.JarTaskProvider;
 import net.flintmc.gradle.java.JavaPluginInteraction;
 import net.flintmc.gradle.java.RunConfigurationProvider;
 import net.flintmc.gradle.manifest.ManifestConfigurator;
+import net.flintmc.gradle.manifest.dev.DevelopmentStaticFiles;
 import net.flintmc.gradle.maven.MavenArtifactDownloader;
 import net.flintmc.gradle.maven.RemoteMavenRepository;
 import net.flintmc.gradle.maven.SimpleMavenRepository;
@@ -53,19 +55,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
   @Override
   public void apply(@Nonnull Project project) {
     this.project = project;
-    String[] versions = {"v1.15.2", "v1.16.3", "internal"};
     project.getPlugins().apply("maven-publish");
-
-
-    for (String version : versions) {
-      project.getConfigurations().maybeCreate(String.format("%sAnnotationProcessor", version.replace('.', '_')));
-      Configuration versionedConfiguration = project.getConfigurations().maybeCreate(String.format("%sImplementation", version.replace('.', '_')));
-
-      project.beforeEvaluate((dummy) -> {
-        Configuration runtimeClasspathConfiguration = project.getConfigurations().getByName("runtimeClasspath");
-        runtimeClasspathConfiguration.extendsFrom(versionedConfiguration);
-      });
-    }
 
     Project parent = project;
     while ((parent = parent.getParent()) != null) {
@@ -117,7 +107,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
       }
 
       this.runConfigurationProvider = new RunConfigurationProvider(
-          project, minecraftRepository, minecraftCache.resolve("run"), authenticator);
+          project, minecraftRepository, minecraftCache.resolve("run"), authenticator, httpClient);
       this.jarTaskProvider = new JarTaskProvider();
       this.mavenArtifactURLCache = new MavenArtifactURLCache(flintGradlePath.resolve("maven-artifact-urls"), httpClient == null);
       try {
@@ -139,6 +129,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
     }
 
     this.manifestConfigurator = new ManifestConfigurator(this);
+    interaction.setup();
     project.afterEvaluate((p) -> extension.ensureConfigured());
   }
 
@@ -146,10 +137,19 @@ public class FlintGradlePlugin implements Plugin<Project> {
    * Called by the {@link FlintGradleExtension} as soon as it has been configured
    */
   public void onExtensionConfigured() {
-    interaction.setup(extension);
+    if(extension.getFlintVersion() == null) {
+      throw new IllegalStateException("Please set the flintVersion property on the flint extension");
+    }
 
     for (String version : extension.getMinecraftVersions()) {
       handleVersion(version);
+    }
+
+    for(FlintStaticFileDescription staticFileDescription : extension.getStaticFiles().getStaticFileDescriptions()) {
+      if(!staticFileDescription.isRemote()) {
+        DevelopmentStaticFiles.register(
+            project, staticFileDescription.getTarget(), staticFileDescription.getSourceFile());
+      }
     }
 
     project.getRepositories().maven(repo -> {
@@ -207,7 +207,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
     }
 
     // Configure the project dependencies and configurations for the given version
-    interaction.setupVersioned(extension, compileArtifacts, runtimeArtifacts, version);
+    interaction.setupVersioned(compileArtifacts, runtimeArtifacts, version);
   }
 
   /**

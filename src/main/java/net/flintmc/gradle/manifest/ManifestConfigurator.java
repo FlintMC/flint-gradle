@@ -8,6 +8,7 @@ import net.flintmc.gradle.manifest.data.ManifestRepositoryInput;
 import net.flintmc.gradle.manifest.data.ManifestStaticFileInput;
 import net.flintmc.gradle.manifest.tasks.*;
 import net.flintmc.gradle.maven.cache.MavenArtifactURLCache;
+import net.flintmc.gradle.minecraft.InstallStaticFilesTask;
 import net.flintmc.gradle.property.FlintPluginProperties;
 import net.flintmc.gradle.util.MaybeNull;
 import net.flintmc.gradle.util.Util;
@@ -43,7 +44,6 @@ public class ManifestConfigurator {
   private URI projectPublishURI;
   private URI distributorMavenURI;
   private URI projectMavenURI;
-  private HttpHeaderCredentials publishCredentials;
 
   /**
    * Installs the required gradle tasks to generate the flint manifests.
@@ -81,16 +81,16 @@ public class ManifestConfigurator {
             publishingExtension.getRepositories().maven((repo) -> repo.setName("FlintDistributor"));
         repository.setUrl(distributorUrl);
 
-        // Gradle does not allow setting the credentials instance directly, so copy it
-        HttpHeaderCredentials credentials = repository.getCredentials(HttpHeaderCredentials.class);
-        HttpHeaderCredentials values = getPublishCredentials(
-            "Set enablePublishing to false in the flint extension",
-            "Set shouldAutoConfigurePublishing to false in the flint extension"
-        );
+        // Try to retrieve authentication, it might not be available
+        HttpHeaderCredentials values = Util.getPublishCredentials(project, false);
 
-        credentials.setName(values.getName());
-        credentials.setValue(values.getValue());
-        
+        if(values != null) {
+          // Gradle does not allow setting the credentials instance directly, so copy it
+          HttpHeaderCredentials credentials = repository.getCredentials(HttpHeaderCredentials.class);
+          credentials.setName(values.getName());
+          credentials.setValue(values.getValue());
+        }
+
         // Set the authentication, no further configuration required
         repository.getAuthentication().create("header", HttpHeaderAuthentication.class);
       }
@@ -262,29 +262,4 @@ public class ManifestConfigurator {
     return projectMavenURI;
   }
 
-  /**
-   * Retrieves the HTTP header credentials used for publishing.
-   *
-   * @param notAvailableSolution Messages to display as a solution in case the credentials can't be computed
-   * @return The HTTP header credentials used for publishing
-   */
-  public HttpHeaderCredentials getPublishCredentials(String... notAvailableSolution) {
-    if(publishCredentials == null) {
-      publishCredentials = project.getObjects().newInstance(HttpHeaderCredentials.class);
-
-      // Retrieve either a bearer or publish token
-      String bearerToken = FlintPluginProperties.DISTRIBUTOR_BEARER_TOKEN.resolve(project);
-      if(bearerToken != null) {
-        publishCredentials.setName("Authorization");
-        publishCredentials.setValue("Bearer " + bearerToken);
-      } else {
-        String publishToken = FlintPluginProperties.DISTRIBUTOR_PUBLISH_TOKEN
-            .require(project, notAvailableSolution);
-        publishCredentials.setName("Publish-Token");
-        publishCredentials.setValue(publishToken);
-      }
-    }
-
-    return publishCredentials;
-  }
 }

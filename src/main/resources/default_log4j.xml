@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Configuration status="WARN">
+    <Filters>
+        <MarkerFilter marker="SOUNDS" onMatch="DENY" onMismatch="NEUTRAL" />
+        <MarkerFilter marker="PACKET_RECEIVED" onMatch="DENY" onMismatch="NEUTRAL" />
+        <MarkerFilter marker="PACKET_SENT" onMatch="DENY" onMismatch="NEUTRAL" />
+    </Filters>
     <Appenders>
         <Console name="SysOut" target="SYSTEM_OUT">
             <ThresholdFilter level="WARN" onMatch="DENY" onMismatch="ACCEPT"/>

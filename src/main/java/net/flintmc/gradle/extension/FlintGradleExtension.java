@@ -32,7 +32,6 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
   private String publishToken;
   private Set<String> minecraftVersions;
   private Predicate<Project> projectFilter;
-  private boolean disableInternalSourceSet;
   private Type type = Type.PACKAGE;
   private String flintVersion;
   private boolean enablePublishing;
@@ -207,24 +206,6 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
    */
   public void setProjectFilter(Predicate<Project> projectFilter) {
     this.projectFilter = projectFilter;
-  }
-
-  /**
-   * Specifies if the internal source set should be disabled.
-   *
-   * @param disable If {@code true}, the plugin wont create an internal source set
-   */
-  public void setDisableInternalSourceSet(boolean disable) {
-    this.disableInternalSourceSet = disable;
-  }
-
-  /**
-   * Queries if the internal source set should be disabled.
-   *
-   * @return If the internal source set should be disabled
-   */
-  public boolean shouldDisableInternalSourceSet() {
-    return this.disableInternalSourceSet;
   }
 
   /**
