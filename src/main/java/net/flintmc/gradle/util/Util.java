@@ -495,6 +495,12 @@ public class Util {
     return data;
   }
 
+  /**
+   * Writes a given byte array as a hex string.
+   *
+   * @param data the data to convert
+   * @return the data as a hex string
+   */
   public static String md5Hex(byte[] data) {
     try {
       return new HexBinaryAdapter().marshal(MessageDigest.getInstance("MD5").digest(data));
