@@ -205,7 +205,8 @@ public class GenerateFlintManifestTask extends DefaultTask {
    */
   @Input
   public Set<String> getAuthors() {
-    return new HashSet<>(Arrays.asList(getExtension().getAuthors()));
+    String[] authors = getExtension().getAuthors();
+    return authors == null ? Collections.emptySet() : new HashSet<>(Arrays.asList(authors));
   }
 
   /**
