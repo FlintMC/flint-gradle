@@ -126,27 +126,26 @@ public class RemoteMavenRepository implements ReadableMavenRepository {
       requestBuilder.header(authenticationHeaderName, authenticationHeaderValue);
     }
 
-    try (Response response = httpClient.newCall(requestBuilder.build()).execute()) {
+    Response response = httpClient.newCall(requestBuilder.build()).execute();
 
-      switch (response.code()) {
-        // 200 - Ok - Return the stream to read from
-        case 200:
-          return response.body().byteStream();
+    switch (response.code()) {
+      // 200 - Ok - Return the stream to read from
+      case 200:
+        return response.body().byteStream();
 
-        // 404 - Not Found - Return null since 404 is not a fatal error for a maven repository
-        case 404: {
-          response.body().close();
-          return null;
-        }
+      // 404 - Not Found - Return null since 404 is not a fatal error for a maven repository
+      case 404: {
+        response.body().close();
+        return null;
+      }
 
-        // Every other status code would indicate an error, the 2** codes except 200 itself should never
-        // occur on a maven repository, 3** codes should be handled by the http client and everything else
-        // is an error per HTTP definition.
-        default: {
-          response.body().close();
-          throw new IOException("Maven repository at " + baseURI + " responded with " +
-              response.code() + " (" + response.message() + ")");
-        }
+      // Every other status code would indicate an error, the 2** codes except 200 itself should never
+      // occur on a maven repository, 3** codes should be handled by the http client and everything else
+      // is an error per HTTP definition.
+      default: {
+        response.body().close();
+        throw new IOException("Maven repository at " + baseURI + " responded with " +
+            response.code() + " (" + response.message() + ")");
       }
     }
   }
