@@ -24,9 +24,7 @@ import java.util.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-/**
- * Cache for maven artifacts and their corresponding URL's.
- */
+/** Cache for maven artifacts and their corresponding URL's. */
 public class MavenArtifactURLCache {
   private static final Logger LOGGER = Logging.getLogger(MavenArtifactURLCache.class);
 
@@ -42,7 +40,7 @@ public class MavenArtifactURLCache {
    * Constructs a new {@link MavenArtifactURLCache}.
    *
    * @param artifactURLCacheFile The file to store cached data in
-   * @param offline              Whether the current build is an offline build
+   * @param offline Whether the current build is an offline build
    */
   public MavenArtifactURLCache(Path artifactURLCacheFile, boolean offline) {
     this.negativeCache = new HashMap<>();
@@ -61,57 +59,61 @@ public class MavenArtifactURLCache {
   public void setup() throws IOException {
     boolean wasMissing = !Files.isRegularFile(artifactURLCacheFile);
 
-    if(wasMissing) {
+    if (wasMissing) {
       // Create the parent directories and the file itself so it can be locked
       Files.createDirectories(artifactURLCacheFile.getParent());
       Files.createFile(artifactURLCacheFile);
     }
 
     // Lock the file
-    lock((cacheChannel) -> {
-      if(wasMissing) {
-        // The file does exist now, but is empty, so fill it with dummy data
-        // so that later loads succeed
-        save(cacheChannel);
-      } else {
-        // The file did exist already, load it now
-        load(cacheChannel);
-      }
-      return null;
-    });
+    lock(
+        (cacheChannel) -> {
+          if (wasMissing) {
+            // The file does exist now, but is empty, so fill it with dummy data
+            // so that later loads succeed
+            save(cacheChannel);
+          } else {
+            // The file did exist already, load it now
+            load(cacheChannel);
+          }
+          return null;
+        });
   }
 
   /**
    * Resolves all artifact URL's from the cache or online if possible.
    *
-   * @param artifacts          The artifacts to resolve
+   * @param artifacts The artifacts to resolve
    * @param remoteRepositories The repositories to use for resolving
-   * @param resolveFullURI     If {@code true}, the full artifact URI will be returned, if {@code false}, the maven
-   *                           repository base URI will be returned
+   * @param resolveFullURI If {@code true}, the full artifact URI will be returned, if {@code
+   *     false}, the maven repository base URI will be returned
    * @return The artifacts and their resolved URL's
    * @throws IOException If an I/O error occurs
    */
   public Map<MavenArtifact, URI> resolve(
       Collection<MavenArtifact> artifacts,
       Collection<RemoteMavenRepository> remoteRepositories,
-      boolean resolveFullURI
-  ) throws IOException {
+      boolean resolveFullURI)
+      throws IOException {
     Map<MavenArtifact, URI> out = new HashMap<>();
-    Collection<MavenArtifact> missing = resolveInternal(out, artifacts, remoteRepositories, resolveFullURI, true);
+    Collection<MavenArtifact> missing =
+        resolveInternal(out, artifacts, remoteRepositories, resolveFullURI, true);
 
-    if(missing.isEmpty()) {
+    if (missing.isEmpty()) {
       return out;
-    } else if(offline) {
-      LOGGER.error("Failed to resolve {} artifact URL's because the plugin is in offline mode.", missing.size());
+    } else if (offline) {
+      LOGGER.error(
+          "Failed to resolve {} artifact URL's because the plugin is in offline mode.",
+          missing.size());
       LOGGER.error("Please connect to the internet and try again!");
     } else {
       LOGGER.error("Failed to resolve {} artifact URL's.", missing.size());
       LOGGER.error("The artifacts that failed to resolve are:");
-      for(MavenArtifact artifact : missing) {
+      for (MavenArtifact artifact : missing) {
         LOGGER.error("- {}", artifact);
       }
       LOGGER.error("Searched the following repositories:");
-      for(RemoteMavenRepository remoteRepository : remoteRepositories) {
+      for (RemoteMavenRepository remoteRepository : remoteRepositories) {
         LOGGER.error("- {}", remoteRepository.getBaseURI());
       }
     }
@@ -122,12 +124,13 @@ public class MavenArtifactURLCache {
   /**
    * Resolves all artifact URL's from the cache or online if possible.
    *
-   * @param out                The map to store resolved artifacts and their URL's into
-   * @param artifacts          The artifacts to resolve the URL's for
+   * @param out The map to store resolved artifacts and their URL's into
+   * @param artifacts The artifacts to resolve the URL's for
    * @param remoteRepositories The repositories to consider while searching
-   * @param resolveFullURI     If {@code true}, the full artifact URI will be returned, if {@code false}, the maven
-   *                           repository base URI will be returned
-   * @param autoResolveMissing If {@code true}, this method will try to resolve missing artifacts online
+   * @param resolveFullURI If {@code true}, the full artifact URI will be returned, if {@code
+   *     false}, the maven repository base URI will be returned
+   * @param autoResolveMissing If {@code true}, this method will try to resolve missing artifacts
+   *     online
    * @return A collection of artifacts which could not be resolved
    * @throws IOException If an I/O error occurs
    */
@@ -136,13 +139,13 @@ public class MavenArtifactURLCache {
       Collection<MavenArtifact> artifacts,
       Collection<RemoteMavenRepository> remoteRepositories,
       boolean resolveFullURI,
-      boolean autoResolveMissing
-  ) throws IOException {
+      boolean autoResolveMissing)
+      throws IOException {
     Collection<MavenArtifact> missing = new HashSet<>();
 
-    for(MavenArtifact artifact : artifacts) {
+    for (MavenArtifact artifact : artifacts) {
       Map<URI, URI> known = cache.get(artifact);
-      if(known == null) {
+      if (known == null) {
         // Artifact has not been cached
         missing.add(artifact);
         continue;
@@ -151,18 +154,18 @@ public class MavenArtifactURLCache {
       URI foundURI = null;
 
       // Find the artifact based on the available repositories
-      for(RemoteMavenRepository remoteRepository : remoteRepositories) {
+      for (RemoteMavenRepository remoteRepository : remoteRepositories) {
         URI baseURI = remoteRepository.getBaseURI();
         URI artifactURI = known.get(baseURI);
 
-        if(artifactURI != null) {
+        if (artifactURI != null) {
           // Found the artifact
           foundURI = resolveFullURI ? artifactURI : baseURI;
           break;
         }
       }
 
-      if(foundURI != null) {
+      if (foundURI != null) {
         // Artifact has been found
         out.put(artifact, foundURI);
       } else {
@@ -171,14 +174,9 @@ public class MavenArtifactURLCache {
       }
     }
 
-    if(autoResolveMissing && !offline) {
+    if (autoResolveMissing && !offline) {
       // Missing artifacts, try to find them online
-      return resolveMissing(
-          out,
-          artifacts,
-          remoteRepositories,
-          resolveFullURI
-      );
+      return resolveMissing(out, artifacts, remoteRepositories, resolveFullURI);
     } else {
       return missing;
     }
@@ -187,11 +185,11 @@ public class MavenArtifactURLCache {
   /**
    * Resolves missing artifacts from remote repositories.
    *
-   * @param out                The map to store resolved artifacts into
-   * @param artifacts          The artifacts to resolve
+   * @param out The map to store resolved artifacts into
+   * @param artifacts The artifacts to resolve
    * @param remoteRepositories The repositories to resolve the artifacts from
-   * @param resolveFullURI     If {@code true}, the full artifact URI will be returned, if {@code false}, the maven
-   *                           repository base URI will be returned
+   * @param resolveFullURI If {@code true}, the full artifact URI will be returned, if {@code
+   *     false}, the maven repository base URI will be returned
    * @return All artifacts which could not be resolved
    * @throws IOException If an I/O error occurs
    */
@@ -199,58 +197,63 @@ public class MavenArtifactURLCache {
       Map<MavenArtifact, URI> out,
       Collection<MavenArtifact> artifacts,
       Collection<RemoteMavenRepository> remoteRepositories,
-      boolean resolveFullURI
-  ) throws IOException {
-    return lock((cacheChannel) -> {
-      // Reload the cache file, we now have a lock on it
-      load(cacheChannel);
+      boolean resolveFullURI)
+      throws IOException {
+    return lock(
+        (cacheChannel) -> {
+          // Reload the cache file, we now have a lock on it
+          load(cacheChannel);
 
-      // Now that we have reloaded the cache file, try to resolve again
-      Collection<MavenArtifact> stillMissing = resolveInternal(
-          out, artifacts, remoteRepositories, resolveFullURI, false);
-      if(stillMissing.isEmpty()) {
-        // All dependencies resolved after reload, nothing left to do
-        return Collections.emptySet();
-      }
-
-      Set<MavenArtifact> unresolvable = new HashSet<>();
-
-      // Resolve every single missing artifact
-      for(MavenArtifact missing : stillMissing) {
-        // Still missing some dependencies, try resolving them now
-        MavenArtifactDownloader downloader = new MavenArtifactDownloader();
-        Collection<URI> negativeCache = getOrCreateNegativeCacheEntry(missing);
-
-        for(RemoteMavenRepository remoteRepository : remoteRepositories) {
-          if(!negativeCache.contains(remoteRepository.getBaseURI())) {
-            // The repository has not been checked for the artifact yet
-            downloader.addSource(remoteRepository);
+          // Now that we have reloaded the cache file, try to resolve again
+          Collection<MavenArtifact> stillMissing =
+              resolveInternal(out, artifacts, remoteRepositories, resolveFullURI, false);
+          if (stillMissing.isEmpty()) {
+            // All dependencies resolved after reload, nothing left to do
+            return Collections.emptySet();
           }
-        }
 
-        Pair<ReadableMavenRepository, URI> result = downloader.findArtifactURI(missing);
+          Set<MavenArtifact> unresolvable = new HashSet<>();
 
-        if(result != null) {
-          // Resolved the artifact
-          RemoteMavenRepository remoteMavenRepository = (RemoteMavenRepository) result.getFirst();
-          getOrCreateCacheEntry(missing).put(remoteMavenRepository.getBaseURI(), result.getSecond());
-          out.put(missing, resolveFullURI ? result.getSecond() : remoteMavenRepository.getBaseURI());
-        } else {
-          // Failed to resolve the artifact
-          unresolvable.add(missing);
+          // Resolve every single missing artifact
+          for (MavenArtifact missing : stillMissing) {
+            // Still missing some dependencies, try resolving them now
+            MavenArtifactDownloader downloader = new MavenArtifactDownloader();
+            Collection<URI> negativeCache = getOrCreateNegativeCacheEntry(missing);
 
-          // Add the URL's to the negative cache as the artifact could not be resolved in them
-          for(RemoteMavenRepository remoteRepository : remoteRepositories) {
-            negativeCache.add(remoteRepository.getBaseURI());
+            for (RemoteMavenRepository remoteRepository : remoteRepositories) {
+              if (!negativeCache.contains(remoteRepository.getBaseURI())) {
+                // The repository has not been checked for the artifact yet
+                downloader.addSource(remoteRepository);
+              }
+            }
+
+            Pair<ReadableMavenRepository, URI> result = downloader.findArtifactURI(missing);
+
+            if (result != null) {
+              // Resolved the artifact
+              RemoteMavenRepository remoteMavenRepository =
+                  (RemoteMavenRepository) result.getFirst();
+              getOrCreateCacheEntry(missing)
+                  .put(remoteMavenRepository.getBaseURI(), result.getSecond());
+              out.put(
+                  missing,
+                  resolveFullURI ? result.getSecond() : remoteMavenRepository.getBaseURI());
+            } else {
+              // Failed to resolve the artifact
+              unresolvable.add(missing);
+
+              // Add the URL's to the negative cache as the artifact could not be resolved in them
+              for (RemoteMavenRepository remoteRepository : remoteRepositories) {
+                negativeCache.add(remoteRepository.getBaseURI());
+              }
+            }
           }
-        }
-      }
 
-      // Save the cache after resolving
-      save(cacheChannel);
+          // Save the cache after resolving
+          save(cacheChannel);
 
-      return unresolvable;
-    });
+          return unresolvable;
+        });
   }
 
   /**
@@ -275,9 +278,10 @@ public class MavenArtifactURLCache {
 
   /**
    * Opens and locks the cache file.
-   * <p>
-   * This method implements a whole try-with-resources and beyond error handling, the callback is used to deduplicate
-   * code as the error handling would else have to appear multiple times in this file.
+   *
+   * <p>This method implements a whole try-with-resources and beyond error handling, the callback is
+   * used to deduplicate code as the error handling would else have to appear multiple times in this
+   * file.
    *
    * @param callback The callback to call for when the file has been locked
    * @return The return value of the callback
@@ -373,30 +377,26 @@ public class MavenArtifactURLCache {
       lastValidation = in.readLong();
 
       int entriesCount = in.readInt();
-      for(int i = 0; i < entriesCount; i++) {
+      for (int i = 0; i < entriesCount; i++) {
         // Read in one artifact
         String groupId = in.readUTF();
         String artifactId = in.readUTF();
         String version = in.readUTF();
-        String classifier = (String) in.readObject(); // nullable, thus readObject instead of readUTF
+        String classifier =
+            (String) in.readObject(); // nullable, thus readObject instead of readUTF
         String type = (String) in.readObject(); // nullable, thus readObject instead of readUTF
 
-        MavenArtifact artifact = new MavenArtifact(
-            groupId,
-            artifactId,
-            version,
-            classifier,
-            type
-        );
+        MavenArtifact artifact = new MavenArtifact(groupId, artifactId, version, classifier, type);
 
         // This is serializable, so it can be read in automatically
         Map<URI, URI> knownURIs = Util.forceCast(in.readObject());
 
         cache.put(artifact, knownURIs);
       }
-    } catch(ClassNotFoundException e) {
+    } catch (ClassNotFoundException e) {
       throw new RuntimeException(
-          "UNREACHABLE: ClassNotFoundException while reading ObjectInputStream with only standard library classes", e);
+          "UNREACHABLE: ClassNotFoundException while reading ObjectInputStream with only standard library classes",
+          e);
     }
   }
 
@@ -416,7 +416,7 @@ public class MavenArtifactURLCache {
     out.writeLong(lastValidation);
     out.writeInt(cache.size());
 
-    for(Map.Entry<MavenArtifact, Map<URI, URI>> cacheEntry : cache.entrySet()) {
+    for (Map.Entry<MavenArtifact, Map<URI, URI>> cacheEntry : cache.entrySet()) {
       MavenArtifact artifact = cacheEntry.getKey();
 
       // Write out the cached artifact

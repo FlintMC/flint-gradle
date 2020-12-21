@@ -5,7 +5,7 @@ import net.flintmc.gradle.java.exec.JavaExecutionHelper;
 import net.flintmc.gradle.maven.MavenArtifactDownloader;
 import net.flintmc.gradle.maven.SimpleMavenRepository;
 import net.flintmc.gradle.minecraft.MinecraftRepository;
-import org.apache.http.client.HttpClient;
+import okhttp3.OkHttpClient;
 
 /**
  * Class holding utilities useful during deobfuscation
@@ -14,7 +14,7 @@ public class DeobfuscationUtilities {
   private final MavenArtifactDownloader downloader;
   private final MinecraftRepository minecraftRepository;
   private final SimpleMavenRepository internalRepository;
-  private final HttpClient httpClient;
+  private final OkHttpClient httpClient;
   private final EnvironmentCacheFileProvider cacheFileProvider;
   private final JavaExecutionHelper javaExecutionHelper;
   private final JavaCompileHelper javaCompileHelper;
@@ -36,7 +36,7 @@ public class DeobfuscationUtilities {
       MavenArtifactDownloader downloader,
       MinecraftRepository minecraftRepository,
       SimpleMavenRepository internalRepository,
-      HttpClient httpClient,
+      OkHttpClient httpClient,
       EnvironmentCacheFileProvider cacheFileProvider,
       JavaExecutionHelper javaExecutionHelper,
       JavaCompileHelper javaCompileHelper
@@ -82,7 +82,7 @@ public class DeobfuscationUtilities {
    *
    * @return The HTTP client which should be used
    */
-  public HttpClient getHttpClient() {
+  public OkHttpClient getHttpClient() {
     return httpClient;
   }
 

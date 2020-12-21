@@ -2,8 +2,9 @@ package net.flintmc.gradle.manifest.tasks;
 
 import net.flintmc.gradle.manifest.ManifestConfigurator;
 import net.flintmc.gradle.util.MaybeNull;
-import org.apache.http.client.HttpClient;
-import org.apache.http.entity.FileEntity;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.RequestBody;
 import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.InputFile;
 import org.gradle.api.tasks.TaskAction;
@@ -34,7 +35,7 @@ public class PublishFileTask extends PublishTaskBase {
    */
   @Inject
   public PublishFileTask(
-      ManifestConfigurator configurator, MaybeNull<HttpClient> httpClient, File fileToUpload, URI targetURI) {
+      ManifestConfigurator configurator, MaybeNull<OkHttpClient> httpClient, File fileToUpload, URI targetURI) {
     super(configurator, httpClient.get());
     this.fileToUpload = fileToUpload;
     this.targetURI = targetURI;
@@ -82,16 +83,17 @@ public class PublishFileTask extends PublishTaskBase {
   @TaskAction
   public void publish() {
     // Create the entity to upload
-    FileEntity entity = new FileEntity(fileToUpload);
 
+    MediaType mediaType;
     try {
       // Set the content type if it can be determined
-      entity.setContentType(Files.probeContentType(fileToUpload.toPath()));
-    } catch(IOException e) {
+      mediaType = MediaType.get(Files.probeContentType(fileToUpload.toPath()));
+    } catch (IOException e) {
       // Not too bad, but still something we should log
       getLogger().warn("Failed to determine content type of file " + fileToUpload.getAbsolutePath(), e);
+      mediaType = MediaType.get("application/octet-stream");
     }
 
-    publish(targetURI, entity);
+    publish(targetURI, RequestBody.create(fileToUpload, mediaType));
   }
 }

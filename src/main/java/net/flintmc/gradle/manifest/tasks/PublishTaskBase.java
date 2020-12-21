@@ -3,12 +3,10 @@ package net.flintmc.gradle.manifest.tasks;
 import net.flintmc.gradle.FlintGradleException;
 import net.flintmc.gradle.manifest.ManifestConfigurator;
 import net.flintmc.gradle.util.Util;
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpResponse;
-import org.apache.http.StatusLine;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpPut;
-import org.apache.http.util.EntityUtils;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
 import org.gradle.api.DefaultTask;
 import org.gradle.api.credentials.HttpHeaderCredentials;
 
@@ -20,7 +18,7 @@ import java.net.URI;
  */
 public abstract class PublishTaskBase extends DefaultTask {
   private final ManifestConfigurator configurator;
-  private final HttpClient httpClient;
+  private final OkHttpClient httpClient;
 
   /**
    * Constructs a new {@link PublishTaskBase}.
@@ -28,7 +26,7 @@ public abstract class PublishTaskBase extends DefaultTask {
    * @param configurator The manifest configurator creating this task
    * @param httpClient   The HTTP client to use for uploading
    */
-  public PublishTaskBase(ManifestConfigurator configurator, HttpClient httpClient) {
+  public PublishTaskBase(ManifestConfigurator configurator, OkHttpClient httpClient) {
     this.configurator = configurator;
     this.httpClient = httpClient;
   }
@@ -36,17 +34,19 @@ public abstract class PublishTaskBase extends DefaultTask {
   /**
    * Publishes the given entity to the given URI.
    *
-   * @param uri    The URI to publish to
-   * @param entity The HTTP entity to publish
+   * @param uri         The URI to publish to
+   * @param requestBody The HTTP request body to publish
    */
-  protected final void publish(URI uri, HttpEntity entity) {
-    if(httpClient == null) {
+  protected final void publish(URI uri, RequestBody requestBody) {
+    if (httpClient == null) {
       throw new FlintGradleException("Tried to publish file while gradle was in offline mode");
     }
 
     // Configure the upload
-    HttpPut put = new HttpPut(uri);
-    put.setEntity(entity);
+    Request.Builder put = new Request.Builder()
+        .url(uri.toString())
+        .put(requestBody);
+
 
     HttpHeaderCredentials credentials = Util.getPublishCredentials(
         getProject(),
@@ -54,27 +54,20 @@ public abstract class PublishTaskBase extends DefaultTask {
         "Set enablePublishing to false in the flint extension");
 
     // Add the credentials header
-    put.addHeader(credentials.getName(), credentials.getValue());
+    put.header(credentials.getName(), credentials.getValue());
 
-    HttpResponse response = null;
-    // Upload now...
-    try {
-      response = httpClient.execute(put);
+    try (Response response = httpClient.newCall(put.build()).execute()) {
+      // Upload now...
 
       // Check the status of the upload
-      StatusLine statusLine = response.getStatusLine();
-      int code = statusLine.getStatusCode();
+      int code = response.code();
 
-      if(code < 200 || code >= 300) {
+      if (code < 200 || code >= 300) {
         // Unexpected response
-        throw new IOException("Server responded with " + code + " (" + statusLine.getReasonPhrase() + ")");
+        throw new IOException("Server responded with " + code + " (" + response.message() + ")");
       }
-    } catch(IOException e) {
+    } catch (IOException e) {
       throw new FlintGradleException("Failed to publish file", e);
-    } finally {
-      if(response != null && response.getEntity() != null) {
-        EntityUtils.consumeQuietly(response.getEntity());
-      }
     }
   }
 }
