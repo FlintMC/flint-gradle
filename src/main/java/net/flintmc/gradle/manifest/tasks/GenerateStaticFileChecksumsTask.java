@@ -1,12 +1,14 @@
 package net.flintmc.gradle.manifest.tasks;
 
+import net.flintmc.gradle.FlintGradleException;
 import net.flintmc.gradle.manifest.cache.StaticFileChecksums;
 import net.flintmc.gradle.manifest.data.ManifestStaticFile;
 import net.flintmc.gradle.manifest.data.ManifestStaticFileInput;
 import net.flintmc.gradle.util.MaybeNull;
 import net.flintmc.gradle.util.Util;
-import org.apache.commons.codec.digest.DigestUtils;
-import org.apache.http.client.HttpClient;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 import org.gradle.api.DefaultTask;
 import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.InputFiles;
@@ -26,7 +28,7 @@ import java.util.Set;
  * Task that generates and caches the checksums for static files.
  */
 public class GenerateStaticFileChecksumsTask extends DefaultTask {
-  private final HttpClient httpClient;
+  private final OkHttpClient httpClient;
   private final ManifestStaticFileInput staticFiles;
 
   @Input
@@ -42,7 +44,7 @@ public class GenerateStaticFileChecksumsTask extends DefaultTask {
    * @param staticFiles The static files to generate checksums for
    */
   @Inject
-  public GenerateStaticFileChecksumsTask(MaybeNull<HttpClient> httpClient, ManifestStaticFileInput staticFiles) {
+  public GenerateStaticFileChecksumsTask(MaybeNull<OkHttpClient> httpClient, ManifestStaticFileInput staticFiles) {
     this.httpClient = httpClient.get();
     this.staticFiles = staticFiles;
   }
@@ -55,10 +57,10 @@ public class GenerateStaticFileChecksumsTask extends DefaultTask {
   public Set<URI> getRemoteFiles() {
     staticFiles.compute(getProject());
 
-    if(remoteFiles == null) {
+    if (remoteFiles == null) {
       remoteFiles = new HashSet<>();
 
-      for(ManifestStaticFile remoteFile : staticFiles.getRemoteFiles()) {
+      for (ManifestStaticFile remoteFile : staticFiles.getRemoteFiles()) {
         remoteFiles.add(remoteFile.getURI());
       }
     }
@@ -84,7 +86,7 @@ public class GenerateStaticFileChecksumsTask extends DefaultTask {
    * @return The cache file this task writes to
    */
   public File getCacheFile() {
-    if(cacheFile == null) {
+    if (cacheFile == null) {
       cacheFile = StaticFileChecksums.getCacheFile(getProject());
     }
 
@@ -101,7 +103,7 @@ public class GenerateStaticFileChecksumsTask extends DefaultTask {
     staticFiles.compute(getProject());
 
     File parentDir = getCacheFile().getParentFile();
-    if(!parentDir.exists() && !parentDir.mkdirs()) {
+    if (!parentDir.exists() && !parentDir.mkdirs()) {
       throw new IOException("Failed to create directory " + parentDir.getAbsolutePath());
     }
 
@@ -109,23 +111,23 @@ public class GenerateStaticFileChecksumsTask extends DefaultTask {
 
     // Calculate the checksums for local files
     checksums.clearFiles();
-    for(File localFile : getLocalFiles()) {
-      checksums.add(localFile, DigestUtils.md5Hex(Files.readAllBytes(localFile.toPath())));
+    for (File localFile : getLocalFiles()) {
+      checksums.add(localFile, Util.md5Hex(Files.readAllBytes(localFile.toPath())));
     }
 
-    if(httpClient != null) {
+    if (httpClient != null) {
       // Calculate the checksums for remote files
       for(URI remoteFile : getRemoteFiles()) {
         // Calculate the checksum
         try(InputStream stream = Util.getURLStream(httpClient, remoteFile)) {
-          checksums.add(remoteFile, DigestUtils.md5Hex(stream));
+          checksums.add(remoteFile, Util.md5Hex(Util.toByteArray(stream)));
         }
       }
     } else {
       getLogger().warn("Can't recalculate checksums for remote files because gradle is in offline mode");
 
-      for(URI remoteFile : getRemoteFiles()) {
-        if(!checksums.has(remoteFile)) {
+      for (URI remoteFile : getRemoteFiles()) {
+        if (!checksums.has(remoteFile)) {
           throw new IOException("Missing checksum for " + remoteFile.toASCIIString() +
               ", but can't recalculate because gradle is in offline modes");
         }

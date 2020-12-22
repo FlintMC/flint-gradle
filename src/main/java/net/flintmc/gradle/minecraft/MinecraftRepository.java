@@ -26,7 +26,7 @@ import net.flintmc.gradle.minecraft.data.version.VersionedLibrary;
 import net.flintmc.gradle.util.RuleChainResolver;
 import net.flintmc.gradle.io.TimeStampedFile;
 import net.flintmc.gradle.util.Util;
-import org.apache.http.client.HttpClient;
+import okhttp3.OkHttpClient;
 import org.gradle.api.Project;
 import org.gradle.api.logging.Logger;
 import org.gradle.api.logging.Logging;
@@ -46,7 +46,7 @@ public class MinecraftRepository extends SimpleMavenRepository {
   private static final DateTimeFormatter DATE_TIME_FORMATTER =
       DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.US);
 
-  private final HttpClient httpClient;
+  private final OkHttpClient httpClient;
 
   private final TimeStampedFile versionManifestFile;
   private final TimeStampedFile mappingsDefinitionFile;
@@ -64,7 +64,7 @@ public class MinecraftRepository extends SimpleMavenRepository {
    * @param httpClient The HTTP client to use
    * @throws IOException If an I/O error occurs while creating the directory
    */
-  public MinecraftRepository(Path repoBase, Path cacheDir, HttpClient httpClient) throws IOException {
+  public MinecraftRepository(Path repoBase, Path cacheDir, OkHttpClient httpClient) throws IOException {
     super(repoBase);
     this.httpClient = httpClient;
 

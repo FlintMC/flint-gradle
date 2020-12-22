@@ -12,7 +12,7 @@ import net.flintmc.gradle.minecraft.InstallStaticFilesTask;
 import net.flintmc.gradle.property.FlintPluginProperties;
 import net.flintmc.gradle.util.MaybeNull;
 import net.flintmc.gradle.util.Util;
-import org.apache.http.client.HttpClient;
+import okhttp3.OkHttpClient;
 import org.gradle.api.Project;
 import org.gradle.api.Task;
 import org.gradle.api.artifacts.repositories.MavenArtifactRepository;
@@ -27,7 +27,7 @@ import java.net.URI;
 
 public class ManifestConfigurator {
   private final Project project;
-  private final HttpClient httpClient;
+  private final OkHttpClient httpClient;
   private final MavenArtifactURLCache mavenArtifactURLCache;
 
   /**

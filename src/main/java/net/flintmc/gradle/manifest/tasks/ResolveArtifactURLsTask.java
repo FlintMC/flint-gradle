@@ -9,7 +9,7 @@ import net.flintmc.gradle.maven.RemoteMavenRepository;
 import net.flintmc.gradle.maven.cache.MavenArtifactURLCache;
 import net.flintmc.gradle.maven.pom.MavenArtifact;
 import net.flintmc.gradle.util.MaybeNull;
-import org.apache.http.client.HttpClient;
+import okhttp3.OkHttpClient;
 import org.gradle.api.DefaultTask;
 import org.gradle.api.tasks.*;
 
@@ -23,7 +23,7 @@ import java.util.*;
  * Task resolving the URL's of dependencies for the jar manifest.
  */
 public class ResolveArtifactURLsTask extends DefaultTask {
-  private final HttpClient httpClient;
+  private final OkHttpClient httpClient;
   private final MavenArtifactURLCache mavenArtifactURLCache;
 
   @Nested
@@ -45,7 +45,7 @@ public class ResolveArtifactURLsTask extends DefaultTask {
    */
   @Inject
   public ResolveArtifactURLsTask(
-      MaybeNull<HttpClient> httpClient,
+      MaybeNull<OkHttpClient> httpClient,
       MavenArtifactURLCache mavenArtifactURLCache,
       ManifestRepositoryInput repositoryInput,
       ManifestMavenDependencyInput dependencyInput

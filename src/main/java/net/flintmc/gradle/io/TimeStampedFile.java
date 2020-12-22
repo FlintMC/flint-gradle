@@ -1,12 +1,11 @@
 package net.flintmc.gradle.io;
 
 import net.flintmc.gradle.util.Util;
-import org.apache.http.Header;
-import org.apache.http.HttpResponse;
-import org.apache.http.StatusLine;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpHead;
+import okhttp3.Call;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+import org.gradle.internal.impldep.org.bouncycastle.cert.ocsp.Req;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,6 +18,7 @@ import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Date;
+import java.util.List;
 
 /**
  * Utility class for a file with a timestamp tracking the last update time.
@@ -49,27 +49,32 @@ public class TimeStampedFile {
    * @throws IOException If an I/O error occurs while updating the file
    */
   public void update(
-      HttpClient httpClient, String updateUrl, DateTimeFormatter dateTimeFormatter) throws IOException {
+      OkHttpClient httpClient, String updateUrl, DateTimeFormatter dateTimeFormatter) throws IOException {
     Date lastModifiedDate = null;
 
+
     // Send a HEAD request to the Mojang server in order to retrieve the Last-Modified header
-    HttpHead headRequest = new HttpHead(updateUrl);
-    HttpResponse headResponse = httpClient.execute(headRequest);
-    StatusLine headStatus = headResponse.getStatusLine();
-    if (headStatus.getStatusCode() != 200) {
+    Response headResponse = httpClient.newCall(new Request.Builder()
+        .url(updateUrl)
+        .head()
+        .build())
+        .execute();
+
+
+    if (headResponse.code() != 200) {
       // Bail out of the server did not respond with 200-Ok
       throw new IOException("Server responded with status "
-          + headStatus.getStatusCode() + " (" + headStatus.getReasonPhrase() + ")");
+          + headResponse.code() + " (" + headResponse.message() + ")");
     }
 
-    Header[] lastModifiedHeaders = headResponse.getHeaders("Last-Modified");
-    if (lastModifiedHeaders != null && lastModifiedHeaders.length > 0) {
+
+    String lastModifiedHeader = headResponse.header("Last-Modified");
+    if (lastModifiedHeader != null && lastModifiedHeader.length() > 0) {
       // We have received values in the Last-Modified header
-      String timeValue = lastModifiedHeaders[0].getValue();
-      if (timeValue != null) {
+      if (lastModifiedHeader != null) {
         // Reconstruct the local and remote date
         lastModifiedDate = Date.from(
-            dateTimeFormatter.parse(timeValue, ZonedDateTime::from).toInstant());
+            dateTimeFormatter.parse(lastModifiedHeader, ZonedDateTime::from).toInstant());
       } else {
         LOGGER.warn("Server sent an empty Last-Modified header, assuming " + filePath + " is out of date!");
       }
@@ -91,31 +96,34 @@ public class TimeStampedFile {
     }
 
     // Fetch the file data
-    HttpGet getRequest = new HttpGet(updateUrl);
-    HttpResponse response = httpClient.execute(getRequest);
+    try (Response response = httpClient.newCall(new Request.Builder()
+        .url(updateUrl)
+        .get()
+        .build())
+        .execute()) {
 
-    StatusLine status = response.getStatusLine();
-    if (status.getStatusCode() != 200) {
-      // Bail out if the server did not respond with 200-Ok
-      throw new IOException("Server responded with status code "
-          + status.getStatusCode() + " (" + status.getReasonPhrase() + ")");
+      if (response.code() != 200) {
+        // Bail out if the server did not respond with 200-Ok
+        throw new IOException("Server responded with status code "
+            + response.code() + " (" + response.message() + ")");
+      }
+
+      Path parentPath = this.filePath.getParent();
+      if (!Files.isDirectory(parentPath)) {
+        Files.createDirectories(parentPath);
+      }
+
+      if (lastModifiedDate != null) {
+        // If the server sent a last modified date, save it
+        Files.write(this.stampPath, Util.longToByteArray(lastModifiedDate.getTime()));
+      } else {
+        // We don't know when the file is from, delete the stamp file
+        Files.deleteIfExists(this.stampPath);
+      }
+
+      // Write the received data
+      Files.copy(response.body().byteStream(), this.filePath, StandardCopyOption.REPLACE_EXISTING);
     }
-
-    Path parentPath = this.filePath.getParent();
-    if (!Files.isDirectory(parentPath)) {
-      Files.createDirectories(parentPath);
-    }
-
-    if (lastModifiedDate != null) {
-      // If the server sent a last modified date, save it
-      Files.write(this.stampPath, Util.longToByteArray(lastModifiedDate.getTime()));
-    } else {
-      // We don't know when the file is from, delete the stamp file
-      Files.deleteIfExists(this.stampPath);
-    }
-
-    // Write the received data
-    Files.copy(response.getEntity().getContent(), this.filePath, StandardCopyOption.REPLACE_EXISTING);
   }
 
   /**

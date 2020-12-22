@@ -9,7 +9,7 @@ import net.flintmc.gradle.maven.pom.MavenPom;
 import net.flintmc.gradle.minecraft.MinecraftRepository;
 import net.flintmc.gradle.minecraft.data.environment.ModCoderPackInput;
 import net.flintmc.gradle.util.Util;
-import org.apache.http.client.HttpClient;
+import okhttp3.OkHttpClient;
 import org.gradle.api.logging.Logger;
 import org.gradle.api.logging.Logging;
 
@@ -59,7 +59,7 @@ public class ModCoderPackEnvironment implements DeobfuscationEnvironment {
       throws DeobfuscationException {
     // Get a few utilities classes out of the instance variable
     EnvironmentCacheFileProvider cacheFileProvider = utilities.getCacheFileProvider();
-    HttpClient httpClient = utilities.getHttpClient();
+    OkHttpClient httpClient = utilities.getHttpClient();
 
     // Download and extract the inputs if required
     Path mcpConfigOutput = downloadAndExtractZip(
@@ -318,7 +318,7 @@ public class ModCoderPackEnvironment implements DeobfuscationEnvironment {
    */
   private Path downloadAndExtractZip(
       EnvironmentCacheFileProvider cacheFileProvider,
-      HttpClient httpClient,
+      OkHttpClient httpClient,
       String url,
       String outputName
   ) throws DeobfuscationException {
