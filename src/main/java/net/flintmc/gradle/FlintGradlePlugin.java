@@ -3,7 +3,7 @@ package net.flintmc.gradle;
 import net.flintmc.gradle.environment.DeobfuscationEnvironment;
 import net.flintmc.gradle.extension.FlintGradleExtension;
 import net.flintmc.gradle.extension.FlintStaticFileDescription;
-import net.flintmc.gradle.jar.JarTaskProvider;
+import net.flintmc.gradle.java.JarTaskProvider;
 import net.flintmc.gradle.java.JavaPluginInteraction;
 import net.flintmc.gradle.java.RunConfigurationProvider;
 import net.flintmc.gradle.manifest.ManifestConfigurator;
@@ -20,7 +20,6 @@ import org.apache.http.impl.client.HttpClientBuilder;
 import org.gradle.api.GradleException;
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;
-import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.invocation.Gradle;
 
 import javax.annotation.Nonnull;

@@ -1,8 +1,9 @@
-package net.flintmc.gradle.jar;
+package net.flintmc.gradle.java;
 
 import net.flintmc.gradle.extension.FlintGradleExtension;
 import org.gradle.api.GradleException;
 import org.gradle.api.Project;
+import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.plugins.ExtraPropertiesExtension;
 import org.gradle.api.plugins.JavaPluginConvention;
 import org.gradle.api.tasks.SourceSet;
@@ -10,6 +11,7 @@ import org.gradle.api.tasks.bundling.Jar;
 
 import java.io.*;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -23,30 +25,34 @@ public class JarTaskProvider {
    */
   public void installTasks(Project project, FlintGradleExtension extension) {
     JavaPluginConvention plugin = project.getConvention().getPlugin(JavaPluginConvention.class);
-    Set<String> minecraftVersions = extension.getMinecraftVersions()
+    Set<String> sourceSetsToAdd = extension.getMinecraftVersions()
         .stream()
-        .map(name -> name.matches("[0-9]+(.[0-9]+)+") ? ("v" + name.replace('.', '_')) : name)
+        .map(name -> 'v' + name.replace('.', '_'))
         .collect(Collectors.toSet());
-    minecraftVersions.add("main");
-    minecraftVersions.add("internal");
+    sourceSetsToAdd.add("main");
+    sourceSetsToAdd.add("internal");
+
     plugin.getSourceSets()
         .stream()
-        .filter(sourceSet -> minecraftVersions.contains(sourceSet.getName()))
+        .filter(sourceSet -> sourceSetsToAdd.contains(sourceSet.getName()))
         .forEach(sourceSet -> {
-          this.createJarTask(sourceSet, project);
+          this.addToMainJar(sourceSet, project);
           if (!sourceSet.getName().equals("main")) {
             this.installCompileTask(sourceSet, project);
           }
         });
+
+    createJarBundledInstallerTask(project);
   }
 
   /**
-   * Creates jar tasks for the minecraft source sets.
+   * Adds the outputs of other source sets to the main jar.
    *
-   * @param project the project to install the tasks in
+   * @param sourceSet The source set to add to the main jar
+   * @param project   The project to source set belongs to
    */
   @SuppressWarnings("unchecked")
-  public void createJarTask(SourceSet sourceSet, Project project) {
+  public void addToMainJar(SourceSet sourceSet, Project project) {
     // Retrieve the jar task producing the fat, bundled jar which will be used
     // in the production environment
     Jar mainJarTask = (Jar) project.getTasks().getByName("jar");
@@ -163,6 +169,42 @@ public class JarTaskProvider {
     // not really require the other jar tasks to run, as it will collect sources and
     // services on its own.
 //    mainJarTask.dependsOn(jarTask);
+  }
+
+  /**
+   * Installs a task to generate a self installer on the project.
+   *
+   * @param project The project to add the task on
+   */
+  public void createJarBundledInstallerTask(Project project) {
+    Jar mainJarTask = (Jar) project.getTasks().getByName("jar");
+    project.getTasks().register("bundledInstallerJar", Jar.class, (bundledInstallerJarTask) -> {
+      // Copy from main jar
+      bundledInstallerJarTask.from(project.zipTree(mainJarTask.getOutputs().getFiles().getSingleFile()));
+      bundledInstallerJarTask.getArchiveClassifier().set("bundled-installer");
+      bundledInstallerJarTask.dependsOn(mainJarTask);
+
+      // Create a detached configuration to resolve artifacts from
+      Configuration bundledInstallerConfiguration = project.getConfigurations().detachedConfiguration(
+          project.getDependencies().create("net.flintmc.installer:frontend-gui:1.1.6")
+      );
+
+      Set<Object> inputs = new HashSet<>();
+
+      for (File file : bundledInstallerConfiguration) {
+        // Compute the inputs
+        if (file.isDirectory()) {
+          // Add directories directly
+          inputs.add(file);
+        } else {
+          // Add files as zip trees
+          inputs.add(project.zipTree(file));
+        }
+      }
+
+      // Include the configuration in the jar
+      bundledInstallerJarTask.from(inputs);
+    });
   }
 
   /**
