@@ -42,7 +42,6 @@ repositories {
     mavenCentral()
 }
 
-// 10.0.0 as default, only relevant for local publishing
 version = System.getenv().getOrDefault("VERSION", "2.7.1")
 
 dependencies {
