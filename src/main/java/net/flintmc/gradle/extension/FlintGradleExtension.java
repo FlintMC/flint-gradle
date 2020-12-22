@@ -25,6 +25,7 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
   private final FlintGradlePlugin plugin;
   private final FlintRunsExtension runsExtension;
   private final FlintStaticFilesExtension staticFilesExtension;
+  private final FlintSelfInstallerExtension selfInstallerExtension;
 
   private boolean configured;
 
@@ -49,6 +50,8 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
     this.projectFilter = p -> p.getPluginManager().hasPlugin("java");
     this.runsExtension = new FlintRunsExtension();
     this.staticFilesExtension = new FlintStaticFilesExtension(plugin.getProject());
+    this.selfInstallerExtension = new FlintSelfInstallerExtension();
+
     this.enablePublishing = true;
     this.autoConfigurePublishing = true;
   }
@@ -65,6 +68,8 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
     this.projectFilter = parent.projectFilter;
     this.runsExtension = new FlintRunsExtension(parent.runsExtension);
     this.staticFilesExtension = new FlintStaticFilesExtension(plugin.getProject()); // TODO: Should static files be inherited too?
+    this.selfInstallerExtension = new FlintSelfInstallerExtension(parent.selfInstallerExtension);
+
     this.type = parent.type;
     this.authors = parent.authors != null ? Arrays.copyOf(parent.authors, parent.authors.length) : new String[]{};
     this.flintVersion = parent.flintVersion;
@@ -264,6 +269,26 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
   public FlintStaticFilesExtension staticFiles(Action<NamedDomainObjectContainer<FlintStaticFileDescription>> action) {
     action.execute(this.staticFilesExtension.getStaticFileDescriptions());
     return this.staticFilesExtension;
+  }
+
+  /**
+   * Retrieves the self installer extension of this extension.
+   *
+   * @return The self installer extension of this extension
+   */
+  public FlintSelfInstallerExtension getSelfInstaller() {
+    return this.selfInstallerExtension;
+  }
+
+  /**
+   * Configures the self installer extension of this extension with the given action.
+   *
+   * @param action The action to use for configuration
+   * @return The configured self installer extension of this extension
+   */
+  public FlintSelfInstallerExtension selfInstaller(Action<FlintSelfInstallerExtension> action) {
+    action.execute(this.selfInstallerExtension);
+    return this.selfInstallerExtension;
   }
 
   /**
