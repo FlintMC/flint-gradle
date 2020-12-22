@@ -156,7 +156,7 @@ public class Util {
   /**
    * Downloads the given URI to the given path. The parent directories are created as required.
    *
-   * @param client  The {@link HttpClient} to use for downloading
+   * @param client  The {@link OkHttpClient} to use for downloading
    * @param uri     The URI to download
    * @param output  The target path
    * @param project The project to use for resolving authentication, or {@code null}, if authentication can be ignored
@@ -321,7 +321,9 @@ public class Util {
       while (path.startsWith("/")) {
         path = path.substring(1);
       }
-      current = current.resolve(current.getPath() + '/' + path);
+
+      String currentPath = current.getPath();
+      current = current.resolve(currentPath + (currentPath.endsWith("/") ? "" : "/") + path);
     }
 
     return current;
