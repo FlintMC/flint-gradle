@@ -43,7 +43,7 @@ repositories {
 }
 
 // 10.0.0 as default, only relevant for local publishing
-version = System.getenv().getOrDefault("VERSION", "2.7.0")
+version = System.getenv().getOrDefault("VERSION", "2.7.1")
 
 dependencies {
     implementation(group = "com.fasterxml.jackson.core", name = "jackson-core", version = "2.11.1")
@@ -80,4 +80,9 @@ publishing {
             }
         }
     }
+}
+
+java {
+    withSourcesJar()
+    withJavadocJar()
 }
