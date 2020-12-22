@@ -204,6 +204,15 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
   }
 
   /**
+   * Overwrites the project authors.
+   *
+   * @param authors The new project authors
+   */
+  public void authors(String... authors) {
+    setAuthors(authors);
+  }
+
+  /**
    * Overwrites the project filter with the given predicate. The project filter determines which sub projects the plugin
    * should automatically apply itself to.
    *

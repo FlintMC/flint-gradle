@@ -1,47 +1,72 @@
 # Flint gradle Plugin
 
-Generic Minecraft plugin for the Gradle build system.
+###### Generic Minecraft plugin for the Gradle build system
+
+------------------------------------------------------------------------------------------------------------------------
 
 ## Usage
 
 ### Basic
 
+**Gradle 6.5 or higher is required!**
+
+The plugin is available on the LabyMod distributor and can be added to gradle the following way:
+
+`settings.gradle`:
+
 ```groovy
-buildscript {
-    repositories {
-        maven {
-            // Add the repository, the plugin is available on
-            // the Labymedia Artifactory
-            url "https://maven.laby.tech/artifactory/general"
-            name "Labymedia"
+pluginManagement {
+    plugins {
+        // Make sure to use the latest version
+        id "net.flintmc.flint-gradle" version "2.7.1"
+    }
+
+    buildscript {
+        repositories {
+            maven {
+                url = "https://dist.labymod.net/api/v1/maven/release"
+                name = "LabyMod Distributor"
+            }
+            mavenCentral()
         }
     }
 }
-
-// Apply the plugin
-apply plugin: 'net.flint.flint-gradle-plugin'
 ```
 
+`build.gradle`:
+
+```groovy
+plugins {
+    id "net.flintmc.flint-gradle"
+}
+```
+
+(Syntax varies slightly for kotlin)
+
 This alone is not enough to actually initialize the project, the plugin still needs to be told, which minecraft versions
-run configurations should be generated for. To solve this task, the plugin creates a global `flint` extension on the
-build script, which can be used like this:
+run configurations should be generated for. Additionally, other properties may be set to further customize build. To
+solve this task, the plugin creates a global `flint` extension on the build script, which can be used like this:
 
 ```groovy
 flint {
-    minecraftVersions "1.12.2", "1.15.2"
+    minecraftVersions "1.15.2", "1.16.4"
+    // Make sure to use latest
+    flintVersion "2.0.5"
+
+    authors "Me", "Myself", "I"
 }
 ```
 
 This will generate multiple run tasks and source sets:
 
 - Tasks
-    - `runClient1.12.2`
     - `runClient1.15.2`
+    - `runClient1.16.4`
 - Source sets:
     - `main` Will contain source code shared across all versions and configurations
     - `internal` Will contain source code only available to source sets bound to versions
-    - `v1_12_2` Will contain source code when running the `1.12.2` client
     - `v1_15_2` Will contain source code when running the `1.15.2` client
+    - `v1_16_4` Will contain source code when running the `1.16.4` client
 
 This results in the following project structure:
 
@@ -51,15 +76,15 @@ This results in the following project structure:
 ├── settings.gradle
 └── src
     ├── internal
-    │   ├── java
-    │   └── resources
+    |   ├── java
+    │   └── resources
     ├── main
-    │   ├── java
-    │   └── resources
-    ├── v1_12_2
-    │   ├── java
-    │   └── resources
-    └── v1_15_2
+    │   ├── java
+    |   └── resources
+    ├── v1_15_2
+    │   ├── java
+    │   └── resources
+    └── v1_16_4
         ├── java
         └── resources
 ```
@@ -71,7 +96,7 @@ Java files now go into their respective directories:
 - Everything in `internal` can be used from the version bound source sets, but will not be available to packages
   depending on the package built by this workspace. `internal` often contains the implementation of the interfaces
   in `main`.
-- Everything in `v1_12_2` and `v1_15_2` has access to `main` and `internal`, but is not visible to other packages.
+- Everything in `v1_15_2` and `v1_16_4` has access to `main` and `internal`, but is not visible to other packages.
   Additionally, the source sets also have access to their respective minecraft version.
 
 ### With flint
@@ -86,9 +111,11 @@ dependencies.
 
 ```groovy
 repositories {
-    // Required for the Flint dependencies below
-    url "https://maven.laby.tech/artifactory/general"
-    name "Labymedia"
+    maven {
+        // Required for the Flint dependencies below
+        url = "https://dist.labymod.net/api/v1/maven/release"
+        name = "LabyMod Distributor"
+    }
 }
 
 dependencies {
@@ -96,8 +123,9 @@ dependencies {
     // might cause issues. Instead rely on `implementation` and
     // `runtimeOnly`
 
-    // Pull in the required flint modules, only gui in this case
-    implementation group: 'net.flint.component', name: 'gui', version: '<FLINT VERSION>'
+    // Pull in the required flint modules, only render-gui in this case
+    implementation flintApi("render-gui")
+    // flintApi("module") is a shortcut for "net.flintmc:module:flint-version"
 
     // The annotation processor is also required, however, it needs to be
     // applied to each individual configuration it is used on. In the most
@@ -106,16 +134,21 @@ dependencies {
     //
     // In this example it will be applied to the internal and versioned
     // source sets
-    internalAnnotationProcessor group: 'net.flint.component.annotation-processing', name: 'autoload', version: '<FLINT VERSION>'
-    versionedAnnotationProcessor('1.12.2', group: 'net.flint.component.annotation-processing', name: 'autoload', version: '<FLINT VERSION>')
-    versionedAnnotationProcessor('1.15.2', group: 'net.flint.component.annotation-processing', name: 'autoload', version: '<FLINT VERSION>')
+    internalAnnotationProcessor flintApi("annotation-processing-autoload")
 
+    // This will apply the annotation processor to the source sets for
+    // the minecraft versions 1.15.2 and 1.16.4 
+    minecraft(["1.15.2", "1.16.4"]) {
+        annotationProcessor flintApi("annotation-processing-autoload")
+    }
     // Declaring dependencies for versioned source sets should be done
     // the following way (as also seen above for the annotation processor)
     //
-    // This will allow code in the v1_12_2 source set to use JOML, all other
+    // This will allow code in the v1_16_4 source set to use JOML, all other
     // source sets wont have it available
-    versionedImplementation('1.12.2', group: 'org.joml', 'joml', version: '1.9.25')
+    minecraft("1.16.4") {
+        implementation group: 'org.joml', 'joml', version: '1.9.25'
+    }
 }
 ```
 
@@ -131,26 +164,16 @@ flint {
 
 #### Publishing
 
-If you have a publish-token to publish to the official LabyMod package repository, this can be done by setting it in
-the `flint` extension of the gradle build script.
+If you have a publish-token to publish to the official LabyMod package repository, you can set it using the 2 following
+ways:
 
-```groovy
-flint {
-    // DON'T USE THIS IF YOUR REPOSITORY IS PUBLIC!
-    publishToken "your-personal-publish-token"
-}
-```
+1. Setting the environment variable `FLINT_DISTRIBUTOR_PUBLISH_TOKEN`
+2. Setting the gradle property `net.flint.distributor.publish-token`
 
-**For security reasons, you should never push the token to a public GIT repository**. Consider using the following
-approach, which will allow you to set the publish-token in your local `gradle.properties`:
+If you use variant 2, make sure to set it in your local gradle properties (`C:\Users\YourUser\.gradle\gradle.properties`
+on Windows, `~/.gradle/gradle.properties` on OSX/Linux).
 
-```groovy
-flint {
-    if (project.hasProperty('net.flint.publish-token')) {
-        publishToken "${project.getProperty('net.flint.publish-token')}"
-    }
-}
-```
+**Do not set it in the project gradle.properties as that could expose the token to others!**
 
 ### Advanced usage
 
@@ -232,5 +255,4 @@ will yield at least 3 run-tasks, assuming the project has only been configured f
   will be included in the run configuration.
 
 These filters apply recursively to all sub-projects, so children can overwrite their own configurations, and the
-defaults for their children (Note that you usually just end up with one parent and a lot of children, since gradle
-includes all projects as children of the root when done from one `settings.gradle`.)
+defaults for their children.
