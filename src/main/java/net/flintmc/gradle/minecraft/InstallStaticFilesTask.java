@@ -109,8 +109,6 @@ public class InstallStaticFilesTask extends DefaultTask {
           manifests.add(
               JsonConverter.PACKAGE_MODEL_SERIALIZER.fromString(Util.readAll(manifestStream), PackageModel.class));
         } catch (IOException e) {
-          System.out.println(url.toExternalForm());
-          e.printStackTrace();
           throw new FlintGradleException("Failed to read manifest " + url.toExternalForm(), e);
         }
       }
@@ -146,18 +144,20 @@ public class InstallStaticFilesTask extends DefaultTask {
 
   /**
    * Performs the install of all static files.
-   *
-   * @throws IOException If an I/O error occurs
    */
   @TaskAction
-  public void performInstall() throws IOException {
+  public void performInstall() {
     compute();
     for (Map.Entry<File, StaticFileSource> entry : sources.entrySet()) {
       File target = entry.getKey();
       StaticFileSource source = entry.getValue();
 
       // Install the file
-      source.install(target);
+      try {
+        source.install(target);
+      } catch(IOException e) {
+        throw new FlintGradleException("Failed to install static files", e);
+      }
     }
   }
 
@@ -256,9 +256,13 @@ public class InstallStaticFilesTask extends DefaultTask {
             "Gradle is operating in offline mode and can't download files, but " + errorMessage);
       }
 
-      // MD5 mismatch or the file does not exist, download it
-      Util.download(
-          httpClient, URI.create(model.getUrl()), target.toPath(), getProject(), StandardCopyOption.REPLACE_EXISTING);
+      try {
+        // MD5 mismatch or the file does not exist, download it
+        Util.download(
+            httpClient, URI.create(model.getUrl()), target.toPath(), getProject(), StandardCopyOption.REPLACE_EXISTING);
+      } catch(IOException e) {
+        throw new IOException("Failed to download file from " + model.getUrl() + " to " + target.toPath(), e);
+      }
     }
 
     @Input
