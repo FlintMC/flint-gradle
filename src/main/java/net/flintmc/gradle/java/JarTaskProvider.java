@@ -1,17 +1,20 @@
-package net.flintmc.gradle.jar;
+package net.flintmc.gradle.java;
 
+import net.flintmc.gradle.FlintGradleException;
 import net.flintmc.gradle.extension.FlintGradleExtension;
+import net.flintmc.gradle.extension.FlintSelfInstallerExtension;
+import net.flintmc.gradle.json.JsonConverter;
+import net.flintmc.gradle.manifest.dev.DevelopmentStaticFiles;
 import org.gradle.api.GradleException;
 import org.gradle.api.Project;
+import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.plugins.ExtraPropertiesExtension;
 import org.gradle.api.plugins.JavaPluginConvention;
 import org.gradle.api.tasks.SourceSet;
 import org.gradle.api.tasks.bundling.Jar;
 
 import java.io.*;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class JarTaskProvider {
@@ -23,30 +26,34 @@ public class JarTaskProvider {
    */
   public void installTasks(Project project, FlintGradleExtension extension) {
     JavaPluginConvention plugin = project.getConvention().getPlugin(JavaPluginConvention.class);
-    Set<String> minecraftVersions = extension.getMinecraftVersions()
+    Set<String> sourceSetsToAdd = extension.getMinecraftVersions()
         .stream()
-        .map(name -> name.matches("[0-9]+(.[0-9]+)+") ? ("v" + name.replace('.', '_')) : name)
+        .map(name -> 'v' + name.replace('.', '_'))
         .collect(Collectors.toSet());
-    minecraftVersions.add("main");
-    minecraftVersions.add("internal");
+    sourceSetsToAdd.add("main");
+    sourceSetsToAdd.add("internal");
+
     plugin.getSourceSets()
         .stream()
-        .filter(sourceSet -> minecraftVersions.contains(sourceSet.getName()))
+        .filter(sourceSet -> sourceSetsToAdd.contains(sourceSet.getName()))
         .forEach(sourceSet -> {
-          this.createJarTask(sourceSet, project);
-          if (!sourceSet.getName().equals("main")) {
+          this.addToMainJar(sourceSet, project);
+          if(!sourceSet.getName().equals("main")) {
             this.installCompileTask(sourceSet, project);
           }
         });
+
+    createJarBundledInstallerTask(project, extension.getSelfInstaller());
   }
 
   /**
-   * Creates jar tasks for the minecraft source sets.
+   * Adds the outputs of other source sets to the main jar.
    *
-   * @param project the project to install the tasks in
+   * @param sourceSet The source set to add to the main jar
+   * @param project   The project to source set belongs to
    */
   @SuppressWarnings("unchecked")
-  public void createJarTask(SourceSet sourceSet, Project project) {
+  public void addToMainJar(SourceSet sourceSet, Project project) {
     // Retrieve the jar task producing the fat, bundled jar which will be used
     // in the production environment
     Jar mainJarTask = (Jar) project.getTasks().getByName("jar");
@@ -60,7 +67,7 @@ public class JarTaskProvider {
     File serviceMergeDir = mainJarTaskProperties.has("serviceMergeDir") ?
         (File) mainJarTaskProperties.get("serviceMergeDir") : null;
 
-    if (serviceMergeDir == null) {
+    if(serviceMergeDir == null) {
       // The service merge dir has not been set yet, define it as $buildDir/service-merge
       // and add it as a task input
       serviceMergeDir = new File(project.getBuildDir(), "service-merge");
@@ -68,7 +75,7 @@ public class JarTaskProvider {
       mainJarTask.from(serviceMergeDir);
     }
 
-    if (serviceInputDirs == null) {
+    if(serviceInputDirs == null) {
       // The service input dirs have not been configured yet, create a list to save all
       // directories which should be probed for services in
       serviceInputDirs = new ArrayList<>();
@@ -79,24 +86,24 @@ public class JarTaskProvider {
       List<File> finalServiceInputDirs = serviceInputDirs;
 
       mainJarTask.doFirst((self) -> {
-        if (finalServiceMergeDir.exists()) {
+        if(finalServiceMergeDir.exists()) {
           // Nuke the merge directory if it exists already
           project.delete(finalServiceMergeDir);
         }
 
         // Define the full output directory to write service files to and create it
         File serviceOutputDir = new File(finalServiceMergeDir, "META-INF/services");
-        if (!serviceOutputDir.mkdirs()) {
+        if(!serviceOutputDir.mkdirs()) {
           throw new GradleException("Failed to create service merge output directory");
         }
 
         // Iterate over all possible input dirs to probe for service files
-        for (File root : finalServiceInputDirs) {
+        for(File root : finalServiceInputDirs) {
           File rootServiceDir = new File(root, "META-INF/services");
-          if (rootServiceDir.exists()) {
+          if(rootServiceDir.exists()) {
             // Found a directory which potentially contains service files
             File[] descriptorFiles = rootServiceDir.listFiles();
-            if (descriptorFiles == null) {
+            if(descriptorFiles == null) {
               // Unable to list files in directory, this doesn't have to mean
               // that something went wrong, rather that the operating system
               // did not report any file container to be present in the directory
@@ -105,14 +112,14 @@ public class JarTaskProvider {
 
             // Iterate all found files, assume they are service files or directories
             // (shame the developer if they are not)
-            for (File serviceDescriptor : descriptorFiles) {
-              if (!serviceDescriptor.isFile()) {
+            for(File serviceDescriptor : descriptorFiles) {
+              if(!serviceDescriptor.isFile()) {
                 // Ignore things which are not service files, some frameworks
                 // use directories inside the service dir
                 continue;
               }
 
-              try (
+              try(
                   // Open a write for appending to a service file in case it exists already
                   FileWriter serviceDescriptorWriter =
                       new FileWriter(new File(serviceOutputDir, serviceDescriptor.getName()), true);
@@ -120,11 +127,11 @@ public class JarTaskProvider {
                   BufferedReader serviceDescriptorReader = new BufferedReader(new FileReader(serviceDescriptor))
               ) {
                 String line;
-                while ((line = serviceDescriptorReader.readLine()) != null) {
+                while((line = serviceDescriptorReader.readLine()) != null) {
                   // Copy every line over to the service file
                   serviceDescriptorWriter.write(line + "\n");
                 }
-              } catch (IOException e) {
+              } catch(IOException e) {
                 throw new GradleException("Failed to merge service files", e);
               }
             }
@@ -145,9 +152,9 @@ public class JarTaskProvider {
       // We need the absolute path so we don't exclude wrong stuff
       String path = f.getFile().getAbsolutePath();
 
-      for (File output : sourceSet.getOutput().getFiles()) {
+      for(File output : sourceSet.getOutput().getFiles()) {
         // Probe if file lies within any source set and is very like a service file
-        if (path.startsWith(output.getAbsolutePath()) && path.replace('\\', '/').contains("META-INF/services")) {
+        if(path.startsWith(output.getAbsolutePath()) && path.replace('\\', '/').contains("META-INF/services")) {
           // If so, exclude it
           return true;
         }
@@ -163,6 +170,99 @@ public class JarTaskProvider {
     // not really require the other jar tasks to run, as it will collect sources and
     // services on its own.
 //    mainJarTask.dependsOn(jarTask);
+  }
+
+  /**
+   * Installs a task to generate a self installer on the project.
+   *
+   * @param project   The project to add the task on
+   * @param extension The extension to retrieve the configuration from
+   */
+  public void createJarBundledInstallerTask(Project project, FlintSelfInstallerExtension extension) {
+    if(!extension.isEnabled()) {
+      // Nothing to do
+      return;
+    }
+
+    Jar mainJarTask = (Jar) project.getTasks().getByName("jar");
+    project.getTasks().create("bundledInstallerJar", Jar.class, (bundledInstallerJarTask) -> {
+      bundledInstallerJarTask.getArchiveClassifier().set("bundled-installer");
+      bundledInstallerJarTask.dependsOn(mainJarTask);
+
+      Map<String, String> bundle = new HashMap<>();
+
+      Map<String, File> staticFiles = DevelopmentStaticFiles.getFor(project);
+      if(staticFiles != null) {
+        staticFiles.forEach((localPath, file) -> {
+          String inJarPath = "resources/" + localPath.substring(0, localPath.lastIndexOf('/'));
+
+          // Package the file into the resources folder
+          bundledInstallerJarTask.from(file, (spec) -> spec.into(inJarPath));
+          bundle.put(localPath, inJarPath);
+        });
+      }
+
+      // Package the main jar
+      File mainJar = mainJarTask.getOutputs().getFiles().getSingleFile();
+      String inJarPath = "resources/" + mainJar.getName();
+      bundle.put(mainJar.getName(), inJarPath);
+
+      // Include certain files from main jar
+      bundledInstallerJarTask.from(project.zipTree(mainJar), (spec) -> {
+        spec.include("manifest.json");
+      });
+
+      bundledInstallerJarTask.from(mainJar, (spec) -> spec.into("resources"));
+
+      // Create the bundle.json file
+      File bundleFile = new File(project.getBuildDir(), "tmp/bundledJar/bundle.json");
+      if(!bundleFile.getParentFile().isDirectory() && !bundleFile.getParentFile().mkdirs()) {
+        throw new FlintGradleException(
+            "Failed to create bundled jar dir " + bundleFile.getParentFile().getAbsolutePath());
+      }
+
+      try {
+        // Write the bundle file
+        JsonConverter.OBJECT_MAPPER.writeValue(bundleFile, bundle);
+      } catch(IOException e) {
+        throw new FlintGradleException("Failed to write bundle.json", e);
+      }
+
+      // Include the bundle file
+      bundledInstallerJarTask.from(bundleFile);
+
+      // Create a detached configuration to resolve artifacts from
+      Configuration bundledInstallerConfiguration = project.getConfigurations().detachedConfiguration(
+          project.getDependencies().create(extension.getDependencyNotation())
+      );
+
+      Set<Object> inputs = new HashSet<>();
+
+      for(File file : bundledInstallerConfiguration) {
+        // Compute the inputs
+        if(file.isDirectory()) {
+          // Add directories directly
+          inputs.add(file);
+        } else {
+          // Add files as zip trees
+          inputs.add(project.zipTree(file));
+        }
+      }
+
+      // Include the configuration in the jar
+      bundledInstallerJarTask.from(inputs);
+
+      // Configure main class
+      bundledInstallerJarTask.manifest((manifest) -> {
+        Map<String, Object> attributes = new HashMap<>();
+        attributes.put("Main-Class", extension.getMainClass());
+
+        manifest.attributes(attributes);
+      });
+
+      // Make "build" depend on the bundled installer
+      project.getTasks().getByName("build").dependsOn(bundledInstallerJarTask);
+    });
   }
 
   /**
