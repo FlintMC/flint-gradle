@@ -1,24 +1,25 @@
-fun RepositoryHandler.flintGradlePluginRepository() {
-    maven {
-        setUrl("https://dist.labymod.net/api/v1/maven/release")
-        name = "Flint"
-        credentials(HttpHeaderCredentials::class) {
-            name = "Authorization"
-            value = "Bearer CbtTjzAOuDBr5QXcGnBc1MB3eIHxcZetnyHtdN76VpTNgbwAf87bzWPCntsXwj52"
-        }
-        authentication {
-            create<HttpHeaderAuthentication>("header")
-        }
-    }
-}
-
 fun RepositoryHandler.flintRepository() {
+    var distributorUrl = System.getenv("FLINT_DISTRIBUTOR_URL")
+
+    if (distributorUrl == null) {
+        distributorUrl = project.properties.getOrDefault(
+            "net.flintmc.distributor.url",
+            "https://dist.labymod.net/api/v1/maven/release"
+        ).toString()
+    }
+
+    var bearerToken = System.getenv("FLINT_DISTRIBUTOR_BEARER_TOKEN")
+
+    if (bearerToken == null) {
+        bearerToken = project.properties["net.flintmc.distributor.bearer-token"].toString()
+    }
+
     maven {
-        setUrl("http://dist.labymod.net/api/v1/maven/release")
+        setUrl(distributorUrl)
         name = "Flint"
         credentials(HttpHeaderCredentials::class) {
             name = "Authorization"
-            value = "Bearer CbtTjzAOuDBr5QXcGnBc1MB3eIHxcZetnyHtdN76VpTNgbwAf87bzWPCntsXwj52"
+            value = "Bearer $bearerToken"
         }
         authentication {
             create<HttpHeaderAuthentication>("header")
@@ -38,7 +39,6 @@ group = "net.flintmc"
 repositories {
     mavenLocal()
     flintRepository()
-    flintGradlePluginRepository()
     mavenCentral()
 }
 
@@ -66,18 +66,7 @@ gradlePlugin {
 
 publishing {
     repositories {
-        flintGradlePluginRepository()
-        maven {
-            setUrl("https://dist.labymod.net/api/v1/maven/release")
-            name = "Flint"
-            credentials(HttpHeaderCredentials::class) {
-                name = "Authorization"
-                value = "Bearer CbtTjzAOuDBr5QXcGnBc1MB3eIHxcZetnyHtdN76VpTNgbwAf87bzWPCntsXwj52"
-            }
-            authentication {
-                create<HttpHeaderAuthentication>("header")
-            }
-        }
+        flintRepository()
     }
 }
 
