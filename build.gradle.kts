@@ -32,6 +32,7 @@ plugins {
     `kotlin-dsl`
     id("maven-publish")
     id("maven")
+    id("net.minecrell.licenser") version "0.4.1"
 }
 
 group = "net.flintmc"
@@ -73,4 +74,16 @@ publishing {
 java {
     withSourcesJar()
     withJavadocJar()
+}
+
+license {
+    header = rootProject.file("LICENSE-HEADER")
+    include("**/*.java")
+    include("**/*.kts")
+
+    tasks {
+        create("gradle") {
+            files = project.files("build.gradle.kts", "settings.gradle.kts")
+        }
+    }
 }
