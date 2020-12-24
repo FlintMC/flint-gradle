@@ -17,13 +17,6 @@ fun RepositoryHandler.flintRepository() {
     maven {
         setUrl(distributorUrl)
         name = "Flint"
-        credentials(HttpHeaderCredentials::class) {
-            name = "Authorization"
-            value = "Bearer $bearerToken"
-        }
-        authentication {
-            create<HttpHeaderAuthentication>("header")
-        }
     }
 }
 
