@@ -36,8 +36,8 @@ import org.gradle.api.Project;
 import org.gradle.api.credentials.HttpHeaderCredentials;
 import org.gradle.api.file.FileCollection;
 
-import javax.xml.bind.annotation.adapters.HexBinaryAdapter;
 import java.io.*;
+import java.math.BigInteger;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.CopyOption;
@@ -390,7 +390,7 @@ public class Util {
    * @throws JsonConverterException If the {@code manifest.json} can't be read as a {@link PackageModel}
    */
   public static PackageModel getPackageModelFromJar(File file) throws IOException, JsonConverterException {
-    if (file.getName().endsWith(".jar")) {
+    if (!file.getName().endsWith(".jar")) {
       // Needs to be a jar file
       return null;
     }
@@ -524,7 +524,7 @@ public class Util {
    */
   public static String md5Hex(byte[] data) {
     try {
-      return new HexBinaryAdapter().marshal(MessageDigest.getInstance("MD5").digest(data));
+      return new BigInteger(1, MessageDigest.getInstance("MD5").digest(data)).toString(16);
     } catch (NoSuchAlgorithmException e) {
       throw new IllegalStateException("MD5 digest not available");
     }
