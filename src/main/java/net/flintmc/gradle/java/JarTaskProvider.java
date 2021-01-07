@@ -24,6 +24,7 @@ import net.flintmc.gradle.extension.FlintGradleExtension;
 import net.flintmc.gradle.extension.FlintSelfInstallerExtension;
 import net.flintmc.gradle.json.JsonConverter;
 import net.flintmc.gradle.manifest.dev.DevelopmentStaticFiles;
+import net.flintmc.installer.frontend.gui.InstallBundle;
 import org.gradle.api.GradleException;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.Configuration;
@@ -206,6 +207,7 @@ public class JarTaskProvider {
     Jar mainJarTask = (Jar) project.getTasks().getByName("jar");
     project.getTasks().create("bundledInstallerJar", Jar.class, (bundledInstallerJarTask) -> {
       bundledInstallerJarTask.getArchiveClassifier().set("bundled-installer");
+      bundledInstallerJarTask.setGroup("build");
       bundledInstallerJarTask.dependsOn(mainJarTask);
 
       Map<String, String> bundle = new HashMap<>();
@@ -227,9 +229,7 @@ public class JarTaskProvider {
       bundle.put(mainJar.getName(), inJarPath);
 
       // Include certain files from main jar
-      bundledInstallerJarTask.from(project.zipTree(mainJar), (spec) -> {
-        spec.include("manifest.json");
-      });
+      bundledInstallerJarTask.from(project.zipTree(mainJar), (spec) -> spec.include("manifest.json"));
 
       bundledInstallerJarTask.from(mainJar, (spec) -> spec.into("resources"));
 
@@ -242,7 +242,7 @@ public class JarTaskProvider {
 
       try {
         // Write the bundle file
-        JsonConverter.OBJECT_MAPPER.writeValue(bundleFile, bundle);
+        JsonConverter.OBJECT_MAPPER.writeValue(bundleFile, new InstallBundle(bundle));
       } catch(IOException e) {
         throw new FlintGradleException("Failed to write bundle.json", e);
       }
