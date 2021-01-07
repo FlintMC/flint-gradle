@@ -17,16 +17,13 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-package net.flintmc.gradle.environment.mcp.function;
-
-import net.flintmc.gradle.maven.pom.MavenArtifact;
+package net.flintmc.gradle.environment.function;
 
 import java.net.URI;
 import java.util.List;
+import net.flintmc.gradle.maven.pom.MavenArtifact;
 
-/**
- * Represents a java MCP execution template.
- */
+/** Represents a java execution template. */
 public class JavaExecutionTemplate {
   private final URI executionArtifactRepo;
   private final MavenArtifact executionArtifact;
@@ -34,19 +31,19 @@ public class JavaExecutionTemplate {
   private final List<String> jvmArgs;
 
   /**
-   * Constructs a new {@link JavaExecutionTemplate} with the given repository, artifact, arguments and JVM arguments.
+   * Constructs a new {@link JavaExecutionTemplate} with the given repository, artifact, arguments
+   * and JVM arguments.
    *
    * @param executionArtifactRepo The repository the artifact can be found in
-   * @param executionArtifact     The artifact used for execution
-   * @param args                  The argument templates passed to the execution
-   * @param jvmArgs               The argument passed to the JVM executing the artifact
+   * @param executionArtifact The artifact used for execution
+   * @param args The argument templates passed to the execution
+   * @param jvmArgs The argument passed to the JVM executing the artifact
    */
   public JavaExecutionTemplate(
       URI executionArtifactRepo,
       MavenArtifact executionArtifact,
       List<String> args,
-      List<String> jvmArgs
-  ) {
+      List<String> jvmArgs) {
     this.executionArtifactRepo = executionArtifactRepo;
     this.executionArtifact = executionArtifact;
     this.args = args;

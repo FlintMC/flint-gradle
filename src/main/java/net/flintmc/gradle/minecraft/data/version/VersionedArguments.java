@@ -20,7 +20,6 @@
 package net.flintmc.gradle.minecraft.data.version;
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-
 import java.util.List;
 import java.util.Objects;
 
@@ -35,8 +34,16 @@ public class VersionedArguments {
     return game;
   }
 
+  public void setGame(List<ArgumentString> game) {
+    this.game = game;
+  }
+
   public List<ArgumentString> getJvm() {
     return jvm;
+  }
+
+  public void setJvm(List<ArgumentString> jvm) {
+    this.jvm = jvm;
   }
 
   @Override
@@ -44,8 +51,7 @@ public class VersionedArguments {
     if (this == o) return true;
     if (o == null || getClass() != o.getClass()) return false;
     VersionedArguments that = (VersionedArguments) o;
-    return Objects.equals(game, that.game) &&
-        Objects.equals(jvm, that.jvm);
+    return Objects.equals(game, that.game) && Objects.equals(jvm, that.jvm);
   }
 
   @Override

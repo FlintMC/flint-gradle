@@ -41,6 +41,7 @@ public class VersionManifest {
   private Map<String, VersionedDownload> downloads;
   private List<VersionedLibrary> libraries;
   private Map<String, VersionedLoggingConfiguration> logging;
+  private String minecraftArguments;
 
   public String getId() {
     return id;
@@ -88,6 +89,10 @@ public class VersionManifest {
 
   public Map<String, VersionedLoggingConfiguration> getLogging() {
     return logging;
+  }
+
+  public String getMinecraftArguments() {
+    return minecraftArguments;
   }
 
   @Override

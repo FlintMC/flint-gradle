@@ -21,8 +21,13 @@ package net.flintmc.gradle.minecraft.data.environment;
 
 public class EnvironmentInput {
   private ModCoderPackInput modCoderPack;
+  private YarnInput yarn;
 
   public ModCoderPackInput getModCoderPack() {
     return modCoderPack;
+  }
+
+  public YarnInput getYarn() {
+    return yarn;
   }
 }

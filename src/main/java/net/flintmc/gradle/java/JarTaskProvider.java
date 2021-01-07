@@ -47,7 +47,7 @@ public class JarTaskProvider {
     JavaPluginConvention plugin = project.getConvention().getPlugin(JavaPluginConvention.class);
     Set<String> sourceSetsToAdd = extension.getMinecraftVersions()
         .stream()
-        .map(name -> 'v' + name.replace('.', '_'))
+        .map(name -> 'v' + name.getVersion().replace('.', '_'))
         .collect(Collectors.toSet());
     sourceSetsToAdd.add("main");
     sourceSetsToAdd.add("internal");

@@ -19,19 +19,21 @@
 
 package net.flintmc.gradle.environment;
 
+import java.util.Collection;
 import net.flintmc.gradle.environment.mcp.ModCoderPackEnvironment;
+import net.flintmc.gradle.environment.yarn.YarnEnvironment;
 import net.flintmc.gradle.maven.pom.MavenArtifact;
 import net.flintmc.gradle.maven.pom.MavenPom;
 import net.flintmc.gradle.minecraft.data.environment.EnvironmentInput;
+import net.flintmc.gradle.minecraft.data.environment.EnvironmentType;
 
-import java.util.Collection;
-
-/**
- * Represents a deobfuscation environment which can be used to obtain the minecraft source.
- */
+/** Represents a deobfuscation environment which can be used to obtain the minecraft source. */
 public interface DeobfuscationEnvironment {
-  static DeobfuscationEnvironment createFor(EnvironmentInput input) {
-    return new ModCoderPackEnvironment(input.getModCoderPack());
+
+  static DeobfuscationEnvironment createFor(EnvironmentInput input, EnvironmentType type) {
+    return type == EnvironmentType.MOD_CODER_PACK
+        ? new ModCoderPackEnvironment(input.getModCoderPack())
+        : new YarnEnvironment(input.getYarn());
   }
 
   /**
@@ -42,8 +44,8 @@ public interface DeobfuscationEnvironment {
   String name();
 
   /**
-   * Runs the deobfuscation on the given client and server artifacts. One of the 2 artifacts may
-   * be null, but never both at the same time.
+   * Runs the deobfuscation on the given client and server artifacts. One of the 2 artifacts may be
+   * null, but never both at the same time.
    *
    * @param clientPom The client artifact, may be null if serverPom is not null
    * @param serverPom The client artifact, may be null if clientPom is not null

@@ -20,17 +20,6 @@
 package net.flintmc.gradle.environment.mcp;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import net.flintmc.gradle.environment.DeobfuscationException;
-import net.flintmc.gradle.environment.DeobfuscationUtilities;
-import net.flintmc.gradle.environment.mcp.function.*;
-import net.flintmc.gradle.json.JsonConverter;
-import net.flintmc.gradle.maven.RemoteMavenRepository;
-import net.flintmc.gradle.maven.pom.MavenArtifact;
-import net.flintmc.gradle.maven.pom.MavenPom;
-import net.flintmc.gradle.minecraft.MinecraftRepository;
-import org.gradle.api.logging.Logger;
-import org.gradle.api.logging.Logging;
-
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -39,14 +28,35 @@ import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import net.flintmc.gradle.environment.DeobfuscationException;
+import net.flintmc.gradle.environment.DeobfuscationUtilities;
+import net.flintmc.gradle.environment.EnvironmentRunnable;
+import net.flintmc.gradle.environment.function.Function;
+import net.flintmc.gradle.environment.function.InjectFunction;
+import net.flintmc.gradle.environment.function.JavaExecutionFunction;
+import net.flintmc.gradle.environment.function.JavaExecutionTemplate;
+import net.flintmc.gradle.environment.function.ListLibrariesFunction;
+import net.flintmc.gradle.environment.mcp.function.PatchFunction;
+import net.flintmc.gradle.environment.function.StripFunction;
+import net.flintmc.gradle.json.JsonConverter;
+import net.flintmc.gradle.maven.RemoteMavenRepository;
+import net.flintmc.gradle.maven.pom.MavenArtifact;
+import net.flintmc.gradle.maven.pom.MavenPom;
+import net.flintmc.gradle.minecraft.MinecraftRepository;
+import org.gradle.api.logging.Logger;
+import org.gradle.api.logging.Logging;
 
-public class ModCoderPackRun {
+public class ModCoderPackRun implements EnvironmentRunnable {
   private static final Logger LOGGER = Logging.getLogger(ModCoderPackRun.class);
 
   private final Map<String, Path> variables;
   private final Map<String, JavaExecutionTemplate> javaFunctions;
-  private final Map<String, List<MCPFunction>> steps;
+  private final Map<String, List<Function>> steps;
 
   private final MavenPom clientJar;
   private final MavenPom serverJar;
@@ -67,6 +77,8 @@ public class ModCoderPackRun {
     this.stepsPath = mcpPath.resolve("steps");
   }
 
+  /** {@inheritDoc} */
+  @Override
   public void loadData() throws IOException {
     // Get the path to the config.json
     Path configJson = mcpPath.resolve("config.json");
@@ -95,31 +107,37 @@ public class ModCoderPackRun {
       JsonNode variableNode = dataNode.get(variableName);
 
       switch (variableNode.getNodeType()) {
-        case STRING: {
-          // Path variable without a side association
-          variables.put(variableName, resolveConfigPath(variableNode.asText()));
-          break;
-        }
-
-        case OBJECT: {
-          // Variable is a collection of side associated paths
-          for (Iterator<String> nestedIt = variableNode.fieldNames(); nestedIt.hasNext(); ) {
-            // Construct the name <side>|<name>
-            String nestedName = nestedIt.next();
-            JsonNode nestedNode = variableNode.get(nestedName);
-
-            // Resolve the path and save it in the variables
-            variables.put(nestedName + "|" + variableName,
-                resolveConfigPath(nestedNode.requireNonNull().asText()));
+        case STRING:
+          {
+            // Path variable without a side association
+            variables.put(variableName, resolveConfigPath(variableNode.asText()));
+            break;
           }
-          break;
-        }
 
-        default: {
-          // Unexpected node type
-          throw new UnsupportedOperationException("Found data type " + variableNode.getNodeType().name() +
-              " on MCP input data, expected STRING or OBJECT");
-        }
+        case OBJECT:
+          {
+            // Variable is a collection of side associated paths
+            for (Iterator<String> nestedIt = variableNode.fieldNames(); nestedIt.hasNext(); ) {
+              // Construct the name <side>|<name>
+              String nestedName = nestedIt.next();
+              JsonNode nestedNode = variableNode.get(nestedName);
+
+              // Resolve the path and save it in the variables
+              variables.put(
+                  nestedName + "|" + variableName,
+                  resolveConfigPath(nestedNode.requireNonNull().asText()));
+            }
+            break;
+          }
+
+        default:
+          {
+            // Unexpected node type
+            throw new UnsupportedOperationException(
+                "Found data type "
+                    + variableNode.getNodeType().name()
+                    + " on MCP input data, expected STRING or OBJECT");
+          }
       }
     }
 
@@ -168,7 +186,8 @@ public class ModCoderPackRun {
 
       // Extract the repository and the artifact
       String repo = functionNode.get("repo").requireNonNull().asText();
-      MavenArtifact artifact = new MavenArtifact(functionNode.get("version").requireNonNull().asText());
+      MavenArtifact artifact =
+          new MavenArtifact(functionNode.get("version").requireNonNull().asText());
 
       // Extract the list of arguments passed to the executable, this is always required
       List<String> args = new ArrayList<>();
@@ -177,7 +196,8 @@ public class ModCoderPackRun {
         args.add(argsNode.path(i).requireNonNull().asText());
       }
 
-      // Extract the list of jvm arguments passed the JVM executing the artifact, this is not required
+      // Extract the list of jvm arguments passed the JVM executing the artifact, this is not
+      // required
       List<String> jvmArgs = new ArrayList<>();
       if (functionNode.has("jvmargs")) {
         // Found the jvmargs node, process it
@@ -190,7 +210,7 @@ public class ModCoderPackRun {
       URI repoURI;
       try {
         repoURI = new URI(repo);
-      } catch(URISyntaxException e) {
+      } catch (URISyntaxException e) {
         throw new IOException("Failed to parse " + repo + " as a URI", e);
       }
 
@@ -203,7 +223,7 @@ public class ModCoderPackRun {
    * Reads the steps array of the given side and constructs its functions.
    *
    * @param stepsArray The json array to read the steps from
-   * @param sideName   The name of the side this array belongs to
+   * @param sideName The name of the side this array belongs to
    */
   private void processSteps(JsonNode stepsArray, String sideName) {
     if (!stepsArray.isArray()) {
@@ -211,17 +231,18 @@ public class ModCoderPackRun {
     }
 
     // Construct the list of steps per side in place
-    List<MCPFunction> sidedSteps = steps.compute(
-        sideName,
-        (k, v) -> {
-          if (v == null) {
-            return new ArrayList<>();
-          } else {
-            // processSteps has been called twice with the same sideName
-            throw new IllegalStateException("Steps for side " + sideName + " processed already");
-          }
-        }
-    );
+    List<Function> sidedSteps =
+        steps.compute(
+            sideName,
+            (k, v) -> {
+              if (v == null) {
+                return new ArrayList<>();
+              } else {
+                // processSteps has been called twice with the same sideName
+                throw new IllegalStateException(
+                    "Steps for side " + sideName + " processed already");
+              }
+            });
 
     // Iterate every step
     for (int i = 0; i < stepsArray.size(); i++) {
@@ -246,8 +267,10 @@ public class ModCoderPackRun {
       String name = values.getOrDefault("name", type);
 
       // Some steps don't have an input
-      String input = values.containsKey("input") ?
-          resolveVariableValue(values.get("input"), sideName, values) : null;
+      String input =
+          values.containsKey("input")
+              ? resolveVariableValue(values.get("input"), sideName, values)
+              : null;
       if (input != null) {
         // An input was found, rewrite the value in case it was a variable and has been resolved
         values.put("input", input);
@@ -267,116 +290,111 @@ public class ModCoderPackRun {
         }
 
         // Construct the execution function
-        JavaExecutionFunction function = new JavaExecutionFunction(
-            name,
-            output,
-            template.getExecutionArtifact(),
-            utilities.getHttpClient() == null ? null :
-                new RemoteMavenRepository(
-                    utilities.getHttpClient(),
-                    template.getExecutionArtifactRepo()
-                ),
-            args,
-            template.getJvmArgs()
-        );
+        JavaExecutionFunction function =
+            new JavaExecutionFunction(
+                name,
+                output,
+                template.getExecutionArtifact(),
+                utilities.getHttpClient() == null
+                    ? null
+                    : new RemoteMavenRepository(
+                        utilities.getHttpClient(), template.getExecutionArtifactRepo()),
+                args,
+                template.getJvmArgs());
 
         sidedSteps.add(function);
         continue;
       }
 
       switch (type) {
-        case "inject": {
-          if (input == null) {
-            throw new IllegalArgumentException("The inject function always requires an input");
+        case "inject":
+          {
+            if (input == null) {
+              throw new IllegalArgumentException("The inject function always requires an input");
+            }
+
+            Path output = createOutput(sideName, name, "jar");
+            values.put("output", output.toString());
+
+            // Construct the inject function
+            InjectFunction function = new InjectFunction(name, output, Paths.get(input), "mcp");
+            sidedSteps.add(function);
+            break;
           }
 
-          Path output = createOutput(sideName, name, "jar");
-          values.put("output", output.toString());
+        case "strip":
+          {
+            if (input == null) {
+              throw new IllegalArgumentException("The strip function always requires an input");
+            }
 
-          // Construct the inject function
-          InjectFunction function = new InjectFunction(
-              name,
-              Paths.get(input),
-              output
-          );
-          sidedSteps.add(function);
-          break;
-        }
+            if (!variables.containsKey("mappings")) {
+              // This will hopefully never happen
+              throw new IllegalArgumentException(
+                  "The strip functions requires mappings to be supplied");
+            }
 
-        case "strip": {
-          if (input == null) {
-            throw new IllegalArgumentException("The strip function always requires an input");
+            Path output = createOutput(sideName, name, "jar");
+            values.put("output", output.toString());
+
+            // Construct the strip function
+            StripFunction function =
+                new StripFunction(
+                    name,
+                    variables.get("mappings"),
+                    Paths.get(input),
+                    output,
+                    // It is not clear if this value ever appears, but the MCP checks for it, so do
+                    // we
+                    // By default the mode is always whitelist
+                    resolveVariableValue(values.getOrDefault("mode", "whitelist"), sideName, values)
+                        .equalsIgnoreCase("whitelist"));
+
+            sidedSteps.add(function);
+            break;
           }
 
-          if (!variables.containsKey("mappings")) {
-            // This will hopefully never happen
-            throw new IllegalArgumentException("The strip functions requires mappings to be supplied");
+        case "patch":
+          {
+            if (input == null) {
+              throw new IllegalArgumentException("The patch function always requires an input");
+            }
+
+            Path output = createOutput(sideName, name, "jar");
+            values.put("output", output.toString());
+
+            // Resolve the patches input
+            Path patches = Paths.get(resolveVariableValue("{patches}", sideName, values));
+
+            // Construct the patch function
+            PatchFunction function = new PatchFunction(name, Paths.get(input), output, patches);
+
+            sidedSteps.add(function);
+            break;
           }
 
-          Path output = createOutput(sideName, name, "jar");
-          values.put("output", output.toString());
+        case "listLibraries":
+          {
+            Path output = createOutput(sideName, name, "txt");
+            values.put("output", output.toString());
 
-          // Construct the strip function
-          StripFunction function = new StripFunction(
-              name,
-              variables.get("mappings"),
-              Paths.get(input),
-              output,
-              // It is not clear if this value ever appears, but the MCP checks for it, so do we
-              // By default the mode is always whitelist
-              resolveVariableValue(
-                  values.getOrDefault("mode", "whitelist"),
-                  sideName,
-                  values
-              ).equalsIgnoreCase("whitelist")
-          );
+            // Construct the listLibraries function
+            ListLibrariesFunction function = new ListLibrariesFunction(name, output, clientJar);
 
-          sidedSteps.add(function);
-          break;
-        }
-
-        case "patch": {
-          if (input == null) {
-            throw new IllegalArgumentException("The patch function always requires an input");
+            sidedSteps.add(function);
+            break;
           }
 
-          Path output = createOutput(sideName, name, "jar");
-          values.put("output", output.toString());
-
-          // Resolve the patches input
-          Path patches = Paths.get(resolveVariableValue("{patches}", sideName, values));
-
-          // Construct the patch function
-          PatchFunction function = new PatchFunction(
-              name,
-              Paths.get(input),
-              output,
-              patches
-          );
-
-          sidedSteps.add(function);
-          break;
-        }
-
-        case "listLibraries": {
-          Path output = createOutput(sideName, name, "txt");
-          values.put("output", output.toString());
-
-          // Construct the listLibraries function
-          ListLibrariesFunction function = new ListLibrariesFunction(
-              name,
-              output,
-              clientJar
-          );
-
-          sidedSteps.add(function);
-          break;
-        }
-
-        default: {
-          throw new IllegalArgumentException("Got task " + name + " of type " + type + " which is neither " +
-              "a builtin function nor defined via the java functions");
-        }
+        default:
+          {
+            throw new IllegalArgumentException(
+                "Got task "
+                    + name
+                    + " of type "
+                    + type
+                    + " which is neither "
+                    + "a builtin function nor defined via the java functions");
+          }
       }
     }
   }
@@ -394,8 +412,8 @@ public class ModCoderPackRun {
   /**
    * Creates the output path with the associated variable for the given step.
    *
-   * @param stepName      The name of the step to create the output for
-   * @param side          The side the output belongs to
+   * @param stepName The name of the step to create the output for
+   * @param side The side the output belongs to
    * @param fileExtension The file extension of the output
    * @return The path to the created output path
    */
@@ -408,14 +426,15 @@ public class ModCoderPackRun {
   /**
    * Recursively resolves the value of the given variable name.
    *
-   * @param input          The variable name or value of the variable itself. Will be treated as a variable if starts with
-   *                       <code>{</code> and ends with <code>}</code>.
-   * @param side           The side the variable is being resolved for
+   * @param input The variable name or value of the variable itself. Will be treated as a variable
+   *     if starts with <code>{</code> and ends with <code>}</code>.
+   * @param side The side the variable is being resolved for
    * @param extraVariables Extra variables to resolves values from
    * @return The resolved variable, or {@code null}, if the input name was null
    * @throws IllegalArgumentException If the input is a variable but no does not exist
    */
-  private String resolveVariableValue(String input, String side, Map<String, String> extraVariables) {
+  private String resolveVariableValue(
+      String input, String side, Map<String, String> extraVariables) {
     if (input == null) {
       // Map null to null
       return null;
@@ -435,9 +454,9 @@ public class ModCoderPackRun {
   /**
    * Resolves the value of the given variable name.
    *
-   * @param input          The variable name or value of the variable itself. Will be treated as a variable if starts with
-   *                       <code>{</code> and ends with <code>}</code>.
-   * @param side           The side the variable is being resolved for
+   * @param input The variable name or value of the variable itself. Will be treated as a variable
+   *     if starts with <code>{</code> and ends with <code>}</code>.
+   * @param side The side the variable is being resolved for
    * @param extraVariables Extra variables to resolves values from
    * @return The resolved variable, or {@code null}, if the input name was null
    * @throws IllegalArgumentException If the input is a variable but no does not exist
@@ -460,7 +479,8 @@ public class ModCoderPackRun {
       String sidedName = side + "|" + input;
       if (!variables.containsKey(sidedName)) {
         // The variable was not found in extra nor global variables nor as a sided variable
-        throw new IllegalArgumentException("Variable " + input + " (sided " + sidedName + ") does not exist");
+        throw new IllegalArgumentException(
+            "Variable " + input + " (sided " + sidedName + ") does not exist");
       }
 
       // The variable is a sided one
@@ -478,15 +498,15 @@ public class ModCoderPackRun {
    */
   private boolean shouldIgnoreStep(String stepType) {
     switch (stepType) {
-      // Internal steps, those are done in advance and don't have to
-      // be controlled by the MCP environment
+        // Internal steps, those are done in advance and don't have to
+        // be controlled by the MCP environment
       case "downloadManifest":
       case "downloadJson":
       case "downloadServer":
       case "downloadClient":
         return true;
 
-      // Other steps, need to be executed
+        // Other steps, need to be executed
       default:
         return false;
     }
@@ -503,10 +523,10 @@ public class ModCoderPackRun {
       throw new IllegalArgumentException("No steps defined for side " + side);
     }
 
-    List<MCPFunction> sidedSteps = steps.get(side);
+    List<Function> sidedSteps = steps.get(side);
 
     // Iterate over every step of the given side
-    for (MCPFunction step : sidedSteps) {
+    for (Function step : sidedSteps) {
       Path output = step.getOutput();
 
       if (!Files.isRegularFile(output)) {
@@ -516,8 +536,8 @@ public class ModCoderPackRun {
           try {
             Files.createDirectories(outputDir);
           } catch (IOException e) {
-            throw new DeobfuscationException("Failed to create output directory for step " + step.getName() +
-                " for " + side);
+            throw new DeobfuscationException(
+                "Failed to create output directory for step " + step.getName() + " for " + side);
           }
         }
 
@@ -528,25 +548,20 @@ public class ModCoderPackRun {
     }
   }
 
-  /**
-   * Runs all steps for the given side driving the run to completion
-   *
-   * @param side The side to execute the steps of
-   * @return The output of the last step
-   * @throws DeobfuscationException If a step fails to run
-   */
+  /** {@inheritDoc} */
+  @Override
   public Path execute(String side) throws DeobfuscationException {
     if (!steps.containsKey(side)) {
       throw new IllegalArgumentException("No steps defined for side " + side);
     }
 
-    List<MCPFunction> sidedSteps = steps.get(side);
+    List<Function> sidedSteps = steps.get(side);
 
     boolean forceFollowingSteps = false;
 
     // Iterate over every step of the given side
     for (int i = 0; i < sidedSteps.size(); i++) {
-      MCPFunction step = sidedSteps.get(i);
+      Function step = sidedSteps.get(i);
       Path output = step.getOutput();
 
       if (forceFollowingSteps && Files.exists(output)) {
@@ -560,7 +575,8 @@ public class ModCoderPackRun {
 
       if (!Files.isRegularFile(output)) {
         // The output does not exist, execute the step
-        LOGGER.lifecycle("[{}/{}] Running MCP step {} for {}", i + 1, sidedSteps.size(), step.getName(), side);
+        LOGGER.lifecycle(
+            "[{}/{}] Running MCP step {} for {}", i + 1, sidedSteps.size(), step.getName(), side);
         long startMillis = System.currentTimeMillis();
         try {
           step.execute(utilities);
@@ -571,8 +587,7 @@ public class ModCoderPackRun {
           } catch (IOException innerException) {
             LOGGER.error(
                 "Failed to delete output after step failed, please manually clear the cache!",
-                innerException
-            );
+                innerException);
           }
           throw e;
         }
@@ -587,8 +602,12 @@ public class ModCoderPackRun {
         forceFollowingSteps = true;
       } else {
         // The output exists already
-        LOGGER.lifecycle("[{}/{}] Skipping MCP step {} for {}, output exists already",
-            i + 1, sidedSteps.size(), step.getName(), side);
+        LOGGER.lifecycle(
+            "[{}/{}] Skipping MCP step {} for {}, output exists already",
+            i + 1,
+            sidedSteps.size(),
+            step.getName(),
+            side);
       }
     }
 

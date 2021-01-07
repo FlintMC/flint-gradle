@@ -19,7 +19,19 @@
 
 package net.flintmc.gradle.minecraft.data.environment;
 
+import org.gradle.internal.impldep.com.google.gson.internal.$Gson$Preconditions;
+
 public enum EnvironmentType {
-  MOD_CODER_PACK,
-  YARN
+  MOD_CODER_PACK("ModCoderPack"),
+  YARN("Yarn");
+
+  private final String name;
+
+  EnvironmentType(String name) {
+    this.name = name;
+  }
+
+  public String getName() {
+    return name;
+  }
 }

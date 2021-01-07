@@ -33,6 +33,8 @@ import net.flintmc.gradle.maven.SimpleMavenRepository;
 import net.flintmc.gradle.maven.cache.MavenArtifactURLCache;
 import net.flintmc.gradle.maven.pom.MavenArtifact;
 import net.flintmc.gradle.minecraft.MinecraftRepository;
+import net.flintmc.gradle.minecraft.data.environment.EnvironmentType;
+import net.flintmc.gradle.minecraft.data.environment.MinecraftVersion;
 import net.flintmc.gradle.minecraft.yggdrasil.YggdrasilAuthenticator;
 import okhttp3.OkHttpClient;
 import org.gradle.api.GradleException;
@@ -52,6 +54,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
 
   private static final String MINECRAFT_MAVEN = "https://libraries.minecraft.net";
   private static final String MAVEN_CENTRAL = "https://repo.maven.apache.org/maven2/";
+  private static final String FLINT_MAVEN = "https://dist.labymod.net/api/v1/maven/release/";
 
   private Project project;
 
@@ -159,8 +162,8 @@ public class FlintGradlePlugin implements Plugin<Project> {
       throw new IllegalStateException("Please set the flintVersion property on the flint extension");
     }
 
-    for (String version : extension.getMinecraftVersions()) {
-      handleVersion(version);
+    for (MinecraftVersion minecraftVersion : extension.getMinecraftVersions()) {
+      this.handleVersion(minecraftVersion.getVersion(), minecraftVersion.getEnvironmentType());
     }
 
     for(FlintStaticFileDescription staticFileDescription : extension.getStaticFiles().getStaticFileDescriptions()) {
@@ -171,12 +174,17 @@ public class FlintGradlePlugin implements Plugin<Project> {
     }
 
     project.getRepositories().maven(repo -> {
-      repo.setUrl("Mojang");
+      repo.setName("Mojang");
       repo.setUrl(MINECRAFT_MAVEN);
     });
 
+    project.getRepositories().maven(repo -> {
+      repo.setName("Flint");
+      repo.setUrl(FLINT_MAVEN);
+    });
+
     project.getRepositories().maven((repo) -> {
-      repo.setUrl("Internal minecraft");
+      repo.setName("Internal minecraft");
       repo.setUrl(minecraftRepository.getBaseDir());
     });
 
@@ -185,7 +193,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
         continue;
       }
       subProject.getRepositories().maven(repo -> {
-        repo.setUrl("Mojang");
+        repo.setName("Mojang");
         repo.setUrl(MINECRAFT_MAVEN);
       });
 
@@ -201,10 +209,10 @@ public class FlintGradlePlugin implements Plugin<Project> {
    * Handles the given minecraft version and sets up all of the required steps for using it with gradle.
    *
    * @param version The minecraft version to handle
+   * @param type The environment type.
    */
-  private void handleVersion(String version) {
-    // Get the default obfuscation environment, we don't support custom environments currently
-    DeobfuscationEnvironment environment = minecraftRepository.defaultEnvironment(version);
+  private void handleVersion(String version, EnvironmentType type) {
+    DeobfuscationEnvironment environment = minecraftRepository.defaultEnvironment(version, type);
 
     // Get the server and client artifacts
     MavenArtifact client = getClientArtifact(version);
