@@ -30,12 +30,23 @@ fun RepositoryHandler.flintRepository() {
     var bearerToken = System.getenv("FLINT_DISTRIBUTOR_BEARER_TOKEN")
 
     if (bearerToken == null) {
-        bearerToken = project.properties["net.flintmc.distributor.bearer-token"].toString()
+        bearerToken = project.properties["net.flintmc.distributor.bearer-token"]?.toString()
     }
 
     maven {
         setUrl(distributorUrl)
         name = "Flint"
+
+        if(bearerToken != null) {
+            authentication {
+                create<HttpHeaderAuthentication>("header")
+            }
+
+            credentials(HttpHeaderCredentials::class) {
+                name = "Authorization"
+                value = "Bearer $bearerToken"
+            }
+        }
     }
 }
 
