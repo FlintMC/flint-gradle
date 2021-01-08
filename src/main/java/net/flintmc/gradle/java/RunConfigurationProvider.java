@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -114,7 +115,7 @@ public class RunConfigurationProvider {
         // Test if the source set has not been explicitly excluded for the given configuration
         if (!excludedSourceSetsByConfiguration.containsKey(configuration)
             || !excludedSourceSetsByConfiguration.get(configuration).containsKey(sourceSet)
-            || sourceSet
+            || !sourceSet
                 .getName()
                 .equals(
                     "test") // Exclude the test source set, it can be manually included if wanted
@@ -297,19 +298,24 @@ public class RunConfigurationProvider {
     VersionedArguments versionedArguments = new VersionedArguments();
 
     // Ugly hack for legacy versions...
-    if(manifest.getMinecraftArguments() != null) {
+    if (manifest.getMinecraftArguments() != null) {
       String minecraftArguments = manifest.getMinecraftArguments();
 
+      // Arguments take the form of --key ${value} in the manifest
       String[] split = minecraftArguments.split(" ");
       List<ArgumentString> list = new ArrayList<>();
 
-      for (int i = 0; i < split.length; i++) {
-        list.add(new ArgumentString(split[i], split[i + 1], new ArrayList<>()));
-        i += 2;
+      for (int i = 0; i < split.length; i += 2) {
+        // Convert them to the new format, this currently assumes that the value is indeed a variable
+        list.add(new ArgumentString(null, split[i], null));
+        list.add(new ArgumentString(split[i + 1].replace("${", "").replace("}", ""), "", null));
       }
 
       versionedArguments.setGame(list);
-      versionedArguments.setJvm(new ArrayList<>());
+      versionedArguments.setJvm(
+          Collections.singletonList(
+              new ArgumentString(
+                  "natives_directory", "-Djava.library.path=", Collections.emptyList())));
 
       task.setVersionedArguments(versionedArguments);
     } else {

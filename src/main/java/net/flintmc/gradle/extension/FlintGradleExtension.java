@@ -103,7 +103,6 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
     this.flintVersion = parent.flintVersion;
     this.enablePublishing = parent.enablePublishing;
     this.autoConfigurePublishing = parent.autoConfigurePublishing;
-    this.minecraftVersions = new HashSet<>();
   }
 
   /**

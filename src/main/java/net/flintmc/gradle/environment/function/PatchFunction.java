@@ -17,7 +17,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-package net.flintmc.gradle.environment.mcp.function;
+package net.flintmc.gradle.environment.function;
 
 import com.github.difflib.DiffUtils;
 import com.github.difflib.UnifiedDiffUtils;
@@ -25,6 +25,7 @@ import com.github.difflib.patch.Patch;
 import com.github.difflib.patch.PatchFailedException;
 import net.flintmc.gradle.environment.DeobfuscationException;
 import net.flintmc.gradle.environment.DeobfuscationUtilities;
+import net.flintmc.gradle.environment.mcp.function.MCPFunction;
 import net.flintmc.gradle.util.Util;
 
 import java.io.IOException;
@@ -37,7 +38,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
-public class PatchFunction extends MCPFunction {
+public class PatchFunction extends Function {
   private final Path input;
   private final Path patches;
   private final Map<String, Path> indexedPatches;

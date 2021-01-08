@@ -70,7 +70,7 @@ public class RuleChainResolver {
    * @return {@code true} if the rule chain matches or is {@code null}, false otherwise
    */
   public static boolean testRuleChain(List<VersionedRule> rules, Map<String, Object> features) {
-    if (rules == null) {
+    if (rules == null || rules.isEmpty()) {
       return true;
     }
 

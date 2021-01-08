@@ -51,6 +51,7 @@ public class MinecraftRunTask extends JavaExec {
     DEFAULT_VARIABLES.put("user_type", "mojang");
     DEFAULT_VARIABLES.put("launcher_name", "flint-gradle");
     DEFAULT_VARIABLES.put("launcher_version", "3.0.0");
+    DEFAULT_VARIABLES.put("user_properties", "{}");
   }
 
   private String configurationName;

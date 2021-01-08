@@ -41,7 +41,7 @@ import net.flintmc.gradle.environment.function.InjectFunction;
 import net.flintmc.gradle.environment.function.JavaExecutionFunction;
 import net.flintmc.gradle.environment.function.JavaExecutionTemplate;
 import net.flintmc.gradle.environment.function.ListLibrariesFunction;
-import net.flintmc.gradle.environment.mcp.function.PatchFunction;
+import net.flintmc.gradle.environment.function.PatchFunction;
 import net.flintmc.gradle.environment.function.StripFunction;
 import net.flintmc.gradle.json.JsonConverter;
 import net.flintmc.gradle.maven.RemoteMavenRepository;

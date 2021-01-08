@@ -15,6 +15,7 @@ import net.flintmc.gradle.environment.DeobfuscationException;
 import net.flintmc.gradle.environment.DeobfuscationUtilities;
 import net.flintmc.gradle.environment.EnvironmentCacheFileProvider;
 import net.flintmc.gradle.environment.SourceJarProcessor;
+import net.flintmc.gradle.java.exec.JavaExecutionResult;
 import net.flintmc.gradle.maven.SimpleMavenRepository;
 import net.flintmc.gradle.maven.pom.MavenArtifact;
 import net.flintmc.gradle.maven.pom.MavenDependency;
@@ -159,25 +160,25 @@ public class YarnEnvironment extends DefaultDeobfuscationEnvironment {
 
           sourceDir = Util.temporaryDir();
           Util.extractZip(sourcesTargetArtifactPath, sourceDir);
-          /*
-                    if (side.equals("client")) {
 
-                      JavaExecutionResult compilationResult =
-                          utilities.getJavaCompileHelper().compile(sourceDir, clientLibraries, outputPath);
+          if (side.equals("client")) {
 
-                      if (compilationResult.getExitCode() != 0) {
-                        LOGGER.error("Minecraft {} {} failed to recompile", side, version);
-                        LOGGER.error("javac output:");
-                        LOGGER.error(compilationResult.getStdout());
-                        LOGGER.error("javac error:");
-                        LOGGER.error(compilationResult.getStderr());
-                        throw new DeobfuscationException(
-                            String.format("Failed to recompile %s %s", side, version));
-                      } else {
-                        LOGGER.lifecycle("Done!");
-                      }
-                    }
-          */
+            JavaExecutionResult compilationResult =
+                utilities.getJavaCompileHelper().compile(sourceDir, clientLibraries, outputPath);
+
+            if (compilationResult.getExitCode() != 0) {
+              LOGGER.error("Minecraft {} {} failed to recompile", side, version);
+              LOGGER.error("javac output:");
+              LOGGER.error(compilationResult.getStdout());
+              LOGGER.error("javac error:");
+              LOGGER.error(compilationResult.getStderr());
+              throw new DeobfuscationException(
+                  String.format("Failed to recompile %s %s", side, version));
+            } else {
+              LOGGER.lifecycle("Done!");
+            }
+          }
+
           Path pomPath = minecraftRepository.getPomPath(outputArtifact);
 
           if (!Files.exists(pomPath)) {
