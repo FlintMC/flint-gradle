@@ -22,8 +22,8 @@ fun RepositoryHandler.flintRepository() {
 
     if (distributorUrl == null) {
         distributorUrl = project.properties.getOrDefault(
-            "net.flintmc.distributor.url",
-            "https://dist.labymod.net/api/v1/maven/release"
+                "net.flintmc.distributor.url",
+                "https://dist.labymod.net/api/v1/maven/release"
         ).toString()
     }
 
@@ -66,6 +66,8 @@ dependencies {
     implementation(group = "com.fasterxml.jackson.core", name = "jackson-core", version = "2.12.0-rc1")
     implementation(group = "net.flintmc.installer", name = "logic-implementation", version = "1.1.5")
     implementation(group = "net.flintmc.installer", name = "logic", version = "1.1.5")
+
+    implementation(group = "com.cloudbees", name = "diff4j", version = "1.2")
 }
 
 gradlePlugin {

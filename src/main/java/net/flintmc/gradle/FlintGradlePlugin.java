@@ -21,6 +21,7 @@ package net.flintmc.gradle;
 
 import net.flintmc.gradle.environment.DeobfuscationEnvironment;
 import net.flintmc.gradle.extension.FlintGradleExtension;
+import net.flintmc.gradle.extension.FlintPatcherExtension;
 import net.flintmc.gradle.extension.FlintStaticFileDescription;
 import net.flintmc.gradle.java.JarTaskProvider;
 import net.flintmc.gradle.java.JavaPluginInteraction;
@@ -63,6 +64,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
   private MavenArtifactURLCache mavenArtifactURLCache;
 
   private FlintGradleExtension extension;
+  private FlintPatcherExtension patcherExtension;
   private JavaPluginInteraction interaction;
   private MinecraftRepository minecraftRepository;
   private SimpleMavenRepository internalRepository;
@@ -103,6 +105,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
       }
 
       this.extension = project.getExtensions().create(FlintGradleExtension.NAME, FlintGradleExtension.class, this);
+      this.patcherExtension = project.getExtensions().create(FlintPatcherExtension.NAME, FlintPatcherExtension.class, this);
 
       Path flintGradlePath = gradle.getGradleUserHomeDir().toPath().resolve("caches/flint-gradle");
       Path minecraftCache = flintGradlePath.resolve("minecraft-cache");
@@ -291,6 +294,10 @@ public class FlintGradlePlugin implements Plugin<Project> {
    */
   public MavenArtifactURLCache getMavenArtifactURLCache() {
     return mavenArtifactURLCache;
+  }
+
+  public FlintPatcherExtension getPatcherExtension() {
+    return patcherExtension;
   }
 
   public Project getProject() {

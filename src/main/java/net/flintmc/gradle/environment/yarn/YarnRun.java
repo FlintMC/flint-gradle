@@ -6,15 +6,19 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.file.CopyOption;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 import net.flintmc.gradle.environment.DeobfuscationException;
 import net.flintmc.gradle.environment.DeobfuscationUtilities;
 import net.flintmc.gradle.environment.EnvironmentRunnable;
@@ -24,6 +28,7 @@ import net.flintmc.gradle.environment.function.JavaExecutionFunction;
 import net.flintmc.gradle.environment.function.JavaExecutionTemplate;
 import net.flintmc.gradle.environment.function.ListLibrariesFunction;
 import net.flintmc.gradle.environment.function.StripFunction;
+import net.flintmc.gradle.extension.FlintPatcherExtension;
 import net.flintmc.gradle.json.JsonConverter;
 import net.flintmc.gradle.maven.RemoteMavenRepository;
 import net.flintmc.gradle.maven.pom.MavenArtifact;
@@ -57,6 +62,55 @@ public class YarnRun implements EnvironmentRunnable {
     this.utilities = utilities;
     this.yarnPath = yarnPath;
     this.stepsPath = yarnPath.resolve("steps");
+  }
+
+  /**
+   * Extracts the given zip file to the given directory.
+   *
+   * @param zip The path to the zip file to extract
+   * @param targetDir The directory to extract the zip file into
+   * @param options Options to pass to {@link Files#copy(InputStream, Path, CopyOption...)}
+   * @throws IOException If an I/O error occurs while reading or writing files
+   */
+  public void extractZip(Path zip, Path targetDir, CopyOption... options) throws IOException {
+    try (ZipFile zipFile = new ZipFile(zip.toFile())) {
+      // Get a list of all entries
+      Enumeration<? extends ZipEntry> entries = zipFile.entries();
+      while (entries.hasMoreElements()) {
+        ZipEntry entry = entries.nextElement();
+        if (entry.isDirectory()) {
+          // Required directories will be created automatically
+          continue;
+        }
+
+        String name = entry.getName();
+
+        if (name.contains("assets")
+            || name.contains("pack.png")
+            || name.contains("META-INF")
+            || name.contains("log4j2.xml")) {
+          continue;
+        }
+
+        if (name.startsWith("/")) {
+          // Make sure that the entry does not start with a /, else it will corrupt
+          // the Path#resolve result
+          name = name.substring(1);
+        }
+
+        Path targetFile = targetDir.resolve(name);
+        if (!Files.exists(targetFile.getParent())) {
+          // Make sure the parent directories exist
+          Files.createDirectories(targetFile.getParent());
+        }
+
+        try (InputStream entryStream = zipFile.getInputStream(entry)) {
+          // Copy the entire entry to the target file
+
+          if (!targetFile.toFile().exists()) Files.copy(entryStream, targetFile, options);
+        }
+      }
+    }
   }
 
   @Override
@@ -223,80 +277,77 @@ public class YarnRun implements EnvironmentRunnable {
         continue;
       }
 
-
       switch (type) {
-        case "inject": {
-          if (input == null) {
-            throw new IllegalArgumentException("The inject function always requires an input");
+        case "inject":
+          {
+            if (input == null) {
+              throw new IllegalArgumentException("The inject function always requires an input");
+            }
+
+            Path output = createOutput(sideName, name, "jar");
+            values.put("output", output.toString());
+
+            // Construct the inject function
+            InjectFunction function = new InjectFunction(name, output, Paths.get(input), "yarn");
+            sidedSteps.add(function);
+            break;
           }
-
-          Path output = createOutput(sideName, name, "jar");
-          values.put("output", output.toString());
-
-          // Construct the inject function
-          InjectFunction function = new InjectFunction(
-              name,
-              output,
-              Paths.get(input),
-              "yarn"
-          );
-          sidedSteps.add(function);
-          break;
-        }
 
         case "strip":
-        {
-          if (input == null) {
-            throw new IllegalArgumentException("The strip function always requires an input");
+          {
+            if (input == null) {
+              throw new IllegalArgumentException("The strip function always requires an input");
+            }
+
+            if (!variables.containsKey("mappings")) {
+              // This will hopefully never happen
+              throw new IllegalArgumentException(
+                  "The strip functions requires mappings to be supplied");
+            }
+
+            Path output = createOutput(sideName, name, "jar");
+            values.put("output", output.toString());
+
+            // Construct the strip function
+            StripFunction function =
+                new StripFunction(
+                    name,
+                    variables.get("mappings"),
+                    Paths.get(input),
+                    output,
+                    // It is not clear if this value ever appears, but the MCP checks for it, so do
+                    // we
+                    // By default the mode is always whitelist
+                    resolveVariableValue(values.getOrDefault("mode", "whitelist"), sideName, values)
+                        .equalsIgnoreCase("whitelist"));
+
+            sidedSteps.add(function);
+            break;
           }
 
-          if (!variables.containsKey("mappings")) {
-            // This will hopefully never happen
+        case "listLibraries":
+          {
+            Path output = createOutput(sideName, name, "txt");
+            values.put("output", output.toString());
+
+            // Construct the listLibraries function
+            ListLibrariesFunction function = new ListLibrariesFunction(name, output, clientJar);
+
+            sidedSteps.add(function);
+            break;
+          }
+
+        default:
+          {
             throw new IllegalArgumentException(
-                "The strip functions requires mappings to be supplied");
+                "Got task "
+                    + name
+                    + " of type "
+                    + type
+                    + " which is neither "
+                    + "a builtin function or defined via the java functions");
           }
-
-          Path output = createOutput(sideName, name, "jar");
-          values.put("output", output.toString());
-
-          // Construct the strip function
-          StripFunction function =
-              new StripFunction(
-                  name,
-                  variables.get("mappings"),
-                  Paths.get(input),
-                  output,
-                  // It is not clear if this value ever appears, but the MCP checks for it, so do
-                  // we
-                  // By default the mode is always whitelist
-                  resolveVariableValue(values.getOrDefault("mode", "whitelist"), sideName, values)
-                      .equalsIgnoreCase("whitelist"));
-
-          sidedSteps.add(function);
-          break;
-        }
-
-        case "listLibraries": {
-          Path output = createOutput(sideName, name, "txt");
-          values.put("output", output.toString());
-
-          // Construct the listLibraries function
-          ListLibrariesFunction function = new ListLibrariesFunction(
-              name,
-              output,
-              clientJar
-          );
-
-          sidedSteps.add(function);
-          break;
-        }
-
-        default: {
-          throw new IllegalArgumentException("Got task " + name + " of type " + type + " which is neither " +
-              "a builtin function or defined via the java functions");
-        }
       }
-
     }
   }
 
@@ -525,6 +576,18 @@ public class YarnRun implements EnvironmentRunnable {
             sidedSteps.size(),
             step.getName(),
             side);
+      }
+
+      if (side.equals("client") && output.getFileName().toString().contains("decompile")) {
+
+        if (FlintPatcherExtension.HackyPatcherData.isEnabled()) {
+          try {
+            extractZip(output, FlintPatcherExtension.HackyPatcherData.getCleanSource().toPath());
+            extractZip(output, FlintPatcherExtension.HackyPatcherData.getModifiedSource().toPath());
+          } catch (IOException exception) {
+            exception.printStackTrace();
+          }
+        }
       }
     }
 

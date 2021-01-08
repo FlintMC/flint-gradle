@@ -27,17 +27,20 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.CopyOption;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -51,9 +54,8 @@ import java.util.jar.JarFile;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
+import java.util.zip.ZipOutputStream;
 import javax.xml.bind.annotation.adapters.HexBinaryAdapter;
-import net.flintmc.gradle.environment.DeobfuscationException;
-import net.flintmc.gradle.environment.EnvironmentCacheFileProvider;
 import net.flintmc.gradle.json.JsonConverter;
 import net.flintmc.gradle.json.JsonConverterException;
 import net.flintmc.gradle.property.FlintPluginProperties;
@@ -570,6 +572,47 @@ public class Util {
     }
   }
 
+  /**
+   * Zips the {@code input} to a zip file.
+   *
+   * @param input The input which should be zipped.
+   * @param output The output which is zipped.
+   * @throws IOException Is thrown when an I/O error occurs.
+   */
+  public static void toZip(Path input, Path output) throws IOException {
+
+    try (FileOutputStream fileOutputStream = new FileOutputStream(output.toFile());
+        ZipOutputStream zipOutputStream = new ZipOutputStream(fileOutputStream)) {
+
+      Files.walkFileTree(
+          input,
+          new SimpleFileVisitor<Path>() {
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
+                throws IOException {
+              zipOutputStream.putNextEntry(
+                  new ZipEntry(input.relativize(file).toString().replace("\\", "/")));
+              Files.copy(file, zipOutputStream);
+              zipOutputStream.closeEntry();
+              return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
+                throws IOException {
+              zipOutputStream.putNextEntry(new ZipEntry(input.relativize(dir).toString() + "/"));
+              zipOutputStream.closeEntry();
+              return FileVisitResult.CONTINUE;
+            }
+          });
+    }
+  }
+
+  /**
+   * Whether the operation system is a 64-bit system.
+   *
+   * @return {@code true} if the operation system is a 64-bit system, otherwise {@code false}.
+   */
   public static boolean is64Bit() {
     return System.getProperty("os.name").contains("Windows")
         ? System.getenv("ProgramFiles(x86)") != null

@@ -76,6 +76,7 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
 
     this.enablePublishing = true;
     this.autoConfigurePublishing = true;
+    this.minecraftVersions = new HashSet<>();
   }
 
   /**
@@ -102,6 +103,7 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
     this.flintVersion = parent.flintVersion;
     this.enablePublishing = parent.enablePublishing;
     this.autoConfigurePublishing = parent.autoConfigurePublishing;
+    this.minecraftVersions = new HashSet<>();
   }
 
   /**
@@ -110,13 +112,19 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
    * @param minecraftVersions The minecraft versions made available to this project
    */
   public void minecraftVersions(String... minecraftVersions) {
-    this.minecraftVersions = new HashSet<>();
     this.minecraftVersions.addAll(
         Arrays.stream(minecraftVersions)
             .map(
                 minecraftVersion ->
                     new MinecraftVersion(minecraftVersion, EnvironmentType.MOD_CODER_PACK))
             .collect(Collectors.toCollection(CopyOnWriteArraySet::new)));
+  }
+
+  public void minecraftYarnVersions(String... minecraftVersions) {
+    this.minecraftVersions.addAll(
+        Arrays.stream(minecraftVersions)
+            .map(minecraftVersion -> new MinecraftVersion(minecraftVersion, EnvironmentType.YARN))
+            .collect(Collectors.toList()));
   }
 
   /**
