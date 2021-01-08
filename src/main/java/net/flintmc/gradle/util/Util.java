@@ -130,19 +130,19 @@ public class Util {
    * @throws IOException If an I/O error occurs while opening the connection
    */
   public static InputStream getURLStream(OkHttpClient client, URI uri, Project project) throws IOException {
-    if (uri.getScheme().equals("jar") || uri.getScheme().equals("file")) {
+    if(uri.getScheme().equals("jar") || uri.getScheme().equals("file")) {
       return uri.toURL().openStream();
     } else {
       Request.Builder requestBuilder = new Request.Builder()
           .url(uri.toString())
           .get();
 
-      if (project != null) {
+      if(project != null) {
         URI distributorURI = FlintPluginProperties.DISTRIBUTOR_URL.resolve(project);
-        if (distributorURI.getHost().equals(uri.getHost())) {
+        if(distributorURI.getHost().equals(uri.getHost())) {
           // Reaching out to the distributor, add the authorization
           HttpHeaderCredentials credentials = getPublishCredentials(project, false);
-          if (credentials != null) {
+          if(credentials != null) {
             requestBuilder.header(credentials.getName(), credentials.getValue());
           }
         }
@@ -150,7 +150,7 @@ public class Util {
 
       Response response = client.newCall(requestBuilder.build()).execute();
 
-      if (response.code() != 200) {
+      if(response.code() != 200) {
         throw new IOException("Failed to download file from " + uri + ", server responded with "
             + response.code() + " (" + response.message() + ")");
       }
@@ -184,11 +184,11 @@ public class Util {
    */
   public static void download(
       OkHttpClient client, URI uri, Path output, Project project, CopyOption... options) throws IOException {
-    if (!Files.isDirectory(output.getParent())) {
+    if(!Files.isDirectory(output.getParent())) {
       Files.createDirectories(output.getParent());
     }
 
-    try (InputStream stream = getURLStream(client, uri, project)) {
+    try(InputStream stream = getURLStream(client, uri, project)) {
       Files.copy(stream, output, options);
     }
   }
@@ -202,30 +202,30 @@ public class Util {
    * @throws IOException If an I/O error occurs while reading or writing files
    */
   public static void extractZip(Path zip, Path targetDir, CopyOption... options) throws IOException {
-    try (ZipFile zipFile = new ZipFile(zip.toFile())) {
+    try(ZipFile zipFile = new ZipFile(zip.toFile())) {
       // Get a list of all entries
       Enumeration<? extends ZipEntry> entries = zipFile.entries();
-      while (entries.hasMoreElements()) {
+      while(entries.hasMoreElements()) {
         ZipEntry entry = entries.nextElement();
-        if (entry.isDirectory()) {
+        if(entry.isDirectory()) {
           // Required directories will be created automatically
           continue;
         }
 
         String name = entry.getName();
-        if (name.startsWith("/")) {
+        if(name.startsWith("/")) {
           // Make sure that the entry does not start with a /, else it will corrupt
           // the Path#resolve result
           name = name.substring(1);
         }
 
         Path targetFile = targetDir.resolve(name);
-        if (!Files.exists(targetFile.getParent())) {
+        if(!Files.exists(targetFile.getParent())) {
           // Make sure the parent directories exist
           Files.createDirectories(targetFile.getParent());
         }
 
-        try (InputStream entryStream = zipFile.getInputStream(entry)) {
+        try(InputStream entryStream = zipFile.getInputStream(entry)) {
           // Copy the entire entry to the target file
           Files.copy(entryStream, targetFile, options);
         }
@@ -244,7 +244,7 @@ public class Util {
     byte[] buffer = new byte[4096];
 
     int count;
-    while ((count = in.read(buffer)) != -1) {
+    while((count = in.read(buffer)) != -1) {
       out.write(buffer, 0, count);
     }
   }
@@ -264,7 +264,7 @@ public class Util {
     String line;
 
     // Read all lines until we reach the EOS
-    while ((line = reader.readLine()) != null) {
+    while((line = reader.readLine()) != null) {
       lines.add(line);
     }
 
@@ -279,7 +279,7 @@ public class Util {
    * @throws IOException If an I/O exception occurs while writing to the stream
    */
   public static void writeAllLines(List<String> lines, OutputStream out) throws IOException {
-    for (String line : lines) {
+    for(String line : lines) {
       out.write(line.getBytes(StandardCharsets.UTF_8));
       out.write('\n');
     }
@@ -306,21 +306,21 @@ public class Util {
    */
   public static void nukeDirectory(Path toNuke, boolean ignoreFailures) throws IOException {
     // Walk all files in the given dir
-    try (Stream<Path> allFiles = Files.walk(toNuke)) {
+    try(Stream<Path> allFiles = Files.walk(toNuke)) {
       // Sort them so the files come before the directories
       allFiles.sorted(Comparator.reverseOrder()).forEach((path) -> {
         try {
           // Delete the single file
           Files.delete(path);
-        } catch (IOException e) {
-          if (!ignoreFailures) {
+        } catch(IOException e) {
+          if(!ignoreFailures) {
             // If failures should not be ignore, throw an unchecked IO exception which will
             // be caught by the block later down
             throw new UncheckedIOException(e);
           }
         }
       });
-    } catch (UncheckedIOException e) {
+    } catch(UncheckedIOException e) {
       // Rethrow the cause of the exception which has been thrown above
       throw e.getCause();
     }
@@ -336,8 +336,8 @@ public class Util {
   public static URI concatURI(URI base, String... paths) {
     URI current = base;
 
-    for (String path : paths) {
-      while (path.startsWith("/")) {
+    for(String path : paths) {
+      while(path.startsWith("/")) {
         path = path.substring(1);
       }
 
@@ -371,12 +371,12 @@ public class Util {
    * @throws IOException If an I/O error occurs
    */
   public static boolean isPackageJar(File file) throws IOException {
-    if (file.getName().endsWith(".jar")) {
+    if(file.getName().endsWith(".jar")) {
       // Needs to be a jar file
       return false;
     }
 
-    try (JarFile jarFile = new JarFile(file)) {
+    try(JarFile jarFile = new JarFile(file)) {
       return jarFile.getJarEntry("manifest.json") != null;
     }
   }
@@ -390,18 +390,18 @@ public class Util {
    * @throws JsonConverterException If the {@code manifest.json} can't be read as a {@link PackageModel}
    */
   public static PackageModel getPackageModelFromJar(File file) throws IOException, JsonConverterException {
-    if (!file.getName().endsWith(".jar")) {
+    if(!file.getName().endsWith(".jar")) {
       // Needs to be a jar file
       return null;
     }
 
-    try (JarFile jarFile = new JarFile(file)) {
+    try(JarFile jarFile = new JarFile(file)) {
       JarEntry entry = jarFile.getJarEntry("manifest.json");
-      if (entry == null) {
+      if(entry == null) {
         return null;
       }
 
-      try (InputStream stream = jarFile.getInputStream(entry)) {
+      try(InputStream stream = jarFile.getInputStream(entry)) {
         return JsonConverter.PACKAGE_MODEL_SERIALIZER.fromString(readAll(stream), PackageModel.class);
       }
     }
@@ -410,6 +410,7 @@ public class Util {
   /**
    * Retrieves the per project unique cache directory.
    *
+   * @param project The project to retrieve the cache directory for
    * @return The per project unique cache directory
    */
   public static File getProjectCacheDir(Project project) {
@@ -437,13 +438,13 @@ public class Util {
     Set<File> files = new HashSet<>();
 
     // Iterate all collections
-    for (FileCollection collection : collections) {
-      if (collection == null) {
+    for(FileCollection collection : collections) {
+      if(collection == null) {
         // Skip collections which are null
         continue;
       }
 
-      for (File file : collection.getFiles()) {
+      for(File file : collection.getFiles()) {
         // Make sure every path is absolute to reliably detect duplicates
         files.add(file.getAbsoluteFile());
       }
@@ -461,9 +462,23 @@ public class Util {
    * @throws IOException If an I/O error occurs while reading
    */
   public static String readAll(InputStream stream) throws IOException {
-    try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+    try(ByteArrayOutputStream out = new ByteArrayOutputStream()) {
       copyStream(stream, out);
       return out.toString("UTF-8");
+    }
+  }
+
+  /**
+   * Reads an entire stream as a byte array.
+   *
+   * @param stream The stream to read
+   * @return The read data as a byte array
+   * @throws IOException If an I/O error occurs while reading
+   */
+  public static byte[] readAllAsBytes(InputStream stream) throws IOException {
+    try(ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+      copyStream(stream, out);
+      return out.toByteArray();
     }
   }
 
@@ -481,7 +496,7 @@ public class Util {
 
     // Retrieve either a bearer or publish token
     String bearerToken = FlintPluginProperties.DISTRIBUTOR_BEARER_TOKEN.resolve(project);
-    if (bearerToken != null) {
+    if(bearerToken != null) {
       publishCredentials.setName("Authorization");
       publishCredentials.setValue("Bearer " + bearerToken);
     } else {
@@ -490,7 +505,7 @@ public class Util {
           publishTokenProperty.require(project, notAvailableSolution) :
           publishTokenProperty.resolve(project);
 
-      if (publishToken == null) {
+      if(publishToken == null) {
         return null;
       }
 
@@ -502,21 +517,6 @@ public class Util {
   }
 
   /**
-   * Writes all remaining data of an {@link InputStream} to a byte array.
-   *
-   * @param stream the stream to read from
-   * @return the written byte array
-   * @throws IOException If the first byte cannot be read for any reason
-   *                     other than the end of the file, if the input stream has been closed, or
-   *                     if some other I/O error occurs.
-   */
-  public static byte[] toByteArray(InputStream stream) throws IOException {
-    byte[] data = new byte[stream.available()];
-    stream.read(data);
-    return data;
-  }
-
-  /**
    * Hashes a given byte array and writes it as an hex string
    *
    * @param data the data to convert
@@ -525,7 +525,7 @@ public class Util {
   public static String md5Hex(byte[] data) {
     try {
       return new BigInteger(1, MessageDigest.getInstance("MD5").digest(data)).toString(16);
-    } catch (NoSuchAlgorithmException e) {
+    } catch(NoSuchAlgorithmException e) {
       throw new IllegalStateException("MD5 digest not available");
     }
   }

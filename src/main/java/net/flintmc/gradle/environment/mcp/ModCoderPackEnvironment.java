@@ -296,12 +296,6 @@ public class ModCoderPackEnvironment implements DeobfuscationEnvironment {
     }
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * @param client
-   * @param server
-   */
   @Override
   public Collection<MavenArtifact> getCompileArtifacts(MavenArtifact client, MavenArtifact server) {
     String version = getVersion(client, server);
@@ -311,12 +305,6 @@ public class ModCoderPackEnvironment implements DeobfuscationEnvironment {
     return Collections.singletonList(getJoinedArtifact(version));
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * @param client
-   * @param server
-   */
   @Override
   public Collection<MavenArtifact> getRuntimeArtifacts(MavenArtifact client, MavenArtifact server) {
     String version = getVersion(client, server);

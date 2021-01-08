@@ -38,6 +38,7 @@ public class InjectFunction extends MCPFunction {
    *
    * @param name   The name of the function
    * @param output The output of the function
+   * @param input  The input of the function
    */
   public InjectFunction(String name, Path input, Path output) {
     super(name, output);
@@ -49,14 +50,14 @@ public class InjectFunction extends MCPFunction {
    */
   @Override
   public void execute(DeobfuscationUtilities utilities) throws DeobfuscationException {
-    try (
+    try(
         ZipInputStream inputStream = new ZipInputStream(Files.newInputStream(input));
         ZipOutputStream outputStream = new ZipOutputStream(Files.newOutputStream(output))
     ) {
       ZipEntry entry;
 
       // Iterate over every entry
-      while ((entry = inputStream.getNextEntry()) != null) {
+      while((entry = inputStream.getNextEntry()) != null) {
         // Copy the entry one to one
         outputStream.putNextEntry(entry);
         Util.copyStream(inputStream, outputStream);
@@ -69,7 +70,7 @@ public class InjectFunction extends MCPFunction {
       entry = new ZipEntry(".mcp-processed");
       outputStream.putNextEntry(entry);
       outputStream.closeEntry();
-    } catch (IOException e) {
+    } catch(IOException e) {
       throw new DeobfuscationException("Failed to execute inject function named " + name, e);
     }
   }
