@@ -468,6 +468,20 @@ public class Util {
   }
 
   /**
+   * Reads an entire stream as a byte array.
+   *
+   * @param stream The stream to read
+   * @return The read data as a byte array
+   * @throws IOException If an I/O error occurs while reading
+   */
+  public static byte[] readAllAsBytes(InputStream stream) throws IOException {
+    try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+      copyStream(stream, out);
+      return out.toByteArray();
+    }
+  }
+
+  /**
    * Retrieves the HTTP header credentials used for publishing.
    *
    * @param project              The project to use for resolving the properties
@@ -499,21 +513,6 @@ public class Util {
     }
 
     return publishCredentials;
-  }
-
-  /**
-   * Writes all remaining data of an {@link InputStream} to a byte array.
-   *
-   * @param stream the stream to read from
-   * @return the written byte array
-   * @throws IOException If the first byte cannot be read for any reason
-   *                     other than the end of the file, if the input stream has been closed, or
-   *                     if some other I/O error occurs.
-   */
-  public static byte[] toByteArray(InputStream stream) throws IOException {
-    byte[] data = new byte[stream.available()];
-    stream.read(data);
-    return data;
   }
 
   /**
