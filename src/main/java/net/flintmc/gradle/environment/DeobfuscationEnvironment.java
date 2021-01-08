@@ -44,12 +44,13 @@ public interface DeobfuscationEnvironment {
   String name();
 
   /**
-   * Runs the deobfuscation on the given client and server artifacts. One of the 2 artifacts may be
-   * null, but never both at the same time.
+   * Runs the deobfuscation on the given client and server artifacts. One of the 2 artifacts may be null, but never both
+   * at the same time.
    *
    * @param clientPom The client artifact, may be null if serverPom is not null
    * @param serverPom The client artifact, may be null if clientPom is not null
    * @param utilities Various utilities useful during deobfuscation
+   * @throws DeobfuscationException If the deobfuscation fails
    */
   void runDeobfuscation(MavenPom clientPom, MavenPom serverPom, DeobfuscationUtilities utilities)
       throws DeobfuscationException;

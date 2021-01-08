@@ -62,6 +62,7 @@ public class FlintStaticFileDescription implements Named {
    * Sets the source this static file should be obtained from.
    *
    * @param source The source of this static file
+   * @throws URISyntaxException If source is not a valid URL
    */
   public void from(Object source) throws URISyntaxException {
     if(source instanceof URI) {

@@ -42,8 +42,12 @@ public class JavaExecutionFunction extends Function {
   /**
    * Constructs a new java execution function with the given name, input and output.
    *
-   * @param name   The name of the function
-   * @param output The output of the function
+   * @param name               The name of the function
+   * @param output             The output of the function
+   * @param executionArtifact  The artifact to execute
+   * @param artifactRepository The repository to retrieve the artifact from if it is missing
+   * @param args               The arguments to pass to the executable
+   * @param jvmArgs            The arguments to pass to the JVM executing the executable
    */
   public JavaExecutionFunction(
       String name,
@@ -66,19 +70,19 @@ public class JavaExecutionFunction extends Function {
   @Override
   public void prepare(DeobfuscationUtilities utilities) throws DeobfuscationException {
     SimpleMavenRepository localRepository = utilities.getInternalRepository();
-    if (!localRepository.isInstalled(executionArtifact)) {
+    if(!localRepository.isInstalled(executionArtifact)) {
       // Retrieve utilities
       MavenArtifactDownloader downloader = utilities.getDownloader();
 
       // The artifact is not installed already, install it
-      if (artifactRepository == null) {
+      if(artifactRepository == null) {
         // Can't download anything in offline mode
         throw new DeobfuscationException("Missing artifact " + executionArtifact + " in local repository, " +
             "but working in offline mode");
       }
 
       boolean setupSource = !downloader.hasSource(artifactRepository);
-      if (setupSource) {
+      if(setupSource) {
         // The download has the source not set already, add it now
         downloader.addSource(artifactRepository);
       }
@@ -86,11 +90,11 @@ public class JavaExecutionFunction extends Function {
       try {
         // Install the artifact including dependencies
         downloader.installAll(executionArtifact, localRepository, true);
-      } catch (IOException | MavenResolveException e) {
+      } catch(IOException | MavenResolveException e) {
         throw new DeobfuscationException("Failed to install execution artifact", e);
       }
 
-      if (setupSource) {
+      if(setupSource) {
         // We added the source, clean up afterwards
         downloader.removeSource(artifactRepository);
       }
@@ -117,18 +121,18 @@ public class JavaExecutionFunction extends Function {
           args,
           jvmArgs
       );
-    } catch (IOException e) {
+    } catch(IOException e) {
       // This happens if the execution fails, but has nothing to do with the exit code
       throw new DeobfuscationException("Failed to execute java process for function " + name);
     }
 
-    if (result.getExitCode() != 0) {
+    if(result.getExitCode() != 0) {
       // The process failed to execute properly
       Path standardOutput;
       try {
         // Try to save the standard output
         standardOutput = saveOutput("stdout", result.getStdout());
-      } catch (IOException e) {
+      } catch(IOException e) {
         throw new DeobfuscationException("Failed to save standard output after process failed, " +
             "some is very wrong", e);
       }
@@ -137,7 +141,7 @@ public class JavaExecutionFunction extends Function {
       try {
         // Try to save the standard error
         standardError = saveOutput("stderr", result.getStderr());
-      } catch (IOException e) {
+      } catch(IOException e) {
         throw new DeobfuscationException("Failed to save standard error after process failed, " +
             "some is very wrong", e);
       }

@@ -193,16 +193,13 @@ public class ModCoderPackEnvironment extends DefaultDeobfuscationEnvironment {
         try {
           Files.createDirectories(sourcesTargetArtifactPath.getParent());
         } catch (IOException e) {
-          throw new DeobfuscationException(
-              "Failed to create parent directory for target artifact", e);
+          throw new DeobfuscationException("Failed to create parent directory for target artifact", e);
         }
       }
 
       try {
         // Remap the SRG source jar to deobfuscated jar
         LOGGER.lifecycle("Processing SRG to deobfuscated for {} {}", side, version);
-        LOGGER.lifecycle("Input: " + srgArtifactPath.toAbsolutePath().toString());
-        LOGGER.lifecycle("Output: " + sourcesTargetArtifactPath.toAbsolutePath().toString());
         processor.process(srgArtifactPath, sourcesTargetArtifactPath);
       } catch (IOException e) {
         throw new DeobfuscationException("Failed to process " + side + " " + version, e);
@@ -262,8 +259,7 @@ public class ModCoderPackEnvironment extends DefaultDeobfuscationEnvironment {
             }
           }
         } catch (IOException e) {
-          throw new DeobfuscationException(
-              "IO exception while deobfuscating " + side + " " + version, e);
+          throw new DeobfuscationException("IO exception while deobfuscating " + side + " " + version, e);
         } finally {
           if (sourceDir != null) {
             try {

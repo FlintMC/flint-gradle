@@ -22,9 +22,9 @@ fun RepositoryHandler.flintRepository() {
 
     if (distributorUrl == null) {
         distributorUrl = project.properties.getOrDefault(
-                "net.flintmc.distributor.url",
-                "https://dist.labymod.net/api/v1/maven/release"
-        ).toString()
+            "net.flintmc.distributor.url",
+            "https://dist.labymod.net"
+        ).toString() + "/api/v1/maven/release"
     }
 
     var bearerToken = System.getenv("FLINT_DISTRIBUTOR_BEARER_TOKEN")
@@ -36,6 +36,17 @@ fun RepositoryHandler.flintRepository() {
     maven {
         setUrl(distributorUrl)
         name = "Flint"
+
+        if(bearerToken != null) {
+            authentication {
+                create<HttpHeaderAuthentication>("header")
+            }
+
+            credentials(HttpHeaderCredentials::class) {
+                name = "Authorization"
+                value = "Bearer $bearerToken"
+            }
+        }
     }
 }
 
@@ -55,7 +66,7 @@ repositories {
     mavenCentral()
 }
 
-version = System.getenv().getOrDefault("VERSION", "2.8.2")
+version = System.getenv().getOrDefault("VERSION", "2.7.1")
 
 dependencies {
     implementation(group = "com.fasterxml.jackson.core", name = "jackson-core", version = "2.11.1")
@@ -64,6 +75,10 @@ dependencies {
     implementation(group = "com.squareup.okhttp3", name = "okhttp", version = "4.10.0-RC1")
     implementation(group = "io.github.java-diff-utils", name = "java-diff-utils", version = "4.7")
     implementation(group = "com.fasterxml.jackson.core", name = "jackson-core", version = "2.12.0-rc1")
+
+    implementation(group = "net.flintmc.installer", name = "logic-implementation", version = "1.1.10")
+    implementation(group = "net.flintmc.installer", name = "frontend-gui", version = "1.1.10")
+    implementation(group = "net.flintmc.installer", name = "logic", version = "1.1.10")
     implementation(group = "net.flintmc.installer", name = "logic-implementation", version = "1.1.5")
     implementation(group = "net.flintmc.installer", name = "logic", version = "1.1.5")
 

@@ -19,15 +19,12 @@
 
 package net.flintmc.gradle.manifest.tasks;
 
-import net.flintmc.gradle.FlintGradleException;
 import net.flintmc.gradle.manifest.cache.StaticFileChecksums;
 import net.flintmc.gradle.manifest.data.ManifestStaticFile;
 import net.flintmc.gradle.manifest.data.ManifestStaticFileInput;
 import net.flintmc.gradle.util.MaybeNull;
 import net.flintmc.gradle.util.Util;
 import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
 import org.gradle.api.DefaultTask;
 import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.InputFiles;
@@ -139,7 +136,7 @@ public class GenerateStaticFileChecksumsTask extends DefaultTask {
       for(URI remoteFile : getRemoteFiles()) {
         // Calculate the checksum
         try(InputStream stream = Util.getURLStream(httpClient, remoteFile)) {
-          checksums.add(remoteFile, Util.md5Hex(Util.toByteArray(stream)));
+          checksums.add(remoteFile, Util.md5Hex(Util.readAllAsBytes(stream)));
         }
       }
     } else {

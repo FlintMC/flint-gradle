@@ -45,8 +45,10 @@ public class PatchFunction extends MCPFunction {
   /**
    * Constructs a new Patch function with the given name and output.
    *
-   * @param name   The name of the function
-   * @param output The output of the function
+   * @param name    The name of the function
+   * @param output  The output of the function
+   * @param input   The input of the function
+   * @param patches The path to the patches to apply
    */
   public PatchFunction(String name, Path input, Path output, Path patches) {
     super(name, output);
@@ -74,7 +76,7 @@ public class PatchFunction extends MCPFunction {
                 .replace("\\", "/");
             indexedPatches.put(relativePath, patchPath);
           });
-    } catch (IOException e) {
+    } catch(IOException e) {
       throw new DeobfuscationException("IO error occurred while collecting patch files", e);
     }
   }
@@ -84,17 +86,17 @@ public class PatchFunction extends MCPFunction {
    */
   @Override
   public void execute(DeobfuscationUtilities utilities) throws DeobfuscationException {
-    try (
+    try(
         ZipInputStream inputStream = new ZipInputStream(Files.newInputStream(input));
         ZipOutputStream outputStream = new ZipOutputStream(Files.newOutputStream(output))
     ) {
       ZipEntry entry;
       // Iterate all entries
-      while ((entry = inputStream.getNextEntry()) != null) {
+      while((entry = inputStream.getNextEntry()) != null) {
         outputStream.putNextEntry(entry);
 
         // Check if there is a patch for the entry if it is not a directory
-        if (!entry.isDirectory() && indexedPatches.containsKey(entry.getName())) {
+        if(!entry.isDirectory() && indexedPatches.containsKey(entry.getName())) {
           // Parse the patch file (unified diff format)
           Patch<String> patch =
               UnifiedDiffUtils.parseUnifiedDiff(Files.readAllLines(indexedPatches.get(entry.getName())));
@@ -104,7 +106,7 @@ public class PatchFunction extends MCPFunction {
 
           try {
             patchedLines = DiffUtils.patch(originalLines, patch);
-          } catch (PatchFailedException e) {
+          } catch(PatchFailedException e) {
             throw new DeobfuscationException("Failed to patch file " + entry.getName(), e);
           }
 
@@ -117,7 +119,7 @@ public class PatchFunction extends MCPFunction {
         // Make sure to close the entry
         outputStream.closeEntry();
       }
-    } catch (IOException e) {
+    } catch(IOException e) {
       throw new DeobfuscationException("IO error occurred while patching", e);
     }
   }
