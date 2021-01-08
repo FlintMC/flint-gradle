@@ -294,10 +294,9 @@ public class RunConfigurationProvider {
     task.setVersionType(manifest.getType().name().toLowerCase());
 
     // Set arguments
-    System.out.println(version + " -> ");
-
     VersionedArguments versionedArguments = new VersionedArguments();
 
+    // Ugly hack for legacy versions...
     if(manifest.getMinecraftArguments() != null) {
       String minecraftArguments = manifest.getMinecraftArguments();
 

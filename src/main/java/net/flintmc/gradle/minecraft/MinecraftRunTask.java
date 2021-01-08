@@ -195,9 +195,6 @@ public class MinecraftRunTask extends JavaExec {
       return;
     }
 
-    System.out.println(versionedArguments.getJvm());
-    System.out.println(versionedArguments.getGame());
-
     // Resolve the commandline arguments
     List<String> jvmArgs = resolveArguments(versionedArguments.getJvm(), variables, true);
     List<String> programArgs = resolveArguments(versionedArguments.getGame(), variables, false);
