@@ -19,6 +19,8 @@
 
 package net.flintmc.gradle;
 
+import java.util.ArrayList;
+import java.util.List;
 import net.flintmc.gradle.environment.DeobfuscationEnvironment;
 import net.flintmc.gradle.extension.FlintGradleExtension;
 import net.flintmc.gradle.extension.FlintPatcherExtension;
@@ -28,6 +30,7 @@ import net.flintmc.gradle.java.JavaPluginInteraction;
 import net.flintmc.gradle.java.RunConfigurationProvider;
 import net.flintmc.gradle.manifest.ManifestConfigurator;
 import net.flintmc.gradle.manifest.dev.DevelopmentStaticFiles;
+import net.flintmc.gradle.maven.FlintResolutionStrategy;
 import net.flintmc.gradle.maven.MavenArtifactDownloader;
 import net.flintmc.gradle.maven.RemoteMavenRepository;
 import net.flintmc.gradle.maven.SimpleMavenRepository;
@@ -53,6 +56,8 @@ import java.util.Collection;
 public class FlintGradlePlugin implements Plugin<Project> {
   public static final String MINECRAFT_TASK_GROUP = "minecraft";
 
+  private static final List<String> FORCED_DEPENDENCIES = new ArrayList<>();
+
   private static final String MINECRAFT_MAVEN = "https://libraries.minecraft.net";
   private static final String MAVEN_CENTRAL = "https://repo.maven.apache.org/maven2/";
   private static final String FLINT_MAVEN = "https://dist.labymod.net/api/v1/maven/release/";
@@ -73,6 +78,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
   private JarTaskProvider jarTaskProvider;
   private ManifestConfigurator manifestConfigurator;
 
+  private FlintResolutionStrategy flintResolutionStrategy;
   private FlintGradlePlugin parentPlugin;
 
   @Override
@@ -91,6 +97,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
     }
 
     this.interaction = new JavaPluginInteraction(project);
+    this.flintResolutionStrategy = new FlintResolutionStrategy();
 
     if (this.parentPlugin == null) {
       Gradle gradle = project.getGradle();
@@ -202,6 +209,8 @@ public class FlintGradlePlugin implements Plugin<Project> {
 
       subProject.getPluginManager().apply(getClass());
     }
+
+    this.flintResolutionStrategy.forceDependencies(project);
 
     runConfigurationProvider.installSourceSets(project, extension);
     jarTaskProvider.installTasks(project, extension);
