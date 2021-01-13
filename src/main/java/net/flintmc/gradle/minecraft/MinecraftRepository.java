@@ -232,7 +232,6 @@ public class MinecraftRepository extends SimpleMavenRepository {
     }
 
     try {
-      LOGGER.info("Run deobfuscation...");
       environment.runDeobfuscation(
           clientJar,
           serverJar,
@@ -247,7 +246,6 @@ public class MinecraftRepository extends SimpleMavenRepository {
     } catch (DeobfuscationException e) {
       throw new FlintGradleException("Failed to deobfuscate " + version, e);
     }
-    LOGGER.info("Deobfuscation fished...");
   }
 
   private MavenPom installVariantIfExist(
@@ -302,6 +300,11 @@ public class MinecraftRepository extends SimpleMavenRepository {
           // If the library does not match the rule chain ignore it,
           // the generated POM's will only be used locally and thus only need to
           // match the current environment
+          continue;
+        }
+
+        // If no artifact is found in the library, the library can be skipped.
+        if(library.getDownloads().getArtifact() == null) {
           continue;
         }
 

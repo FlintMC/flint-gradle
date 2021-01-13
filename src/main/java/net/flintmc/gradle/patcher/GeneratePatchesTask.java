@@ -20,10 +20,8 @@
 package net.flintmc.gradle.patcher;
 
 import com.cloudbees.diff.Diff;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.StringReader;
+
+import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -35,8 +33,8 @@ import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import net.flintmc.gradle.util.Util;
+import org.apache.commons.io.IOUtils;
 import org.gradle.api.DefaultTask;
-import org.gradle.api.UncheckedIOException;
 import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.Optional;
 import org.gradle.api.tasks.OutputDirectory;
@@ -73,13 +71,11 @@ public class GeneratePatchesTask extends DefaultTask {
       sourcesDirectory.mkdirs();
     }
 
-    File cleanOutput = new File(sourcesDirectory, "clean.zip");
-    cleanOutput.createNewFile();
+    File cleanOutput = createZipFile(sourcesDirectory, "clean.zip");
 
     Util.toZip(this.cleanSource.toPath(), cleanOutput.toPath());
 
-    File modifiedOutput = new File(sourcesDirectory, "modified.zip");
-    modifiedOutput.createNewFile();
+    File modifiedOutput = createZipFile(sourcesDirectory, "modified.zip");
 
     Util.toZip(this.modifiedSource.toPath(), modifiedOutput.toPath());
 
@@ -145,8 +141,15 @@ public class GeneratePatchesTask extends DefaultTask {
         });
   }
 
-  private Path getPath(List<Path> collect, Path path) {
-    return collect.stream().filter(col -> col.equals(path)).findFirst().orElse(null);
+  private File createZipFile(File directory, String fileName) throws IOException {
+    File file = new File(directory, fileName);
+
+    if(file.exists()) {
+      file.delete();
+    }
+    file.createNewFile();
+
+    return file;
   }
 
   /**
@@ -164,12 +167,12 @@ public class GeneratePatchesTask extends DefaultTask {
     String originalRelative = original == null ? "/dev/null" : this.originalPrefix + name;
     String modifiedRelative = modified == null ? "/dev/null" : this.modifiedPrefix + name;
     String originalData =
-        original == null ? "" : new String(Util.toByteArray(original), StandardCharsets.UTF_8);
+        original == null ? "" :Util.readAll(original);
     String modifiedData =
-        modified == null ? "" : new String(Util.toByteArray(modified), StandardCharsets.UTF_8);
+        modified == null ? "" : Util.readAll(modified);
 
     Diff differences =
-        Diff.diff(new StringReader(originalData), new StringReader(modifiedData), true);
+        Diff.diff(new StringReader(originalData), new StringReader(modifiedData), false);
 
     if (!differences.isEmpty()) {
       return differences
@@ -198,11 +201,12 @@ public class GeneratePatchesTask extends DefaultTask {
       parent.mkdirs();
     }
 
-    try {
-      Files.write(patch.toPath(), differences.getBytes(StandardCharsets.UTF_8));
+    try(FileOutputStream fileOutputStream = new FileOutputStream(patch)) {
+      IOUtils.write(differences, fileOutputStream);
     } catch (IOException exception) {
-      throw new UncheckedIOException(exception);
+      exception.printStackTrace();
     }
+
   }
 
   /**

@@ -116,6 +116,10 @@ public class YarnEnvironment extends DefaultDeobfuscationEnvironment {
               String.format("The minecraft dependency %s is not installed!", dependency));
         }
 
+        if(dependency.getArtifactId().equalsIgnoreCase("guava")) {
+          dependency.setVersion("21.0");
+        }
+
         clientLibraries.add(internalRepository.getArtifactPath(dependency));
       }
     }

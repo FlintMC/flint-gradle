@@ -432,6 +432,7 @@ public class Util {
   /**
    * Retrieves the per project unique cache directory.
    *
+   * @param project The project to retrieves the unique cache directory.
    * @return The per project unique cache directory
    */
   public static File getProjectCacheDir(Project project) {
@@ -535,21 +536,6 @@ public class Util {
     }
 
     return publishCredentials;
-  }
-
-  /**
-   * Writes all remaining data of an {@link InputStream} to a byte array.
-   *
-   * @param stream the stream to read from
-   * @return the written byte array
-   * @throws IOException If the first byte cannot be read for any reason
-   *                     other than the end of the file, if the input stream has been closed, or
-   *                     if some other I/O error occurs.
-   */
-  public static byte[] toByteArray(InputStream stream) throws IOException {
-    byte[] data = new byte[stream.available()];
-    stream.read(data);
-    return data;
   }
 
   /**
