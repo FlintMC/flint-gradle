@@ -39,9 +39,9 @@ import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
 public class PatchFunction extends Function {
-  private final Path input;
-  private final Path patches;
-  private final Map<String, Path> indexedPatches;
+  protected final Path input;
+  protected final Path patches;
+  protected final Map<String, Path> indexedPatches;
 
   /**
    * Constructs a new Patch function with the given name and output.

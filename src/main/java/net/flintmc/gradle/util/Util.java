@@ -33,6 +33,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
+import java.util.Base64;
 import java.util.zip.ZipOutputStream;
 import net.flintmc.gradle.json.JsonConverter;
 import net.flintmc.gradle.json.JsonConverterException;
@@ -586,6 +587,16 @@ public class Util {
             }
           });
     }
+  }
+
+  public static byte[] deserializeLines(List<String> lines) throws IOException {
+    ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+
+    for (String line : lines) {
+      byteArrayOutputStream.write(Base64.getDecoder().decode(line));
+    }
+
+    return byteArrayOutputStream.toByteArray();
   }
 
   /**

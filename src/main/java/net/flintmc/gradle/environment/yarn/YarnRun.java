@@ -48,6 +48,7 @@ import net.flintmc.gradle.environment.function.JavaExecutionTemplate;
 import net.flintmc.gradle.environment.function.ListLibrariesFunction;
 import net.flintmc.gradle.environment.function.PatchFunction;
 import net.flintmc.gradle.environment.function.StripFunction;
+import net.flintmc.gradle.environment.yarn.function.YarnPatchFunction;
 import net.flintmc.gradle.extension.FlintPatcherExtension;
 import net.flintmc.gradle.json.JsonConverter;
 import net.flintmc.gradle.maven.RemoteMavenRepository;
@@ -370,7 +371,7 @@ public class YarnRun implements EnvironmentRunnable {
           Path patches = Paths.get(resolveVariableValue("{patches}", sideName, values));
 
           // Construct the patch function
-          PatchFunction function = new PatchFunction(name, Paths.get(input), output, patches);
+          PatchFunction function = new YarnPatchFunction(name, Paths.get(input), output, patches);
 
           sidedSteps.add(function);
           break;

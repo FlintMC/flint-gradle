@@ -34,6 +34,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import net.flintmc.gradle.util.Util;
 import org.apache.commons.io.IOUtils;
+import org.apache.groovy.json.internal.IO;
 import org.gradle.api.DefaultTask;
 import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.Optional;
@@ -167,9 +168,9 @@ public class GeneratePatchesTask extends DefaultTask {
     String originalRelative = original == null ? "/dev/null" : this.originalPrefix + name;
     String modifiedRelative = modified == null ? "/dev/null" : this.modifiedPrefix + name;
     String originalData =
-        original == null ? "" :Util.readAll(original);
+        original == null ? "" : new String(IOUtils.toByteArray(original), StandardCharsets.UTF_8);
     String modifiedData =
-        modified == null ? "" : Util.readAll(modified);
+        modified == null ? "" : new String(IOUtils.toByteArray(modified), StandardCharsets.UTF_8);
 
     Diff differences =
         Diff.diff(new StringReader(originalData), new StringReader(modifiedData), false);

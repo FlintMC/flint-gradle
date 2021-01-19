@@ -21,6 +21,7 @@ package net.flintmc.gradle.minecraft;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.format.DateTimeFormatter;
@@ -65,7 +66,7 @@ public class MinecraftRepository extends SimpleMavenRepository {
   private static final Logger LOGGER = Logging.getLogger(MinecraftRepository.class);
   private static final String VERSION_MANIFEST_URL =
       "https://launchermeta.mojang.com/mc/game/version_manifest.json";
-  private static final String MAPPINGS_URL = "http://localhost/labymod/index_new.json";
+  private static final String MAPPINGS_URL = "https://dl.labymod.net/mappings/index_new.json";
 
   private static final DateTimeFormatter DATE_TIME_FORMATTER =
       DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.US);
@@ -77,6 +78,7 @@ public class MinecraftRepository extends SimpleMavenRepository {
 
   private final Path environmentBasePath;
   private final Path versionsDir;
+  private final Path runDir;
   private final VersionsManifest manifest;
   private final Map<String, EnvironmentInput> versionedEnvironments;
 
@@ -98,6 +100,7 @@ public class MinecraftRepository extends SimpleMavenRepository {
 
     this.environmentBasePath = cacheDir.resolve("environments");
     this.versionsDir = cacheDir.resolve("versions");
+    this.runDir = cacheDir.resolve("run");
 
     if (!Files.isDirectory(versionsDir)) {
       Files.createDirectories(versionsDir);
@@ -273,6 +276,41 @@ public class MinecraftRepository extends SimpleMavenRepository {
     if (includeDependencies) {
       try {
         downloader.installAll(pom, internalRepository, false);
+
+        for (MavenDependency dependency : pom.getDependencies()) {
+
+          if (dependency.getClassifier() != null && dependency.getClassifier().contains("natives")) {
+
+            // Get a natives directory to extract the natives libraries.
+            Path nativeDirectory = runDir.resolve("natives").resolve(manifest.getId());
+            if (!Files.isDirectory(nativeDirectory)) {
+              // Try to create the natives directory if it does not exist
+              try {
+                Files.createDirectories(nativeDirectory);
+              } catch (IOException exception) {
+                throw new FlintGradleException(
+                        "Failed to create natives dir for " + manifest.getId(), exception);
+              }
+            }
+
+            Path nativeLibrary = runDir.resolve(String.format(
+                    "../../internal-repository/%s/%s/%s/%s-%s-%s.jar",
+                    dependency.getGroupId().replace(".", "/"),
+                    dependency.getArtifactId(),
+                    dependency.getVersion(),
+                    dependency.getArtifactId(),
+                    dependency.getVersion(),
+                    dependency.getClassifier()));
+
+            if (Files.exists(nativeLibrary)) {
+              try {
+                Util.extractZip(nativeLibrary, nativeDirectory);
+              } catch (FileAlreadyExistsException exception) {
+                //
+              }
+            }
+          }
+        }
       } catch (MavenResolveException e) {
         // This will hopefully never happen
         throw new FlintGradleException("Minecraft " + variant + " has broken dependencies", e);
@@ -303,13 +341,8 @@ public class MinecraftRepository extends SimpleMavenRepository {
           continue;
         }
 
-        // If no artifact is found in the library, the library can be skipped.
-        if(library.getDownloads().getArtifact() == null) {
-          continue;
-        }
-
         MavenArtifact artifact = library.getName();
-        if (!mavenArtifacts.contains(artifact)) {
+        if (!mavenArtifacts.contains(artifact) && library.getDownloads().getArtifact() != null) {
           // Found a new dependency, add it to the POM
           pom.addDependency(new MavenDependency(artifact, MavenDependencyScope.COMPILE));
           mavenArtifacts.add(artifact);
@@ -320,7 +353,8 @@ public class MinecraftRepository extends SimpleMavenRepository {
           // The dependency has a native variant, construct a new artifact with the native
           // classifier
           MavenArtifact nativeArtifact = new MavenArtifact(artifact);
-          nativeArtifact.setClassifier(nativeClassifier.replace("${arch}", Util.is64Bit() ? "64" : "32"));
+          nativeArtifact.setClassifier(
+              nativeClassifier.replace("${arch}", Util.is64Bit() ? "64" : "32"));
 
           if (!mavenArtifacts.contains(nativeArtifact)) {
             // If the native dependency is not added already, add it to the POM
