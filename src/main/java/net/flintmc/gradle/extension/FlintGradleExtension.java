@@ -109,7 +109,9 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
    * Overwrites the minecraft versions this project contains modules for.
    *
    * @param minecraftVersions The minecraft versions made available to this project
+   * @deprecated Has been deprecated since we use yarn but also both mcp mappings.
    */
+  @Deprecated
   public void minecraftVersions(String... minecraftVersions) {
     this.minecraftVersions.addAll(
         Arrays.stream(minecraftVersions)
@@ -119,6 +121,25 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
             .collect(Collectors.toCollection(CopyOnWriteArraySet::new)));
   }
 
+  /**
+   * Overwrites the minecraft versions this project contains modules for.
+   *
+   * @param minecraftVersions The minecraft versions made available to this project
+   */
+  public void minecraftModCoderPackVersions(String... minecraftVersions) {
+    this.minecraftVersions.addAll(
+        Arrays.stream(minecraftVersions)
+            .map(
+                minecraftVersion ->
+                    new MinecraftVersion(minecraftVersion, EnvironmentType.MOD_CODER_PACK))
+            .collect(Collectors.toList()));
+  }
+
+  /**
+   * Overwrites the minecraft versions this project contains modules for.
+   *
+   * @param minecraftVersions The minecraft versions made available to this project
+   */
   public void minecraftYarnVersions(String... minecraftVersions) {
     this.minecraftVersions.addAll(
         Arrays.stream(minecraftVersions)
