@@ -19,26 +19,28 @@
 
 package net.flintmc.gradle.environment.function;
 
-import com.github.difflib.DiffUtils;
-import com.github.difflib.UnifiedDiffUtils;
-import com.github.difflib.patch.Patch;
-import com.github.difflib.patch.PatchFailedException;
-import net.flintmc.gradle.environment.DeobfuscationException;
-import net.flintmc.gradle.environment.DeobfuscationUtilities;
-import net.flintmc.gradle.environment.mcp.function.MCPFunction;
-import net.flintmc.gradle.util.Util;
-
+import com.cloudbees.diff.PatchException;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
-import java.util.zip.ZipOutputStream;
+import java.util.zip.ZipFile;
+import net.flintmc.gradle.environment.DeobfuscationException;
+import net.flintmc.gradle.environment.DeobfuscationUtilities;
+import net.flintmc.gradle.patch.PatchContextual;
+import net.flintmc.gradle.patch.PatchFile;
+import net.flintmc.gradle.patch.context.ZipPatchContextProvider;
+import net.flintmc.gradle.patch.report.HunkReport;
+import net.flintmc.gradle.patch.report.PatchReport;
+import org.gradle.api.logging.Logger;
+import org.gradle.api.logging.Logging;
 
 public class PatchFunction extends Function {
+  private static final Logger LOGGER = Logging.getLogger(PatchFunction.class);
+
   protected final Path input;
   protected final Path patches;
   protected final Map<String, Path> indexedPatches;
@@ -46,9 +48,9 @@ public class PatchFunction extends Function {
   /**
    * Constructs a new Patch function with the given name and output.
    *
-   * @param name    The name of the function
-   * @param output  The output of the function
-   * @param input   The input of the function
+   * @param name The name of the function
+   * @param output The output of the function
+   * @param input The input of the function
    * @param patches The path to the patches to apply
    */
   public PatchFunction(String name, Path input, Path output, Path patches) {
@@ -58,9 +60,7 @@ public class PatchFunction extends Function {
     this.indexedPatches = new HashMap<>();
   }
 
-  /**
-   * {@inheritDoc}
-   */
+  /** {@inheritDoc} */
   @Override
   public void prepare(DeobfuscationUtilities utilities) throws DeobfuscationException {
     try {
@@ -68,60 +68,100 @@ public class PatchFunction extends Function {
       Files.walk(patches)
           .filter(Files::isRegularFile)
           .filter(path -> path.getFileName().toString().endsWith(".java.patch"))
-          .forEach((patchPath) -> {
-            // Calculate the relative path of the patch file
-            String relativePath = patches
-                .relativize(patchPath)
-                .toString()
-                .replace(".patch", "")
-                .replace("\\", "/");
-            indexedPatches.put(relativePath, patchPath);
-          });
-    } catch(IOException e) {
+          .forEach(
+              (patchPath) -> {
+                // Calculate the relative path of the patch file
+                String relativePath =
+                    patches
+                        .relativize(patchPath)
+                        .toString()
+                        .replace(".patch", "")
+                        .replace("\\", "/");
+                indexedPatches.put(relativePath, patchPath);
+              });
+    } catch (IOException e) {
       throw new DeobfuscationException("IO error occurred while collecting patch files", e);
     }
   }
 
-  /**
-   * {@inheritDoc}
-   */
+  /** {@inheritDoc} */
   @Override
   public void execute(DeobfuscationUtilities utilities) throws DeobfuscationException {
-    try(
-        ZipInputStream inputStream = new ZipInputStream(Files.newInputStream(input));
-        ZipOutputStream outputStream = new ZipOutputStream(Files.newOutputStream(output))
-    ) {
-      ZipEntry entry;
-      // Iterate all entries
-      while((entry = inputStream.getNextEntry()) != null) {
-        outputStream.putNextEntry(entry);
+    try (ZipFile zipFile = new ZipFile(this.input.toFile())) {
+      ZipPatchContextProvider zipPatchContextProvider = new ZipPatchContextProvider(zipFile);
 
-        // Check if there is a patch for the entry if it is not a directory
-        if(!entry.isDirectory() && indexedPatches.containsKey(entry.getName())) {
-          // Parse the patch file (unified diff format)
-          Patch<String> patch =
-              UnifiedDiffUtils.parseUnifiedDiff(Files.readAllLines(indexedPatches.get(entry.getName())));
+      Boolean reduce =
+          Files.walk(this.patches)
+              .filter(
+                  patch ->
+                      Files.isRegularFile(patch)
+                          && patch.getFileName().toString().endsWith(".patch"))
+              .map(
+                  patch -> {
+                    boolean success = true;
+                    PatchContextual patchContextual =
+                        PatchContextual.create(
+                            PatchFile.from(patch.toFile()), zipPatchContextProvider);
+                    patchContextual.setCanonicalization(false, false);
+                    patchContextual.setMaximalAttempt(10);
 
-          List<String> originalLines = Util.readAllLines(inputStream);
-          List<String> patchedLines;
+                    String name =
+                        patch
+                            .toFile()
+                            .getAbsolutePath()
+                            .substring(this.patches.toFile().getAbsolutePath().length() + 1);
 
-          try {
-            patchedLines = DiffUtils.patch(originalLines, patch);
-          } catch(PatchFailedException e) {
-            throw new DeobfuscationException("Failed to patch file " + entry.getName(), e);
-          }
+                    try {
+                      LOGGER.info("Apply Patch: {}", name);
 
-          Util.writeAllLines(patchedLines, outputStream);
-        } else {
-          // If there is no patch or the entry is a directory simply copy the entry
-          Util.copyStream(inputStream, outputStream);
-        }
+                      List<PatchReport> result = patchContextual.patch(false);
 
-        // Make sure to close the entry
-        outputStream.closeEntry();
+                      for (int i = 0; i < result.size(); i++) {
+                        PatchReport report = result.get(i);
+
+                        if (!report.getStatus().isSuccess()) {
+                          LOGGER.info("Apply Patch: {}", name);
+                          success = false;
+
+                          for (int j = 0; j < report.getHunkReports().size(); j++) {
+                            HunkReport hunkReport = report.getHunkReports().get(j);
+
+                            if (hunkReport.hasFailed()) {
+                              if (hunkReport.getFailure() == null) {
+                                LOGGER.error(
+                                    "\tHunk #{} Failed @{} Fuzz: {}",
+                                    hunkReport.getHunkIdentifier(),
+                                    hunkReport.getIndex(),
+                                    hunkReport.getFailure());
+                              } else {
+                                LOGGER.error(
+                                    "\tHunk #{} Failed: {}",
+                                    hunkReport.getHunkIdentifier(),
+                                    hunkReport.getFailure().getMessage());
+                              }
+                            }
+                          }
+                        }
+                      }
+
+                    } catch (PatchException exception) {
+                      LOGGER.error("\tPatch Name: " + name);
+                      LOGGER.error("\t\t" + exception.getMessage());
+                    } catch (IOException exception) {
+                      LOGGER.error("Patch Name: " + name);
+                      throw new UncheckedIOException(exception);
+                    }
+
+                    return success;
+                  })
+              .reduce(true, (a, b) -> a && b);
+
+      if (reduce) {
+        zipPatchContextProvider.save(this.output.toFile());
       }
-    } catch(IOException e) {
-      throw new DeobfuscationException("IO error occurred while patching", e);
+
+    } catch (IOException exception) {
+      throw new DeobfuscationException(exception);
     }
   }
 }
