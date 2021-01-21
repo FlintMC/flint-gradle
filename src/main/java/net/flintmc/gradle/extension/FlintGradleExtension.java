@@ -46,6 +46,7 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
 
   private final FlintGradlePlugin plugin;
   private final FlintRunsExtension runsExtension;
+  private final FlintResolutionStrategyExtension resolutionStrategyExtension;
   private final FlintStaticFilesExtension staticFilesExtension;
   private final FlintSelfInstallerExtension selfInstallerExtension;
 
@@ -71,6 +72,7 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
     this.minecraftVersions = new HashSet<>();
     this.projectFilter = p -> p.getPluginManager().hasPlugin("java");
     this.runsExtension = new FlintRunsExtension();
+    this.resolutionStrategyExtension = new FlintResolutionStrategyExtension();
     this.staticFilesExtension = new FlintStaticFilesExtension(plugin.getProject());
     this.selfInstallerExtension = new FlintSelfInstallerExtension();
 
@@ -90,6 +92,7 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
     this.minecraftVersions = new HashSet<>(parent.minecraftVersions);
     this.projectFilter = parent.projectFilter;
     this.runsExtension = new FlintRunsExtension(parent.runsExtension);
+    this.resolutionStrategyExtension = new FlintResolutionStrategyExtension();
     this.staticFilesExtension =
         new FlintStaticFilesExtension(
             plugin.getProject()); // TODO: Should static files be inherited too?
@@ -331,6 +334,18 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
   public FlintRunsExtension runs(Action<FlintRunsExtension> action) {
     action.execute(this.runsExtension);
     return this.runsExtension;
+  }
+
+  /**
+   * Configures the resolution strategy extension of this extension with the given action.
+   *
+   * @param action The action to use for configuration
+   * @return The configured resolution strategy extension of this extension
+   */
+  public FlintResolutionStrategyExtension resolutionStrategy(
+      Action<FlintResolutionStrategyExtension> action) {
+    action.execute(this.resolutionStrategyExtension);
+    return this.resolutionStrategyExtension;
   }
 
   /**

@@ -19,8 +19,12 @@
 
 package net.flintmc.gradle;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.net.URI;
+import java.nio.file.Path;
+import java.util.Collection;
+import javax.annotation.Nonnull;
 import net.flintmc.gradle.environment.DeobfuscationEnvironment;
 import net.flintmc.gradle.extension.FlintGradleExtension;
 import net.flintmc.gradle.extension.FlintPatcherExtension;
@@ -46,17 +50,8 @@ import org.gradle.api.Plugin;
 import org.gradle.api.Project;
 import org.gradle.api.invocation.Gradle;
 
-import javax.annotation.Nonnull;
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.net.URI;
-import java.nio.file.Path;
-import java.util.Collection;
-
 public class FlintGradlePlugin implements Plugin<Project> {
   public static final String MINECRAFT_TASK_GROUP = "minecraft";
-
-  private static final List<String> FORCED_DEPENDENCIES = new ArrayList<>();
 
   private static final String MINECRAFT_MAVEN = "https://libraries.minecraft.net";
   private static final String MAVEN_CENTRAL = "https://repo.maven.apache.org/maven2/";
@@ -78,7 +73,6 @@ public class FlintGradlePlugin implements Plugin<Project> {
   private JarTaskProvider jarTaskProvider;
   private ManifestConfigurator manifestConfigurator;
 
-  private FlintResolutionStrategy flintResolutionStrategy;
   private FlintGradlePlugin parentPlugin;
 
   @Override
@@ -97,7 +91,6 @@ public class FlintGradlePlugin implements Plugin<Project> {
     }
 
     this.interaction = new JavaPluginInteraction(project);
-    this.flintResolutionStrategy = new FlintResolutionStrategy();
 
     if (this.parentPlugin == null) {
       Gradle gradle = project.getGradle();
@@ -161,7 +154,10 @@ public class FlintGradlePlugin implements Plugin<Project> {
 
     this.manifestConfigurator = new ManifestConfigurator(this);
     interaction.setup();
-    project.afterEvaluate((p) -> extension.ensureConfigured());
+    project.afterEvaluate((p) -> {
+      extension.ensureConfigured();
+      FlintResolutionStrategy.getInstance().forceResolutionStrategy(p);
+    });
   }
 
   /**
@@ -210,7 +206,6 @@ public class FlintGradlePlugin implements Plugin<Project> {
       subProject.getPluginManager().apply(getClass());
     }
 
-    this.flintResolutionStrategy.forceDependencies(project);
 
     runConfigurationProvider.installSourceSets(project, extension);
     jarTaskProvider.installTasks(project, extension);
