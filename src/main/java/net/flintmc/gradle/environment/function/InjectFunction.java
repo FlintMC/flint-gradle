@@ -17,11 +17,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-package net.flintmc.gradle.environment.mcp.function;
-
-import net.flintmc.gradle.environment.DeobfuscationException;
-import net.flintmc.gradle.environment.DeobfuscationUtilities;
-import net.flintmc.gradle.util.Util;
+package net.flintmc.gradle.environment.function;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -29,49 +25,52 @@ import java.nio.file.Path;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
+import net.flintmc.gradle.environment.DeobfuscationException;
+import net.flintmc.gradle.environment.DeobfuscationUtilities;
+import net.flintmc.gradle.util.Util;
 
-public class InjectFunction extends MCPFunction {
+public class InjectFunction extends Function {
+
   private final Path input;
+  private final String environmentName;
 
   /**
-   * Constructs a new Inject function with the given name, input and output.
+   * Constructs a new function with the given {@code name} and {@code output}.
    *
-   * @param name   The name of the function
-   * @param output The output of the function
-   * @param input  The input of the function
+   * @param name The name of the function.
+   * @param output The output of the function.
+   * @param input The input of the function.
+   * @param environmentName The environment name of the function.
    */
-  public InjectFunction(String name, Path input, Path output) {
+  public InjectFunction(String name, Path output, Path input, String environmentName) {
     super(name, output);
     this.input = input;
+    this.environmentName = environmentName;
   }
 
-  /**
-   * {@inheritDoc}
-   */
+  /** {@inheritDoc} */
   @Override
   public void execute(DeobfuscationUtilities utilities) throws DeobfuscationException {
-    try(
-        ZipInputStream inputStream = new ZipInputStream(Files.newInputStream(input));
-        ZipOutputStream outputStream = new ZipOutputStream(Files.newOutputStream(output))
-    ) {
+
+    try (ZipInputStream inputStream = new ZipInputStream(Files.newInputStream(this.input));
+        ZipOutputStream outputStream = new ZipOutputStream(Files.newOutputStream(this.output))) {
+
       ZipEntry entry;
 
-      // Iterate over every entry
-      while((entry = inputStream.getNextEntry()) != null) {
-        // Copy the entry one to one
+      while ((entry = inputStream.getNextEntry()) != null) {
         outputStream.putNextEntry(entry);
+
         Util.copyStream(inputStream, outputStream);
 
-        // Make sure to close the entry
         outputStream.closeEntry();
       }
 
-      // Add our marker entry
-      entry = new ZipEntry(".mcp-processed");
+      entry = new ZipEntry("." + this.environmentName + "-processed");
       outputStream.putNextEntry(entry);
       outputStream.closeEntry();
-    } catch(IOException e) {
-      throw new DeobfuscationException("Failed to execute inject function named " + name, e);
+    } catch (IOException exception) {
+      throw new DeobfuscationException(
+          "Failed to execute inject function named " + name, exception);
     }
   }
 }

@@ -20,6 +20,7 @@
 package net.flintmc.gradle.java.interop;
 
 import net.flintmc.gradle.extension.FlintGradleExtension;
+import net.flintmc.gradle.minecraft.data.environment.MinecraftVersion;
 import org.gradle.api.Action;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.dsl.DependencyHandler;
@@ -52,13 +53,15 @@ public class FlintDependencyAdder implements BiConsumer<String, Action<Dependenc
     // The extension needs be configured by now
     extension.ensureConfigured();
 
-    if(!extension.getMinecraftVersions().contains(version)) {
-      throw new IllegalArgumentException("Can't define dependencies for a minecraft version not part of the project");
+    for (MinecraftVersion minecraftVersion : extension.getMinecraftVersions()) {
+      if(minecraftVersion.getVersion().equals(version)) {
+        // Retrieve or create a dependency handler proxy
+        DependencyHandler handler = proxiedDependencyHandlers.computeIfAbsent(version, this::createProxy);
+        dependencyHandlerAction.execute(handler);
+        return;
+      }
     }
 
-    // Retrieve or create a dependency handler proxy
-    DependencyHandler handler = proxiedDependencyHandlers.computeIfAbsent(version, this::createProxy);
-    dependencyHandlerAction.execute(handler);
   }
 
   /**

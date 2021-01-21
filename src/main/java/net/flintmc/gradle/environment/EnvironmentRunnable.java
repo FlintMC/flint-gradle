@@ -17,17 +17,31 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-package net.flintmc.gradle.minecraft.data.environment;
+package net.flintmc.gradle.environment;
 
-public class EnvironmentInput {
-  private ModCoderPackInput modCoderPack;
-  private YarnInput yarn;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.nio.file.Path;
 
-  public ModCoderPackInput getModCoderPack() {
-    return modCoderPack;
-  }
+public interface EnvironmentRunnable {
 
-  public YarnInput getYarn() {
-    return yarn;
-  }
+  void loadData() throws FileNotFoundException, IOException;
+
+  /**
+   * Prepares all steps for of the given side for execution.
+   *
+   * @param side The side to prepare the steps for.
+   * @throws DeobfuscationException If a step fails to prepare.
+   */
+  void prepare(String side) throws DeobfuscationException;
+
+  /**
+   * Runs all steps for the given side driving the run to completion.
+   *
+   * @param side The side to execute the steps of.
+   * @return The output of the last step.
+   * @throws DeobfuscationException If a step fails to run.
+   */
+  Path execute(String side) throws DeobfuscationException;
+
 }

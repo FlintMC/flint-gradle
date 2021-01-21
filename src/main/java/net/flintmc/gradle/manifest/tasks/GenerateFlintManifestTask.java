@@ -19,6 +19,8 @@
 
 package net.flintmc.gradle.manifest.tasks;
 
+import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.stream.Collectors;
 import net.flintmc.gradle.FlintGradleException;
 import net.flintmc.gradle.extension.FlintGradleExtension;
 import net.flintmc.gradle.manifest.cache.BoundMavenDependencies;
@@ -26,6 +28,7 @@ import net.flintmc.gradle.manifest.cache.StaticFileChecksums;
 import net.flintmc.gradle.manifest.data.*;
 import net.flintmc.gradle.manifest.dev.DevelopmentStaticFiles;
 import net.flintmc.gradle.maven.pom.MavenArtifact;
+import net.flintmc.gradle.minecraft.data.environment.MinecraftVersion;
 import net.flintmc.gradle.property.FlintPluginProperties;
 import net.flintmc.installer.impl.repository.models.DependencyDescriptionModel;
 import net.flintmc.installer.impl.repository.models.InternalModelSerializer;
@@ -204,7 +207,9 @@ public class GenerateFlintManifestTask extends DefaultTask {
    */
   @Input
   public Set<String> getMinecraftVersions() {
-    return getExtension().getMinecraftVersions();
+    return this.getExtension().getMinecraftVersions().stream()
+        .map(MinecraftVersion::getVersion)
+        .collect(Collectors.toCollection(CopyOnWriteArraySet::new));
   }
 
   /**

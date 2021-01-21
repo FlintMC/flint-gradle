@@ -24,6 +24,17 @@ import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.JsonNode;
+import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.UncheckedIOException;
+import java.util.Base64;
+import java.util.zip.ZipOutputStream;
 import net.flintmc.gradle.json.JsonConverter;
 import net.flintmc.gradle.json.JsonConverterException;
 import net.flintmc.gradle.property.FlintPluginProperties;
@@ -41,11 +52,19 @@ import java.math.BigInteger;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.CopyOption;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.Enumeration;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.stream.Stream;
@@ -54,21 +73,22 @@ import java.util.zip.ZipFile;
 
 public class Util {
   /**
-   * Converts the given long into a byte array. Reverse operation of {@link #longFromByteArray(byte[])}.
+   * Converts the given long into a byte array. Reverse operation of {@link
+   * #longFromByteArray(byte[])}.
    *
    * @param l The long to convert into a byte array
    * @return A 8 byte array containing the long
    */
   public static byte[] longToByteArray(long l) {
-    return new byte[]{
-        (byte) l,
-        (byte) (l >> 8),
-        (byte) (l >> 16),
-        (byte) (l >> 24),
-        (byte) (l >> 32),
-        (byte) (l >> 40),
-        (byte) (l >> 48),
-        (byte) (l >> 56)
+    return new byte[] {
+      (byte) l,
+      (byte) (l >> 8),
+      (byte) (l >> 16),
+      (byte) (l >> 24),
+      (byte) (l >> 32),
+      (byte) (l >> 40),
+      (byte) (l >> 48),
+      (byte) (l >> 56)
     };
   }
 
@@ -93,9 +113,9 @@ public class Util {
    * Reads a {@link JsonNode} into an object using Jackson
    *
    * @param target The type of the target object
-   * @param root   The node to convert into an object
-   * @param ctxt   The context to use for error reporting and such
-   * @param <T>    The type of the target object
+   * @param root The node to convert into an object
+   * @param ctxt The context to use for error reporting and such
+   * @param <T> The type of the target object
    * @return The target object constructed from `root`
    * @throws IOException If any error occurs constructing the object
    */
@@ -112,7 +132,7 @@ public class Util {
    * Opens a stream to read from the given URL.
    *
    * @param client The {@link OkHttpClient} to use for opening the connection
-   * @param uri    The URI to open
+   * @param uri The URI to open
    * @return An input stream to read the data from
    * @throws IOException If an I/O error occurs while opening the connection
    */
@@ -123,26 +143,28 @@ public class Util {
   /**
    * Opens a stream to read from the given URL.
    *
-   * @param client  The {@link OkHttpClient} to use for opening the connection
-   * @param uri     The URI to open
-   * @param project The project to use for resolving authentication, or {@code null}, if authentication can be ignored
+   * @param client The {@link OkHttpClient} to use for opening the connection
+   * @param uri The URI to open
+   * @param project The project to use for resolving authentication, or {@code null}, if
+   *     authentication can be ignored
    * @return An input stream to read the data from
    * @throws IOException If an I/O error occurs while opening the connection
    */
-  public static InputStream getURLStream(OkHttpClient client, URI uri, Project project) throws IOException {
-    if(uri.getScheme().equals("jar") || uri.getScheme().equals("file")) {
+  public static InputStream getURLStream(OkHttpClient client, URI uri, Project project)
+      throws IOException {
+    if (uri.getScheme().equals("jar") || uri.getScheme().equals("file")) {
       return uri.toURL().openStream();
     } else {
       Request.Builder requestBuilder = new Request.Builder()
           .url(uri.toString())
           .get();
 
-      if(project != null) {
+      if (project != null) {
         URI distributorURI = FlintPluginProperties.DISTRIBUTOR_URL.resolve(project);
-        if(distributorURI.getHost().equals(uri.getHost())) {
+        if (distributorURI.getHost().equals(uri.getHost())) {
           // Reaching out to the distributor, add the authorization
           HttpHeaderCredentials credentials = getPublishCredentials(project, false);
-          if(credentials != null) {
+          if (credentials != null) {
             requestBuilder.header(credentials.getName(), credentials.getValue());
           }
         }
@@ -184,11 +206,11 @@ public class Util {
    */
   public static void download(
       OkHttpClient client, URI uri, Path output, Project project, CopyOption... options) throws IOException {
-    if(!Files.isDirectory(output.getParent())) {
+    if (!Files.isDirectory(output.getParent())) {
       Files.createDirectories(output.getParent());
     }
 
-    try(InputStream stream = getURLStream(client, uri, project)) {
+    try (InputStream stream = getURLStream(client, uri, project)) {
       Files.copy(stream, output, options);
     }
   }
@@ -202,30 +224,30 @@ public class Util {
    * @throws IOException If an I/O error occurs while reading or writing files
    */
   public static void extractZip(Path zip, Path targetDir, CopyOption... options) throws IOException {
-    try(ZipFile zipFile = new ZipFile(zip.toFile())) {
+    try (ZipFile zipFile = new ZipFile(zip.toFile())) {
       // Get a list of all entries
       Enumeration<? extends ZipEntry> entries = zipFile.entries();
-      while(entries.hasMoreElements()) {
+      while (entries.hasMoreElements()) {
         ZipEntry entry = entries.nextElement();
-        if(entry.isDirectory()) {
+        if (entry.isDirectory()) {
           // Required directories will be created automatically
           continue;
         }
 
         String name = entry.getName();
-        if(name.startsWith("/")) {
+        if (name.startsWith("/")) {
           // Make sure that the entry does not start with a /, else it will corrupt
           // the Path#resolve result
           name = name.substring(1);
         }
 
         Path targetFile = targetDir.resolve(name);
-        if(!Files.exists(targetFile.getParent())) {
+        if (!Files.exists(targetFile.getParent())) {
           // Make sure the parent directories exist
           Files.createDirectories(targetFile.getParent());
         }
 
-        try(InputStream entryStream = zipFile.getInputStream(entry)) {
+        try (InputStream entryStream = zipFile.getInputStream(entry)) {
           // Copy the entire entry to the target file
           Files.copy(entryStream, targetFile, options);
         }
@@ -244,7 +266,7 @@ public class Util {
     byte[] buffer = new byte[4096];
 
     int count;
-    while((count = in.read(buffer)) != -1) {
+    while ((count = in.read(buffer)) != -1) {
       out.write(buffer, 0, count);
     }
   }
@@ -264,7 +286,7 @@ public class Util {
     String line;
 
     // Read all lines until we reach the EOS
-    while((line = reader.readLine()) != null) {
+    while ((line = reader.readLine()) != null) {
       lines.add(line);
     }
 
@@ -279,7 +301,7 @@ public class Util {
    * @throws IOException If an I/O exception occurs while writing to the stream
    */
   public static void writeAllLines(List<String> lines, OutputStream out) throws IOException {
-    for(String line : lines) {
+    for (String line : lines) {
       out.write(line.getBytes(StandardCharsets.UTF_8));
       out.write('\n');
     }
@@ -306,21 +328,21 @@ public class Util {
    */
   public static void nukeDirectory(Path toNuke, boolean ignoreFailures) throws IOException {
     // Walk all files in the given dir
-    try(Stream<Path> allFiles = Files.walk(toNuke)) {
+    try (Stream<Path> allFiles = Files.walk(toNuke)) {
       // Sort them so the files come before the directories
       allFiles.sorted(Comparator.reverseOrder()).forEach((path) -> {
         try {
           // Delete the single file
           Files.delete(path);
-        } catch(IOException e) {
-          if(!ignoreFailures) {
+        } catch (IOException e) {
+          if (!ignoreFailures) {
             // If failures should not be ignore, throw an unchecked IO exception which will
             // be caught by the block later down
             throw new UncheckedIOException(e);
           }
         }
       });
-    } catch(UncheckedIOException e) {
+    } catch (UncheckedIOException e) {
       // Rethrow the cause of the exception which has been thrown above
       throw e.getCause();
     }
@@ -336,8 +358,8 @@ public class Util {
   public static URI concatURI(URI base, String... paths) {
     URI current = base;
 
-    for(String path : paths) {
-      while(path.startsWith("/")) {
+    for (String path : paths) {
+      while (path.startsWith("/")) {
         path = path.substring(1);
       }
 
@@ -349,12 +371,13 @@ public class Util {
   }
 
   /**
-   * Used for completely erasing the type of a variable. Sometimes Java does not allow casting back target type easily,
-   * especially when a wildcard is used. In this case this method may help to force the type to fit.
-   * <p>
-   * <b>Use with care! This essentially circumvents all type checking, you have been warned!</b>
+   * Used for completely erasing the type of a variable. Sometimes Java does not allow casting back
+   * target type easily, especially when a wildcard is used. In this case this method may help to
+   * force the type to fit.
    *
-   * @param in  The object to cast
+   * <p><b>Use with care! This essentially circumvents all type checking, you have been warned!</b>
+   *
+   * @param in The object to cast
    * @param <T> The type to cast to
    * @return in
    */
@@ -371,12 +394,12 @@ public class Util {
    * @throws IOException If an I/O error occurs
    */
   public static boolean isPackageJar(File file) throws IOException {
-    if(file.getName().endsWith(".jar")) {
+    if (file.getName().endsWith(".jar")) {
       // Needs to be a jar file
       return false;
     }
 
-    try(JarFile jarFile = new JarFile(file)) {
+    try (JarFile jarFile = new JarFile(file)) {
       return jarFile.getJarEntry("manifest.json") != null;
     }
   }
@@ -390,18 +413,18 @@ public class Util {
    * @throws JsonConverterException If the {@code manifest.json} can't be read as a {@link PackageModel}
    */
   public static PackageModel getPackageModelFromJar(File file) throws IOException, JsonConverterException {
-    if(!file.getName().endsWith(".jar")) {
+    if (file.getName().endsWith(".jar")) {
       // Needs to be a jar file
       return null;
     }
 
-    try(JarFile jarFile = new JarFile(file)) {
+    try (JarFile jarFile = new JarFile(file)) {
       JarEntry entry = jarFile.getJarEntry("manifest.json");
-      if(entry == null) {
+      if (entry == null) {
         return null;
       }
 
-      try(InputStream stream = jarFile.getInputStream(entry)) {
+      try (InputStream stream = jarFile.getInputStream(entry)) {
         return JsonConverter.PACKAGE_MODEL_SERIALIZER.fromString(readAll(stream), PackageModel.class);
       }
     }
@@ -410,7 +433,7 @@ public class Util {
   /**
    * Retrieves the per project unique cache directory.
    *
-   * @param project The project to retrieve the cache directory for
+   * @param project The project to retrieves the unique cache directory.
    * @return The per project unique cache directory
    */
   public static File getProjectCacheDir(Project project) {
@@ -438,13 +461,13 @@ public class Util {
     Set<File> files = new HashSet<>();
 
     // Iterate all collections
-    for(FileCollection collection : collections) {
-      if(collection == null) {
+    for (FileCollection collection : collections) {
+      if (collection == null) {
         // Skip collections which are null
         continue;
       }
 
-      for(File file : collection.getFiles()) {
+      for (File file : collection.getFiles()) {
         // Make sure every path is absolute to reliably detect duplicates
         files.add(file.getAbsoluteFile());
       }
@@ -462,7 +485,7 @@ public class Util {
    * @throws IOException If an I/O error occurs while reading
    */
   public static String readAll(InputStream stream) throws IOException {
-    try(ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+    try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
       copyStream(stream, out);
       return out.toString("UTF-8");
     }
@@ -496,7 +519,7 @@ public class Util {
 
     // Retrieve either a bearer or publish token
     String bearerToken = FlintPluginProperties.DISTRIBUTOR_BEARER_TOKEN.resolve(project);
-    if(bearerToken != null) {
+    if (bearerToken != null) {
       publishCredentials.setName("Authorization");
       publishCredentials.setValue("Bearer " + bearerToken);
     } else {
@@ -505,7 +528,7 @@ public class Util {
           publishTokenProperty.require(project, notAvailableSolution) :
           publishTokenProperty.resolve(project);
 
-      if(publishToken == null) {
+      if (publishToken == null) {
         return null;
       }
 
@@ -528,5 +551,62 @@ public class Util {
     } catch(NoSuchAlgorithmException e) {
       throw new IllegalStateException("MD5 digest not available");
     }
+  }
+
+  /**
+   * Zips the {@code input} to a zip file.
+   *
+   * @param input The input which should be zipped.
+   * @param output The output which is zipped.
+   * @throws IOException Is thrown when an I/O error occurs.
+   */
+  public static void toZip(Path input, Path output) throws IOException {
+
+    try (FileOutputStream fileOutputStream = new FileOutputStream(output.toFile());
+        ZipOutputStream zipOutputStream = new ZipOutputStream(fileOutputStream)) {
+
+      Files.walkFileTree(
+          input,
+          new SimpleFileVisitor<Path>() {
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
+                throws IOException {
+              zipOutputStream.putNextEntry(
+                  new ZipEntry(input.relativize(file).toString().replace("\\", "/")));
+              Files.copy(file, zipOutputStream);
+              zipOutputStream.closeEntry();
+              return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
+                throws IOException {
+              zipOutputStream.putNextEntry(new ZipEntry(input.relativize(dir).toString() + "/"));
+              zipOutputStream.closeEntry();
+              return FileVisitResult.CONTINUE;
+            }
+          });
+    }
+  }
+
+  public static byte[] deserializeLines(List<String> lines) throws IOException {
+    ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+
+    for (String line : lines) {
+      byteArrayOutputStream.write(Base64.getDecoder().decode(line));
+    }
+
+    return byteArrayOutputStream.toByteArray();
+  }
+
+  /**
+   * Whether the operation system is a 64-bit system.
+   *
+   * @return {@code true} if the operation system is a 64-bit system, otherwise {@code false}.
+   */
+  public static boolean is64Bit() {
+    return System.getProperty("os.name").contains("Windows")
+        ? System.getenv("ProgramFiles(x86)") != null
+        : System.getProperty("os.arch").indexOf("64") != -1;
   }
 }

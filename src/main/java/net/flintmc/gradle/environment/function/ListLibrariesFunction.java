@@ -17,13 +17,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-package net.flintmc.gradle.environment.mcp.function;
-
-import net.flintmc.gradle.environment.DeobfuscationException;
-import net.flintmc.gradle.environment.DeobfuscationUtilities;
-import net.flintmc.gradle.maven.SimpleMavenRepository;
-import net.flintmc.gradle.maven.pom.MavenDependency;
-import net.flintmc.gradle.maven.pom.MavenPom;
+package net.flintmc.gradle.environment.function;
 
 import java.io.IOException;
 import java.io.PrintStream;
@@ -31,8 +25,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import net.flintmc.gradle.environment.DeobfuscationException;
+import net.flintmc.gradle.environment.DeobfuscationUtilities;
+import net.flintmc.gradle.maven.SimpleMavenRepository;
+import net.flintmc.gradle.maven.pom.MavenDependency;
+import net.flintmc.gradle.maven.pom.MavenPom;
 
-public class ListLibrariesFunction extends MCPFunction {
+public class ListLibrariesFunction extends Function {
   private final MavenPom clientPom;
   private final List<Path> directLibraries;
 

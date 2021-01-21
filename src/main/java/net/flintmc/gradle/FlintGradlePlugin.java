@@ -19,20 +19,30 @@
 
 package net.flintmc.gradle;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.net.URI;
+import java.nio.file.Path;
+import java.util.Collection;
+import javax.annotation.Nonnull;
 import net.flintmc.gradle.environment.DeobfuscationEnvironment;
 import net.flintmc.gradle.extension.FlintGradleExtension;
+import net.flintmc.gradle.extension.FlintPatcherExtension;
 import net.flintmc.gradle.extension.FlintStaticFileDescription;
 import net.flintmc.gradle.java.JarTaskProvider;
 import net.flintmc.gradle.java.JavaPluginInteraction;
 import net.flintmc.gradle.java.RunConfigurationProvider;
 import net.flintmc.gradle.manifest.ManifestConfigurator;
 import net.flintmc.gradle.manifest.dev.DevelopmentStaticFiles;
+import net.flintmc.gradle.maven.FlintResolutionStrategy;
 import net.flintmc.gradle.maven.MavenArtifactDownloader;
 import net.flintmc.gradle.maven.RemoteMavenRepository;
 import net.flintmc.gradle.maven.SimpleMavenRepository;
 import net.flintmc.gradle.maven.cache.MavenArtifactURLCache;
 import net.flintmc.gradle.maven.pom.MavenArtifact;
 import net.flintmc.gradle.minecraft.MinecraftRepository;
+import net.flintmc.gradle.minecraft.data.environment.EnvironmentType;
+import net.flintmc.gradle.minecraft.data.environment.MinecraftVersion;
 import net.flintmc.gradle.minecraft.yggdrasil.YggdrasilAuthenticator;
 import okhttp3.OkHttpClient;
 import org.gradle.api.GradleException;
@@ -40,18 +50,12 @@ import org.gradle.api.Plugin;
 import org.gradle.api.Project;
 import org.gradle.api.invocation.Gradle;
 
-import javax.annotation.Nonnull;
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.net.URI;
-import java.nio.file.Path;
-import java.util.Collection;
-
 public class FlintGradlePlugin implements Plugin<Project> {
   public static final String MINECRAFT_TASK_GROUP = "minecraft";
 
   private static final String MINECRAFT_MAVEN = "https://libraries.minecraft.net";
   private static final String MAVEN_CENTRAL = "https://repo.maven.apache.org/maven2/";
+  private static final String FLINT_MAVEN = "https://dist.labymod.net/api/v1/maven/release/";
 
   private Project project;
 
@@ -60,6 +64,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
   private MavenArtifactURLCache mavenArtifactURLCache;
 
   private FlintGradleExtension extension;
+  private FlintPatcherExtension patcherExtension;
   private JavaPluginInteraction interaction;
   private MinecraftRepository minecraftRepository;
   private SimpleMavenRepository internalRepository;
@@ -100,6 +105,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
       }
 
       this.extension = project.getExtensions().create(FlintGradleExtension.NAME, FlintGradleExtension.class, this);
+      this.patcherExtension = project.getExtensions().create(FlintPatcherExtension.NAME, FlintPatcherExtension.class, this);
 
       Path flintGradlePath = gradle.getGradleUserHomeDir().toPath().resolve("caches/flint-gradle");
       Path minecraftCache = flintGradlePath.resolve("minecraft-cache");
@@ -148,7 +154,10 @@ public class FlintGradlePlugin implements Plugin<Project> {
 
     this.manifestConfigurator = new ManifestConfigurator(this);
     interaction.setup();
-    project.afterEvaluate((p) -> extension.ensureConfigured());
+    project.afterEvaluate((p) -> {
+      extension.ensureConfigured();
+      FlintResolutionStrategy.getInstance().forceResolutionStrategy(p);
+    });
   }
 
   /**
@@ -159,8 +168,8 @@ public class FlintGradlePlugin implements Plugin<Project> {
       throw new IllegalStateException("Please set the flintVersion property on the flint extension");
     }
 
-    for (String version : extension.getMinecraftVersions()) {
-      handleVersion(version);
+    for (MinecraftVersion minecraftVersion : extension.getMinecraftVersions()) {
+      this.handleVersion(minecraftVersion.getVersion(), minecraftVersion.getEnvironmentType());
     }
 
     for(FlintStaticFileDescription staticFileDescription : extension.getStaticFiles().getStaticFileDescriptions()) {
@@ -171,12 +180,17 @@ public class FlintGradlePlugin implements Plugin<Project> {
     }
 
     project.getRepositories().maven(repo -> {
-      repo.setUrl("Mojang");
+      repo.setName("Mojang");
       repo.setUrl(MINECRAFT_MAVEN);
     });
 
+    project.getRepositories().maven(repo -> {
+      repo.setName("Flint");
+      repo.setUrl(FLINT_MAVEN);
+    });
+
     project.getRepositories().maven((repo) -> {
-      repo.setUrl("Internal minecraft");
+      repo.setName("Internal minecraft");
       repo.setUrl(minecraftRepository.getBaseDir());
     });
 
@@ -185,12 +199,13 @@ public class FlintGradlePlugin implements Plugin<Project> {
         continue;
       }
       subProject.getRepositories().maven(repo -> {
-        repo.setUrl("Mojang");
+        repo.setName("Mojang");
         repo.setUrl(MINECRAFT_MAVEN);
       });
 
       subProject.getPluginManager().apply(getClass());
     }
+
 
     runConfigurationProvider.installSourceSets(project, extension);
     jarTaskProvider.installTasks(project, extension);
@@ -201,10 +216,10 @@ public class FlintGradlePlugin implements Plugin<Project> {
    * Handles the given minecraft version and sets up all of the required steps for using it with gradle.
    *
    * @param version The minecraft version to handle
+   * @param type The environment type.
    */
-  private void handleVersion(String version) {
-    // Get the default obfuscation environment, we don't support custom environments currently
-    DeobfuscationEnvironment environment = minecraftRepository.defaultEnvironment(version);
+  private void handleVersion(String version, EnvironmentType type) {
+    DeobfuscationEnvironment environment = minecraftRepository.defaultEnvironment(version, type);
 
     // Get the server and client artifacts
     MavenArtifact client = getClientArtifact(version);
@@ -283,6 +298,10 @@ public class FlintGradlePlugin implements Plugin<Project> {
    */
   public MavenArtifactURLCache getMavenArtifactURLCache() {
     return mavenArtifactURLCache;
+  }
+
+  public FlintPatcherExtension getPatcherExtension() {
+    return patcherExtension;
   }
 
   public Project getProject() {

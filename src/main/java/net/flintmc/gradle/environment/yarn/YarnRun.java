@@ -17,7 +17,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-package net.flintmc.gradle.environment.mcp;
+package net.flintmc.gradle.environment.yarn;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.FileNotFoundException;
@@ -25,14 +25,19 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.file.CopyOption;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 import net.flintmc.gradle.environment.DeobfuscationException;
 import net.flintmc.gradle.environment.DeobfuscationUtilities;
 import net.flintmc.gradle.environment.EnvironmentRunnable;
@@ -43,6 +48,7 @@ import net.flintmc.gradle.environment.function.JavaExecutionTemplate;
 import net.flintmc.gradle.environment.function.ListLibrariesFunction;
 import net.flintmc.gradle.environment.function.PatchFunction;
 import net.flintmc.gradle.environment.function.StripFunction;
+import net.flintmc.gradle.extension.FlintPatcherExtension;
 import net.flintmc.gradle.json.JsonConverter;
 import net.flintmc.gradle.maven.RemoteMavenRepository;
 import net.flintmc.gradle.maven.pom.MavenArtifact;
@@ -51,8 +57,9 @@ import net.flintmc.gradle.minecraft.MinecraftRepository;
 import org.gradle.api.logging.Logger;
 import org.gradle.api.logging.Logging;
 
-public class ModCoderPackRun implements EnvironmentRunnable {
-  private static final Logger LOGGER = Logging.getLogger(ModCoderPackRun.class);
+public class YarnRun implements EnvironmentRunnable {
+
+  private static final Logger LOGGER = Logging.getLogger("Yarn");
 
   private final Map<String, Path> variables;
   private final Map<String, JavaExecutionTemplate> javaFunctions;
@@ -61,11 +68,11 @@ public class ModCoderPackRun implements EnvironmentRunnable {
   private final MavenPom clientJar;
   private final MavenPom serverJar;
   private final DeobfuscationUtilities utilities;
-  private final Path mcpPath;
+  private final Path yarnPath;
   private final Path stepsPath;
 
-  public ModCoderPackRun(
-      MavenPom clientJar, MavenPom serverJar, DeobfuscationUtilities utilities, Path mcpPath) {
+  public YarnRun(
+      MavenPom clientJar, MavenPom serverJar, DeobfuscationUtilities utilities, Path yarnPath) {
     this.variables = new HashMap<>();
     this.javaFunctions = new HashMap<>();
     this.steps = new HashMap<>();
@@ -73,223 +80,207 @@ public class ModCoderPackRun implements EnvironmentRunnable {
     this.clientJar = clientJar;
     this.serverJar = serverJar;
     this.utilities = utilities;
-    this.mcpPath = mcpPath;
-    this.stepsPath = mcpPath.resolve("steps");
+    this.yarnPath = yarnPath;
+    this.stepsPath = yarnPath.resolve("steps");
   }
 
-  /** {@inheritDoc} */
+  /**
+   * Extracts the given zip file to the given directory.
+   *
+   * @param zip The path to the zip file to extract
+   * @param targetDir The directory to extract the zip file into
+   * @param options Options to pass to {@link Files#copy(InputStream, Path, CopyOption...)}
+   * @throws IOException If an I/O error occurs while reading or writing files
+   */
+  public void extractZip(Path zip, Path targetDir, CopyOption... options) throws IOException {
+    try (ZipFile zipFile = new ZipFile(zip.toFile())) {
+      // Get a list of all entries
+      Enumeration<? extends ZipEntry> entries = zipFile.entries();
+      while (entries.hasMoreElements()) {
+        ZipEntry entry = entries.nextElement();
+        if (entry.isDirectory()) {
+          // Required directories will be created automatically
+          continue;
+        }
+
+        String name = entry.getName();
+
+        if (name.contains("assets")
+            || name.contains("pack.png")
+            || name.contains("META-INF")
+            || name.contains("log4j2.xml")) {
+          continue;
+        }
+
+        if (name.startsWith("/")) {
+          // Make sure that the entry does not start with a /, else it will corrupt
+          // the Path#resolve result
+          name = name.substring(1);
+        }
+
+        Path targetFile = targetDir.resolve(name);
+        if (!Files.exists(targetFile.getParent())) {
+          // Make sure the parent directories exist
+          Files.createDirectories(targetFile.getParent());
+        }
+
+        try (InputStream entryStream = zipFile.getInputStream(entry)) {
+          // Copy the entire entry to the target file
+
+          if (!targetFile.toFile().exists()) Files.copy(entryStream, targetFile, options);
+        }
+      }
+    }
+  }
+
   @Override
   public void loadData() throws IOException {
-    // Get the path to the config.json
-    Path configJson = mcpPath.resolve("config.json");
+    Path configJson = yarnPath.resolve("config.json");
+
     if (!Files.isRegularFile(configJson)) {
-      throw new FileNotFoundException("config.json not found: does not exist or is not a file");
+      throw new FileNotFoundException("config.json not found: does not exist or is not a file!");
     }
 
-    // Read the config.json
     JsonNode configRoot;
-    try (InputStream stream = Files.newInputStream(configJson)) {
-      configRoot = JsonConverter.OBJECT_MAPPER.readTree(stream);
+
+    try (InputStream inputStream = Files.newInputStream(configJson)) {
+      configRoot = JsonConverter.OBJECT_MAPPER.readTree(inputStream);
     }
 
-    // Check that we have the correct specification version
+    JsonNode dataNode = configRoot.get("data").requireNonNull();
+
     int specVersion = configRoot.get("spec").asInt();
+
     if (specVersion != 1) {
       throw new UnsupportedOperationException(
-          "The MCP environment only supports spec version 1, but got " + specVersion);
+          "The yarn environment only supports spec version 1, but got " + specVersion);
     }
 
-    // Read the input variables, all of them are paths
-    JsonNode dataNode = configRoot.get("data").requireNonNull();
-    for (Iterator<String> it = dataNode.fieldNames(); it.hasNext(); ) {
-      // Retrieve key and value
-      String variableName = it.next();
+    for (Iterator<String> iterator = dataNode.fieldNames(); iterator.hasNext(); ) {
+
+      String variableName = iterator.next();
       JsonNode variableNode = dataNode.get(variableName);
 
       switch (variableNode.getNodeType()) {
         case STRING:
           {
-            // Path variable without a side association
-            variables.put(variableName, resolveConfigPath(variableNode.asText()));
+            this.variables.put(variableName, this.resolveConfigPath(variableNode.asText()));
             break;
           }
 
         case OBJECT:
           {
-            // Variable is a collection of side associated paths
-            for (Iterator<String> nestedIt = variableNode.fieldNames(); nestedIt.hasNext(); ) {
-              // Construct the name <side>|<name>
-              String nestedName = nestedIt.next();
+            for (Iterator<String> nestedIterator = variableNode.fieldNames();
+                nestedIterator.hasNext(); ) {
+
+              String nestedName = nestedIterator.next();
               JsonNode nestedNode = variableNode.get(nestedName);
 
-              // Resolve the path and save it in the variables
               variables.put(
-                  nestedName + "|" + variableName,
-                  resolveConfigPath(nestedNode.requireNonNull().asText()));
+                  nestedName + "|" + variableName, this.resolveConfigPath(nestedNode.asText()));
             }
+
             break;
           }
 
         default:
-          {
-            // Unexpected node type
-            throw new UnsupportedOperationException(
-                "Found data type "
-                    + variableNode.getNodeType().name()
-                    + " on MCP input data, expected STRING or OBJECT");
-          }
+          throw new UnsupportedOperationException(
+              String.format(
+                  "Found data type %s on yarn input data, expected STRING or OBJECT!",
+                  variableNode.getNodeType().name()));
       }
     }
 
     MinecraftRepository minecraftRepository = utilities.getMinecraftRepository();
 
-    // Set up own input variables
-    if (clientJar != null) {
-      variables.put("downloadClientOutput", minecraftRepository.getArtifactPath(clientJar));
+    if (this.clientJar != null) {
+      this.variables.put(
+          "downloadClientOutput", minecraftRepository.getArtifactPath(this.clientJar));
     }
 
-    if (serverJar != null) {
-      variables.put("downloadServerOutput", minecraftRepository.getArtifactPath(serverJar));
+    if (this.serverJar != null) {
+      this.variables.put(
+          "downloadServerOutput", minecraftRepository.getArtifactPath(this.serverJar));
     }
 
-    // Process all java functions so they can be used while processing the steps
-    processJavaFunctions(configRoot.get("functions").requireNonNull());
+    this.processJavaFunctions(configRoot.get("functions").requireNonNull());
 
     JsonNode stepsNode = configRoot.get("steps").requireNonNull();
-    for (Iterator<String> it = stepsNode.fieldNames(); it.hasNext(); ) {
-      String sideName = it.next();
 
-      // Create general log
-      Path sidedLog = stepsPath.resolve(sideName).resolve("other.log");
+    for (Iterator<String> iterator = stepsNode.fieldNames(); iterator.hasNext(); ) {
+
+      String sideName = iterator.next();
+
+      Path sidedLog = this.stepsPath.resolve(sideName).resolve("other.log");
+
       if (Files.isDirectory(sidedLog.getParent())) {
         Files.createDirectories(sidedLog.getParent());
       }
 
-      variables.put(sideName + "|log", sidedLog);
+      this.variables.put(sideName + "|log", sidedLog);
 
-      processSteps(stepsNode.get(sideName), sideName);
+      this.processSteps(stepsNode.get(sideName), sideName);
     }
   }
 
-  /**
-   * Reads the functions map from the config json.
-   *
-   * @param functionsMap The node containing the functions map
-   * @throws IOException If parsing an URI fails
-   */
-  private void processJavaFunctions(JsonNode functionsMap) throws IOException {
-    // Iterate over every function name
-    for (Iterator<String> it = functionsMap.fieldNames(); it.hasNext(); ) {
-      // Extract key and value
-      String functionName = it.next();
-      JsonNode functionNode = functionsMap.get(functionName).requireNonNull();
+  private void processSteps(JsonNode steps, String sideName) {
 
-      // Extract the repository and the artifact
-      String repo = functionNode.get("repo").requireNonNull().asText();
-      MavenArtifact artifact =
-          new MavenArtifact(functionNode.get("version").requireNonNull().asText());
-
-      // Extract the list of arguments passed to the executable, this is always required
-      List<String> args = new ArrayList<>();
-      JsonNode argsNode = functionNode.get("args");
-      for (int i = 0; i < argsNode.size(); i++) {
-        args.add(argsNode.path(i).requireNonNull().asText());
-      }
-
-      // Extract the list of jvm arguments passed the JVM executing the artifact, this is not
-      // required
-      List<String> jvmArgs = new ArrayList<>();
-      if (functionNode.has("jvmargs")) {
-        // Found the jvmargs node, process it
-        JsonNode jvmArgsNode = functionNode.get("jvmargs");
-        for (int i = 0; i < jvmArgsNode.size(); i++) {
-          jvmArgs.add(jvmArgsNode.path(i).requireNonNull().asText());
-        }
-      }
-
-      URI repoURI;
-      try {
-        repoURI = new URI(repo);
-      } catch (URISyntaxException e) {
-        throw new IOException("Failed to parse " + repo + " as a URI", e);
-      }
-
-      // Add the function to the found functions
-      javaFunctions.put(functionName, new JavaExecutionTemplate(repoURI, artifact, args, jvmArgs));
-    }
-  }
-
-  /**
-   * Reads the steps array of the given side and constructs its functions.
-   *
-   * @param stepsArray The json array to read the steps from
-   * @param sideName The name of the side this array belongs to
-   */
-  private void processSteps(JsonNode stepsArray, String sideName) {
-    if (!stepsArray.isArray()) {
-      throw new IllegalArgumentException("Expected steps of " + sideName + " to be an array");
+    if (!steps.isArray()) {
+      throw new IllegalArgumentException(
+          String.format("Expected steps of %s to be an array!", sideName));
     }
 
-    // Construct the list of steps per side in place
     List<Function> sidedSteps =
-        steps.compute(
+        this.steps.compute(
             sideName,
             (k, v) -> {
               if (v == null) {
                 return new ArrayList<>();
               } else {
-                // processSteps has been called twice with the same sideName
                 throw new IllegalStateException(
-                    "Steps for side " + sideName + " processed already");
+                    String.format("Steps for side %s processed already", sideName));
               }
             });
 
-    // Iterate every step
-    for (int i = 0; i < stepsArray.size(); i++) {
-      JsonNode stepNode = stepsArray.path(i);
+    for (int i = 0; i < steps.size(); i++) {
+      JsonNode stepNode = steps.path(i);
 
-      // Collect the input values of the step
       Map<String, String> values = new HashMap<>();
-      for (Iterator<String> it = stepNode.fieldNames(); it.hasNext(); ) {
-        String key = it.next();
+
+      for (Iterator<String> iterator = stepNode.fieldNames(); iterator.hasNext(); ) {
+        String key = iterator.next();
         values.put(key, stepNode.get(key).requireNonNull().asText());
       }
 
       String type = values.get("type");
+
       if (type == null) {
-        // Every step requires at least a type value
-        throw new IllegalArgumentException("Missing type value for step");
+        throw new IllegalArgumentException("Missing type value for step!");
       } else if (shouldIgnoreStep(type)) {
         continue;
       }
 
-      // Some steps don't have a name value, the type is then used as a name
       String name = values.getOrDefault("name", type);
-
-      // Some steps don't have an input
       String input =
           values.containsKey("input")
               ? resolveVariableValue(values.get("input"), sideName, values)
               : null;
+
       if (input != null) {
-        // An input was found, rewrite the value in case it was a variable and has been resolved
         values.put("input", input);
       }
 
-      if (javaFunctions.containsKey(type)) {
+      if (this.javaFunctions.containsKey(type)) {
         Path output = createOutput(sideName, name, "jar");
         values.put("output", output.toString());
 
-        // This step is a Java function, construct the execution
-        JavaExecutionTemplate template = javaFunctions.get(type);
+        JavaExecutionTemplate template = this.javaFunctions.get(type);
 
-        // Construct the arguments replacing variables with their respective values
-        List<String> args = new ArrayList<>();
+        List<String> arguments = new ArrayList<>();
         for (String arg : template.getArgs()) {
-          args.add(resolveVariableValue(arg, sideName, values));
+          arguments.add(resolveVariableValue(arg, sideName, values));
         }
 
-        // Construct the execution function
         JavaExecutionFunction function =
             new JavaExecutionFunction(
                 name,
@@ -299,7 +290,7 @@ public class ModCoderPackRun implements EnvironmentRunnable {
                     ? null
                     : new RemoteMavenRepository(
                         utilities.getHttpClient(), template.getExecutionArtifactRepo()),
-                args,
+                arguments,
                 template.getJvmArgs());
 
         sidedSteps.add(function);
@@ -317,7 +308,7 @@ public class ModCoderPackRun implements EnvironmentRunnable {
             values.put("output", output.toString());
 
             // Construct the inject function
-            InjectFunction function = new InjectFunction(name, output, Paths.get(input), "mcp");
+            InjectFunction function = new InjectFunction(name, output, Paths.get(input), "yarn");
             sidedSteps.add(function);
             break;
           }
@@ -354,25 +345,6 @@ public class ModCoderPackRun implements EnvironmentRunnable {
             break;
           }
 
-        case "patch":
-          {
-            if (input == null) {
-              throw new IllegalArgumentException("The patch function always requires an input");
-            }
-
-            Path output = createOutput(sideName, name, "jar");
-            values.put("output", output.toString());
-
-            // Resolve the patches input
-            Path patches = Paths.get(resolveVariableValue("{patches}", sideName, values));
-
-            // Construct the patch function
-            PatchFunction function = new PatchFunction(name, Paths.get(input), output, patches);
-
-            sidedSteps.add(function);
-            break;
-          }
-
         case "listLibraries":
           {
             Path output = createOutput(sideName, name, "txt");
@@ -385,6 +357,26 @@ public class ModCoderPackRun implements EnvironmentRunnable {
             break;
           }
 
+        case "patch":
+        {
+          if (input == null) {
+            throw new IllegalArgumentException("The patch function always requires an input");
+          }
+
+          Path output = createOutput(sideName, name, "jar");
+          values.put("output", output.toString());
+
+          // Resolve the patches input
+          Path patches = Paths.get(resolveVariableValue("{patches}", sideName, values));
+
+          // Construct the patch function
+          PatchFunction function = new PatchFunction(name, Paths.get(input), output, patches);
+
+          sidedSteps.add(function);
+          break;
+        }
+
+
         default:
           {
             throw new IllegalArgumentException(
@@ -393,20 +385,10 @@ public class ModCoderPackRun implements EnvironmentRunnable {
                     + " of type "
                     + type
                     + " which is neither "
-                    + "a builtin function nor defined via the java functions");
+                    + "a builtin function or defined via the java functions");
           }
       }
     }
-  }
-
-  /**
-   * Resolves a path relative to the MCP config directory.
-   *
-   * @param partial The partial path
-   * @return A path resolved to the MCP config directory
-   */
-  private Path resolveConfigPath(String partial) {
-    return mcpPath.resolve(partial);
   }
 
   /**
@@ -490,14 +472,8 @@ public class ModCoderPackRun implements EnvironmentRunnable {
     return variables.get(input).toString();
   }
 
-  /**
-   * Determines if the given step type should be ignored.
-   *
-   * @param stepType The type of the step to check
-   * @return {@code true} if the steps of the given type should be ignored, {@code false} otherwise
-   */
-  private boolean shouldIgnoreStep(String stepType) {
-    switch (stepType) {
+  private boolean shouldIgnoreStep(String stepNode) {
+    switch (stepNode) {
         // Internal steps, those are done in advance and don't have to
         // be controlled by the MCP environment
       case "downloadManifest":
@@ -512,43 +488,75 @@ public class ModCoderPackRun implements EnvironmentRunnable {
     }
   }
 
-  /**
-   * Prepares all steps for of the given side for execution.
-   *
-   * @param side The side to prepare the steps for
-   * @throws DeobfuscationException If a step fails to prepare
-   */
-  public void prepare(String side) throws DeobfuscationException {
-    if (!steps.containsKey(side)) {
-      throw new IllegalArgumentException("No steps defined for side " + side);
-    }
+  private void processJavaFunctions(JsonNode functions) throws IOException {
 
-    List<Function> sidedSteps = steps.get(side);
+    for (Iterator<String> iterator = functions.fieldNames(); iterator.hasNext(); ) {
 
-    // Iterate over every step of the given side
-    for (Function step : sidedSteps) {
-      Path output = step.getOutput();
+      String functionName = iterator.next();
+      JsonNode functionNode = functions.get(functionName).requireNonNull();
 
-      if (!Files.isRegularFile(output)) {
-        Path outputDir = output.getParent();
-        if (!Files.isDirectory(outputDir)) {
-          // If the output directory does not exist, create it
-          try {
-            Files.createDirectories(outputDir);
-          } catch (IOException e) {
-            throw new DeobfuscationException(
-                "Failed to create output directory for step " + step.getName() + " for " + side);
-          }
-        }
+      String repo = functionNode.get("repo").requireNonNull().asText();
+      MavenArtifact artifact =
+          new MavenArtifact(functionNode.get("version").requireNonNull().asText());
 
-        // The output does not exist, prepare the step for execution
-        LOGGER.lifecycle("Preparing MCP step {} for {}", step.getName(), side);
-        step.prepare(utilities);
+      List<String> arguments = new CopyOnWriteArrayList<>();
+      JsonNode argsNode = functionNode.get("args");
+
+      for (int i = 0; i < argsNode.size(); i++) {
+        arguments.add(argsNode.path(i).requireNonNull().asText());
       }
+
+      List<String> jvmArguments = new CopyOnWriteArrayList<>();
+      if (functionNode.has("jvmargs")) {
+        JsonNode jvmArgumentsNode = functionNode.get("jvmargs");
+
+        for (int i = 0; i < jvmArgumentsNode.size(); i++) {
+          jvmArguments.add(jvmArgumentsNode.path(i).requireNonNull().asText());
+        }
+      }
+
+      URI repoUri;
+
+      try {
+        repoUri = new URI(repo);
+      } catch (URISyntaxException exception) {
+        throw new IOException("Failed to parse " + repo + " as a URI!", exception);
+      }
+
+      this.javaFunctions.put(
+          functionName, new JavaExecutionTemplate(repoUri, artifact, arguments, jvmArguments));
     }
   }
 
-  /** {@inheritDoc} */
+  @Override
+  public void prepare(String side) throws DeobfuscationException {
+    if (!this.steps.containsKey(side)) {
+      throw new IllegalArgumentException("No steps defined for side " + side);
+    }
+
+    List<Function> functions = this.steps.get(side);
+
+    for (Function function : functions) {
+      Path output = function.getOutput();
+
+      if (!Files.isRegularFile(output)) {
+        Path outputDir = output.getParent();
+
+        try {
+          Files.createDirectories(outputDir);
+        } catch (IOException exception) {
+          throw new DeobfuscationException(
+              String.format(
+                  "Failed to create output directory for step %s for %s",
+                  function.getName(), side));
+        }
+      }
+
+      LOGGER.lifecycle("Preparing Yarn step {} for {}", function.getName(), side);
+      function.prepare(this.utilities);
+    }
+  }
+
   @Override
   public Path execute(String side) throws DeobfuscationException {
     if (!steps.containsKey(side)) {
@@ -576,11 +584,11 @@ public class ModCoderPackRun implements EnvironmentRunnable {
       if (!Files.isRegularFile(output)) {
         // The output does not exist, execute the step
         LOGGER.lifecycle(
-            "[{}/{}] Running MCP step {} for {}", i + 1, sidedSteps.size(), step.getName(), side);
+            "[{}/{}] Running Yarn step {} for {}", i + 1, sidedSteps.size(), step.getName(), side);
         long startMillis = System.currentTimeMillis();
         try {
           step.execute(utilities);
-        } catch (DeobfuscationException | RuntimeException e) {
+        } catch (DeobfuscationException | RuntimeException exception) {
           try {
             // If an exception occurred, try to delete the file
             Files.deleteIfExists(output);
@@ -589,7 +597,7 @@ public class ModCoderPackRun implements EnvironmentRunnable {
                 "Failed to delete output after step failed, please manually clear the cache!",
                 innerException);
           }
-          throw e;
+          throw exception;
         }
         long timeTaken = System.currentTimeMillis() - startMillis;
 
@@ -603,14 +611,30 @@ public class ModCoderPackRun implements EnvironmentRunnable {
       } else {
         // The output exists already
         LOGGER.lifecycle(
-            "[{}/{}] Skipping MCP step {} for {}, output exists already",
+            "[{}/{}] Skipping Yarn step {} for {}, output exists already",
             i + 1,
             sidedSteps.size(),
             step.getName(),
             side);
       }
+
+      if (side.equals("client") && output.getFileName().toString().contains("decompile")) {
+
+        if (FlintPatcherExtension.HackyPatcherData.isEnabled()) {
+          try {
+            extractZip(output, FlintPatcherExtension.HackyPatcherData.getCleanSource().toPath());
+            extractZip(output, FlintPatcherExtension.HackyPatcherData.getModifiedSource().toPath());
+          } catch (IOException exception) {
+            exception.printStackTrace();
+          }
+        }
+      }
     }
 
     return sidedSteps.get(sidedSteps.size() - 1).getOutput();
+  }
+
+  private Path resolveConfigPath(String partial) {
+    return this.yarnPath.resolve(partial);
   }
 }

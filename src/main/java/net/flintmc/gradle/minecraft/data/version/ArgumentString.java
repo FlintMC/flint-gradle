@@ -33,7 +33,7 @@ public class ArgumentString {
   private final String value;
   private final List<VersionedRule> rules;
 
-  private ArgumentString(String variableName, String value, List<VersionedRule> rules) {
+  public ArgumentString(String variableName, String value, List<VersionedRule> rules) {
     this.variableName = variableName;
     this.value = value;
     this.rules = rules;

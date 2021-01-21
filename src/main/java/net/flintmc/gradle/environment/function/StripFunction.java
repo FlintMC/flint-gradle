@@ -17,10 +17,11 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-package net.flintmc.gradle.environment.mcp.function;
+package net.flintmc.gradle.environment.function;
 
 import net.flintmc.gradle.environment.DeobfuscationException;
 import net.flintmc.gradle.environment.DeobfuscationUtilities;
+import net.flintmc.gradle.environment.mcp.function.MCPFunction;
 import net.flintmc.gradle.util.Util;
 
 import java.io.BufferedReader;
@@ -33,7 +34,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
-public class StripFunction extends MCPFunction {
+public class StripFunction extends Function {
   private final Path mappings;
   private final Path input;
   private final boolean whitelist;

@@ -30,7 +30,7 @@ fun RepositoryHandler.flintRepository() {
     var bearerToken = System.getenv("FLINT_DISTRIBUTOR_BEARER_TOKEN")
 
     if (bearerToken == null) {
-        bearerToken = project.properties["net.flintmc.distributor.bearer-token"]?.toString()
+        bearerToken = project.properties["net.flintmc.distributor.bearer-token"].toString()
     }
 
     maven {
@@ -66,7 +66,7 @@ repositories {
     mavenCentral()
 }
 
-version = System.getenv().getOrDefault("VERSION", "2.7.1")
+version = System.getenv().getOrDefault("VERSION", "2.8.0")
 
 dependencies {
     implementation(group = "com.fasterxml.jackson.core", name = "jackson-core", version = "2.11.1")
@@ -79,6 +79,10 @@ dependencies {
     implementation(group = "net.flintmc.installer", name = "logic-implementation", version = "1.1.10")
     implementation(group = "net.flintmc.installer", name = "frontend-gui", version = "1.1.10")
     implementation(group = "net.flintmc.installer", name = "logic", version = "1.1.10")
+    implementation(group = "net.flintmc.installer", name = "logic-implementation", version = "1.1.5")
+    implementation(group = "net.flintmc.installer", name = "logic", version = "1.1.5")
+
+    implementation(group = "com.cloudbees", name = "diff4j", version = "1.2")
 }
 
 gradlePlugin {

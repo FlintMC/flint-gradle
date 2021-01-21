@@ -17,8 +17,12 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-package net.flintmc.gradle.environment.mcp.function;
+package net.flintmc.gradle.environment.function;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
 import net.flintmc.gradle.environment.DeobfuscationException;
 import net.flintmc.gradle.environment.DeobfuscationUtilities;
 import net.flintmc.gradle.java.exec.JavaExecutionHelper;
@@ -29,12 +33,7 @@ import net.flintmc.gradle.maven.ReadableMavenRepository;
 import net.flintmc.gradle.maven.SimpleMavenRepository;
 import net.flintmc.gradle.maven.pom.MavenArtifact;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.List;
-
-public class JavaExecutionFunction extends MCPFunction {
+public class JavaExecutionFunction extends Function {
   private final MavenArtifact executionArtifact;
   private final ReadableMavenRepository artifactRepository;
   private final List<String> args;
@@ -163,7 +162,7 @@ public class JavaExecutionFunction extends MCPFunction {
    * @throws IOException If an I/O error occurs while writing the file
    */
   private Path saveOutput(String outputName, String outputContent) throws IOException {
-    Path tempFile = Files.createTempFile("flint_gradle_", "mcp_function_" + name + "_" + outputName + ".log");
+    Path tempFile = Files.createTempFile("flint_gradle_", "function_" + name + "_" + outputName + ".log");
     Files.write(tempFile, outputContent.getBytes());
     return tempFile;
   }
