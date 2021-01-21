@@ -36,10 +36,7 @@ import net.flintmc.gradle.util.Util;
 import org.apache.commons.io.IOUtils;
 import org.apache.groovy.json.internal.IO;
 import org.gradle.api.DefaultTask;
-import org.gradle.api.tasks.Input;
-import org.gradle.api.tasks.Optional;
-import org.gradle.api.tasks.OutputDirectory;
-import org.gradle.api.tasks.TaskAction;
+import org.gradle.api.tasks.*;
 
 /** This task generates patches. */
 public class GeneratePatchesTask extends DefaultTask {
@@ -47,11 +44,21 @@ public class GeneratePatchesTask extends DefaultTask {
   public static final String NAME = "generatePatches";
   private static final int CONTEXT_LINES = 3;
 
+  @InputFile
   private File cleanSource;
+
+  @InputFile
   private File modifiedSource;
+
+  @OutputDirectory
   private File patches;
 
+  @Input
+  @Optional
   private String originalPrefix;
+
+  @Input
+  @Optional
   private String modifiedPrefix;
 
   /**
@@ -215,7 +222,6 @@ public class GeneratePatchesTask extends DefaultTask {
    *
    * @return The location where the clean source code is located.
    */
-  @Input
   public File getCleanSource() {
     return cleanSource;
   }
@@ -234,7 +240,6 @@ public class GeneratePatchesTask extends DefaultTask {
    *
    * @return The location where the modified source code is located.
    */
-  @Input
   public File getModifiedSource() {
     return modifiedSource;
   }
@@ -253,7 +258,6 @@ public class GeneratePatchesTask extends DefaultTask {
    *
    * @return The location where the patches are located.
    */
-  @OutputDirectory
   public File getPatches() {
     return patches;
   }
@@ -272,8 +276,6 @@ public class GeneratePatchesTask extends DefaultTask {
    *
    * @return The original prefix for the patch files.
    */
-  @Input
-  @Optional
   public String getOriginalPrefix() {
     return originalPrefix;
   }
@@ -292,8 +294,6 @@ public class GeneratePatchesTask extends DefaultTask {
    *
    * @return The modified prefix for the patch files.
    */
-  @Input
-  @Optional
   public String getModifiedPrefix() {
     return modifiedPrefix;
   }
