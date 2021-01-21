@@ -1,10 +1,12 @@
-name: Publish tag
+name: Build
 
 on:
+  pull_request:
+    types: [ opened, synchronize ]
   push:
-    tags:
-      - '**'
-
+    branches:
+      - main
+      - develop
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -33,13 +35,6 @@ jobs:
 
       - name: Build with Gradle
         run: ./gradlew build --full-stacktrace
-        env:
-          VERSION: ${{ steps.get_tag_name.outputs.VERSION }}
-          FLINT_DISTRIBUTOR_BEARER_TOKEN: ${{ secrets.FLINT_DISTRIBUTOR_BEARER_TOKEN }}
-          FLINT_DISTRIBUTOR_URL: ${{ secrets.FLINT_DISTRIBUTOR_URL }}
-
-      - name: Publish with Gradle to maven repository
-        run: ./gradlew publish --full-stacktrace
         env:
           VERSION: ${{ steps.get_tag_name.outputs.VERSION }}
           FLINT_DISTRIBUTOR_BEARER_TOKEN: ${{ secrets.FLINT_DISTRIBUTOR_BEARER_TOKEN }}
