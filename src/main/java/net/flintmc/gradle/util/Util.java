@@ -33,7 +33,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
-import java.util.Base64;
+import java.util.*;
 import java.util.zip.ZipOutputStream;
 import net.flintmc.gradle.json.JsonConverter;
 import net.flintmc.gradle.json.JsonConverterException;
@@ -59,12 +59,6 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.Enumeration;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.stream.Stream;
@@ -605,14 +599,22 @@ public class Util {
     }
   }
 
-  public static byte[] deserializeLines(List<String> lines) throws IOException {
-    ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+  /**
+   * Decodes a collection of base64 encoded lines into a byte array.
+   *
+   * @param lines The lines to decode
+   * @return The decoded data
+   * @throws IOException If an I/O error occurs while decoding the data
+   */
+  public static byte[] decodeBase64Lines(Collection<String> lines) throws IOException {
+    try(ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream()) {
 
-    for (String line : lines) {
-      byteArrayOutputStream.write(Base64.getDecoder().decode(line));
+      for(String line : lines) {
+        byteArrayOutputStream.write(Base64.getDecoder().decode(line));
+      }
+
+      return byteArrayOutputStream.toByteArray();
     }
-
-    return byteArrayOutputStream.toByteArray();
   }
 
   /**
@@ -623,6 +625,6 @@ public class Util {
   public static boolean is64Bit() {
     return System.getProperty("os.name").contains("Windows")
         ? System.getenv("ProgramFiles(x86)") != null
-        : System.getProperty("os.arch").indexOf("64") != -1;
+        : System.getProperty("os.arch").contains("64");
   }
 }

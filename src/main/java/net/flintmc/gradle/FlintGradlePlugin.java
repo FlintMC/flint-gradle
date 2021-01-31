@@ -44,11 +44,14 @@ import net.flintmc.gradle.minecraft.MinecraftRepository;
 import net.flintmc.gradle.minecraft.data.environment.EnvironmentType;
 import net.flintmc.gradle.minecraft.data.environment.MinecraftVersion;
 import net.flintmc.gradle.minecraft.yggdrasil.YggdrasilAuthenticator;
+import net.flintmc.gradle.util.JavaClosure;
+import net.flintmc.gradle.util.Util;
 import okhttp3.OkHttpClient;
 import org.gradle.api.GradleException;
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;
 import org.gradle.api.invocation.Gradle;
+import org.gradle.api.tasks.Delete;
 
 public class FlintGradlePlugin implements Plugin<Project> {
   public static final String MINECRAFT_TASK_GROUP = "minecraft";
@@ -139,6 +142,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
       } catch (IOException e) {
         throw new UncheckedIOException("Failed to setup artifact URL cache", e);
       }
+
     } else {
       this.httpClient = parentPlugin.httpClient;
       this.downloader = parentPlugin.downloader;
@@ -154,6 +158,9 @@ public class FlintGradlePlugin implements Plugin<Project> {
 
     this.manifestConfigurator = new ManifestConfigurator(this);
     interaction.setup();
+    project.getTasks().getByName("clean").configure(
+        JavaClosure.of((Delete task) -> task.delete(Util.getProjectCacheDir(project))));
+
     project.afterEvaluate((p) -> extension.ensureConfigured());
   }
 

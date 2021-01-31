@@ -92,7 +92,7 @@ public class ZipPatchContextProvider implements PatchContextProvider {
       this.delete.remove(patch.getTargetPath());
 
       if (patch.isBinary()) {
-        this.binary.put(patch.getTargetPath(), Util.deserializeLines(patch.getHunks()[0].lines));
+        this.binary.put(patch.getTargetPath(), Util.decodeBase64Lines(patch.getHunks()[0].lines));
         this.modified.remove(patch.getTargetPath());
       } else {
 

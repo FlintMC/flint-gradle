@@ -125,7 +125,7 @@ public class LocalPatchContextProvider implements PatchContextProvider {
       if (patch.getHunks().length == 0) {
         patch.getTargetFile().delete();
       } else {
-        byte[] content = Util.deserializeLines(patch.getHunks()[0].lines);
+        byte[] content = Util.decodeBase64Lines(patch.getHunks()[0].lines);
         this.copyStreamsCloseAll(
             new FileOutputStream(patch.getTargetFile()), new ByteArrayInputStream(content));
       }
