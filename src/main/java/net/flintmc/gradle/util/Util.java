@@ -540,14 +540,30 @@ public class Util {
   }
 
   /**
-   * Hashes a given byte array and writes it as an hex string
+   * Hashes a given byte array and writes it as a hex string
    *
    * @param data the data to convert
    * @return the md5 hash as a hex string
    */
   public static String md5Hex(byte[] data) {
     try {
-      return new BigInteger(1, MessageDigest.getInstance("MD5").digest(data)).toString(16);
+      MessageDigest digest = MessageDigest.getInstance("MD5");
+      byte[] md5sum = digest.digest(data);
+
+      // Build a hexadecimal string from the md5sum
+      StringBuilder buffer = new StringBuilder();
+      for(byte b : md5sum) {
+        String hex = Integer.toHexString(b & 0xFF);
+
+        if(hex.length() < 2) {
+          // Insert a 0 if the string is too short
+          buffer.append('0');
+        }
+
+        buffer.append(hex);
+      }
+
+      return buffer.toString();
     } catch(NoSuchAlgorithmException e) {
       throw new IllegalStateException("MD5 digest not available");
     }

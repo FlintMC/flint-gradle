@@ -154,10 +154,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
 
     this.manifestConfigurator = new ManifestConfigurator(this);
     interaction.setup();
-    project.afterEvaluate((p) -> {
-      extension.ensureConfigured();
-      FlintResolutionStrategy.getInstance().forceResolutionStrategy(p);
-    });
+    project.afterEvaluate((p) -> extension.ensureConfigured());
   }
 
   /**
@@ -178,6 +175,8 @@ public class FlintGradlePlugin implements Plugin<Project> {
             project, staticFileDescription.getTarget(), staticFileDescription.getSourceFile());
       }
     }
+
+    FlintResolutionStrategy.getInstance().forceResolutionStrategy(project);
 
     project.getRepositories().maven(repo -> {
       repo.setName("Mojang");
