@@ -183,7 +183,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
       }
     }
 
-    FlintResolutionStrategy.getInstance().forceResolutionStrategy(project);
+    FlintResolutionStrategy.getInstance().forceResolutionStrategy(project, extension);
 
     project.getRepositories().maven(repo -> {
       repo.setName("Mojang");
