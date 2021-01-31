@@ -162,6 +162,21 @@ public class FlintGradlePlugin implements Plugin<Project> {
         JavaClosure.of((Delete task) -> task.delete(Util.getProjectCacheDir(project))));
 
     project.afterEvaluate((p) -> extension.ensureConfigured());
+
+    project.getRepositories().maven(repo -> {
+      repo.setName("Mojang");
+      repo.setUrl(MINECRAFT_MAVEN);
+    });
+
+    project.getRepositories().maven(repo -> {
+      repo.setName("Flint");
+      repo.setUrl(FLINT_MAVEN);
+    });
+
+    project.getRepositories().maven((repo) -> {
+      repo.setName("Internal minecraft");
+      repo.setUrl(minecraftRepository.getBaseDir());
+    });
   }
 
   /**
@@ -184,21 +199,6 @@ public class FlintGradlePlugin implements Plugin<Project> {
     }
 
     FlintResolutionStrategy.getInstance().forceResolutionStrategy(project, extension);
-
-    project.getRepositories().maven(repo -> {
-      repo.setName("Mojang");
-      repo.setUrl(MINECRAFT_MAVEN);
-    });
-
-    project.getRepositories().maven(repo -> {
-      repo.setName("Flint");
-      repo.setUrl(FLINT_MAVEN);
-    });
-
-    project.getRepositories().maven((repo) -> {
-      repo.setName("Internal minecraft");
-      repo.setUrl(minecraftRepository.getBaseDir());
-    });
 
     for (Project subProject : project.getSubprojects()) {
       if (!extension.getProjectFilter().test(subProject)) {
