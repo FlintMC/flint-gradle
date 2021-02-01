@@ -171,6 +171,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
     project.getRepositories().maven(repo -> {
       repo.setName("Flint");
       repo.setUrl(FLINT_MAVEN);
+      Util.applyDistributorCredentials(project, repo, false);
     });
 
     project.getRepositories().maven((repo) -> {

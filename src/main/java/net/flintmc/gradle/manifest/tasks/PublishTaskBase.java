@@ -67,7 +67,7 @@ public abstract class PublishTaskBase extends DefaultTask {
         .put(requestBody);
 
 
-    HttpHeaderCredentials credentials = Util.getPublishCredentials(
+    HttpHeaderCredentials credentials = Util.getDistributorCredentials(
         getProject(),
         true,
         "Set enablePublishing to false in the flint extension");

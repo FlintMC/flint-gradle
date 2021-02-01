@@ -27,7 +27,6 @@ import net.flintmc.gradle.manifest.data.ManifestRepositoryInput;
 import net.flintmc.gradle.manifest.data.ManifestStaticFileInput;
 import net.flintmc.gradle.manifest.tasks.*;
 import net.flintmc.gradle.maven.cache.MavenArtifactURLCache;
-import net.flintmc.gradle.minecraft.InstallStaticFilesTask;
 import net.flintmc.gradle.property.FlintPluginProperties;
 import net.flintmc.gradle.util.MaybeNull;
 import net.flintmc.gradle.util.Util;
@@ -100,18 +99,8 @@ public class ManifestConfigurator {
             publishingExtension.getRepositories().maven((repo) -> repo.setName("FlintDistributor"));
         repository.setUrl(distributorUrl);
 
-        // Try to retrieve authentication, it might not be available
-        HttpHeaderCredentials values = Util.getPublishCredentials(project, false);
-
-        if(values != null) {
-          // Gradle does not allow setting the credentials instance directly, so copy it
-          HttpHeaderCredentials credentials = repository.getCredentials(HttpHeaderCredentials.class);
-          credentials.setName(values.getName());
-          credentials.setValue(values.getValue());
-        }
-
-        // Set the authentication, no further configuration required
-        repository.getAuthentication().create("header", HttpHeaderAuthentication.class);
+        // Apply the access credentials if available
+        Util.applyDistributorCredentials(project, repository, false);
       }
     }
 

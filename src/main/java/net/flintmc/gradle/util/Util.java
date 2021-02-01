@@ -44,11 +44,11 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 import org.gradle.api.Project;
+import org.gradle.api.artifacts.repositories.AuthenticationSupported;
 import org.gradle.api.credentials.HttpHeaderCredentials;
 import org.gradle.api.file.FileCollection;
+import org.gradle.authentication.http.HttpHeaderAuthentication;
 
-import java.io.*;
-import java.math.BigInteger;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.CopyOption;
@@ -157,7 +157,7 @@ public class Util {
         URI distributorURI = FlintPluginProperties.DISTRIBUTOR_URL.resolve(project);
         if (distributorURI.getHost().equals(uri.getHost())) {
           // Reaching out to the distributor, add the authorization
-          HttpHeaderCredentials credentials = getPublishCredentials(project, false);
+          HttpHeaderCredentials credentials = getDistributorCredentials(project, false);
           if (credentials != null) {
             requestBuilder.header(credentials.getName(), credentials.getValue());
           }
@@ -500,14 +500,14 @@ public class Util {
   }
 
   /**
-   * Retrieves the HTTP header credentials used for publishing.
+   * Retrieves the HTTP header credentials used for accessing the distributor.
    *
    * @param project              The project to use for resolving the properties
    * @param required             If {@code true}, this method will abort the build if no authorization is configured
    * @param notAvailableSolution Messages to display as a solution in case the credentials can't be computed
-   * @return The HTTP header credentials used for publishing
+   * @return The HTTP header credentials used for accessing the distributor
    */
-  public static HttpHeaderCredentials getPublishCredentials(
+  public static HttpHeaderCredentials getDistributorCredentials(
       Project project, boolean required, String... notAvailableSolution) {
     HttpHeaderCredentials publishCredentials = project.getObjects().newInstance(HttpHeaderCredentials.class);
 
@@ -531,6 +531,29 @@ public class Util {
     }
 
     return publishCredentials;
+  }
+
+  /**
+   * Applies the HTTP header credentials used for accessing the distributor the given object.
+   *
+   * @param project              The project to use for resolving the properties
+   * @param target               The object to apply the credentials to
+   * @param required             If {@code true}, this method will abort the build if no authorization is configured
+   * @param notAvailableSolution Messages to display as a solution in case the credentials can't be computed
+   */
+  public static void applyDistributorCredentials(
+      Project project, AuthenticationSupported target, boolean required, String... notAvailableSolution) {
+    HttpHeaderCredentials credentials = getDistributorCredentials(project, required, notAvailableSolution);
+
+    if(credentials != null) {
+      // Apply the credentials by copying them since gradle does not support directly setting them
+      HttpHeaderCredentials toApply = target.getCredentials(HttpHeaderCredentials.class);
+      toApply.setName(credentials.getName());
+      toApply.setValue(credentials.getValue());
+
+      // Set the authentication, no further configuration required
+      target.getAuthentication().create("FlintDistributor", HttpHeaderAuthentication.class);
+    }
   }
 
   /**
