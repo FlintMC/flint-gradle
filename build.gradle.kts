@@ -66,7 +66,7 @@ repositories {
     mavenCentral()
 }
 
-version = System.getenv().getOrDefault("VERSION", "2.8.0")
+version = System.getenv().getOrDefault("VERSION", "2.8.1")
 
 dependencies {
     implementation(group = "com.fasterxml.jackson.core", name = "jackson-core", version = "2.11.1")
