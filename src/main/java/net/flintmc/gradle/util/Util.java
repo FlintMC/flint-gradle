@@ -33,7 +33,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
-import java.util.Base64;
+import java.util.*;
 import java.util.zip.ZipOutputStream;
 import net.flintmc.gradle.json.JsonConverter;
 import net.flintmc.gradle.json.JsonConverterException;
@@ -44,11 +44,11 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 import org.gradle.api.Project;
+import org.gradle.api.artifacts.repositories.AuthenticationSupported;
 import org.gradle.api.credentials.HttpHeaderCredentials;
 import org.gradle.api.file.FileCollection;
+import org.gradle.authentication.http.HttpHeaderAuthentication;
 
-import java.io.*;
-import java.math.BigInteger;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.CopyOption;
@@ -59,12 +59,6 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.Enumeration;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.stream.Stream;
@@ -163,7 +157,7 @@ public class Util {
         URI distributorURI = FlintPluginProperties.DISTRIBUTOR_URL.resolve(project);
         if (distributorURI.getHost().equals(uri.getHost())) {
           // Reaching out to the distributor, add the authorization
-          HttpHeaderCredentials credentials = getPublishCredentials(project, false);
+          HttpHeaderCredentials credentials = getDistributorCredentials(project, false);
           if (credentials != null) {
             requestBuilder.header(credentials.getName(), credentials.getValue());
           }
@@ -394,7 +388,7 @@ public class Util {
    * @throws IOException If an I/O error occurs
    */
   public static boolean isPackageJar(File file) throws IOException {
-    if (file.getName().endsWith(".jar")) {
+    if (!file.getName().endsWith(".jar")) {
       // Needs to be a jar file
       return false;
     }
@@ -413,7 +407,7 @@ public class Util {
    * @throws JsonConverterException If the {@code manifest.json} can't be read as a {@link PackageModel}
    */
   public static PackageModel getPackageModelFromJar(File file) throws IOException, JsonConverterException {
-    if (file.getName().endsWith(".jar")) {
+    if (!file.getName().endsWith(".jar")) {
       // Needs to be a jar file
       return null;
     }
@@ -506,14 +500,14 @@ public class Util {
   }
 
   /**
-   * Retrieves the HTTP header credentials used for publishing.
+   * Retrieves the HTTP header credentials used for accessing the distributor.
    *
    * @param project              The project to use for resolving the properties
    * @param required             If {@code true}, this method will abort the build if no authorization is configured
    * @param notAvailableSolution Messages to display as a solution in case the credentials can't be computed
-   * @return The HTTP header credentials used for publishing
+   * @return The HTTP header credentials used for accessing the distributor
    */
-  public static HttpHeaderCredentials getPublishCredentials(
+  public static HttpHeaderCredentials getDistributorCredentials(
       Project project, boolean required, String... notAvailableSolution) {
     HttpHeaderCredentials publishCredentials = project.getObjects().newInstance(HttpHeaderCredentials.class);
 
@@ -540,14 +534,53 @@ public class Util {
   }
 
   /**
-   * Hashes a given byte array and writes it as an hex string
+   * Applies the HTTP header credentials used for accessing the distributor the given object.
+   *
+   * @param project              The project to use for resolving the properties
+   * @param target               The object to apply the credentials to
+   * @param required             If {@code true}, this method will abort the build if no authorization is configured
+   * @param notAvailableSolution Messages to display as a solution in case the credentials can't be computed
+   */
+  public static void applyDistributorCredentials(
+      Project project, AuthenticationSupported target, boolean required, String... notAvailableSolution) {
+    HttpHeaderCredentials credentials = getDistributorCredentials(project, required, notAvailableSolution);
+
+    if(credentials != null) {
+      // Apply the credentials by copying them since gradle does not support directly setting them
+      HttpHeaderCredentials toApply = target.getCredentials(HttpHeaderCredentials.class);
+      toApply.setName(credentials.getName());
+      toApply.setValue(credentials.getValue());
+
+      // Set the authentication, no further configuration required
+      target.getAuthentication().create("FlintDistributor", HttpHeaderAuthentication.class);
+    }
+  }
+
+  /**
+   * Hashes a given byte array and writes it as a hex string
    *
    * @param data the data to convert
    * @return the md5 hash as a hex string
    */
   public static String md5Hex(byte[] data) {
     try {
-      return new BigInteger(1, MessageDigest.getInstance("MD5").digest(data)).toString(16);
+      MessageDigest digest = MessageDigest.getInstance("MD5");
+      byte[] md5sum = digest.digest(data);
+
+      // Build a hexadecimal string from the md5sum
+      StringBuilder buffer = new StringBuilder();
+      for(byte b : md5sum) {
+        String hex = Integer.toHexString(b & 0xFF);
+
+        if(hex.length() < 2) {
+          // Insert a 0 if the string is too short
+          buffer.append('0');
+        }
+
+        buffer.append(hex);
+      }
+
+      return buffer.toString();
     } catch(NoSuchAlgorithmException e) {
       throw new IllegalStateException("MD5 digest not available");
     }
@@ -589,14 +622,22 @@ public class Util {
     }
   }
 
-  public static byte[] deserializeLines(List<String> lines) throws IOException {
-    ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+  /**
+   * Decodes a collection of base64 encoded lines into a byte array.
+   *
+   * @param lines The lines to decode
+   * @return The decoded data
+   * @throws IOException If an I/O error occurs while decoding the data
+   */
+  public static byte[] decodeBase64Lines(Collection<String> lines) throws IOException {
+    try(ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream()) {
 
-    for (String line : lines) {
-      byteArrayOutputStream.write(Base64.getDecoder().decode(line));
+      for(String line : lines) {
+        byteArrayOutputStream.write(Base64.getDecoder().decode(line));
+      }
+
+      return byteArrayOutputStream.toByteArray();
     }
-
-    return byteArrayOutputStream.toByteArray();
   }
 
   /**
@@ -607,6 +648,23 @@ public class Util {
   public static boolean is64Bit() {
     return System.getProperty("os.name").contains("Windows")
         ? System.getenv("ProgramFiles(x86)") != null
-        : System.getProperty("os.arch").indexOf("64") != -1;
+        : System.getProperty("os.arch").contains("64");
+  }
+
+  /**
+   * Retrieves the base URI of the distributor repository.
+   *
+   * @param project The project to use for resolving the properties
+   * @param notAvailableSolution Messages to display as a solution in case URI can't be computed
+   * @return The base URI of the distributor repository
+   */
+  public static URI getDistributorMavenURI(Project project, String... notAvailableSolution) {
+    return concatURI(
+        FlintPluginProperties.DISTRIBUTOR_URL
+            .require(project, notAvailableSolution),
+        "api/v1/maven",
+        FlintPluginProperties.DISTRIBUTOR_CHANNEL
+            .require(project, notAvailableSolution)
+    );
   }
 }

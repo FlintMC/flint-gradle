@@ -44,18 +44,20 @@ import net.flintmc.gradle.minecraft.MinecraftRepository;
 import net.flintmc.gradle.minecraft.data.environment.EnvironmentType;
 import net.flintmc.gradle.minecraft.data.environment.MinecraftVersion;
 import net.flintmc.gradle.minecraft.yggdrasil.YggdrasilAuthenticator;
+import net.flintmc.gradle.util.JavaClosure;
+import net.flintmc.gradle.util.Util;
 import okhttp3.OkHttpClient;
 import org.gradle.api.GradleException;
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;
 import org.gradle.api.invocation.Gradle;
+import org.gradle.api.tasks.Delete;
 
 public class FlintGradlePlugin implements Plugin<Project> {
   public static final String MINECRAFT_TASK_GROUP = "minecraft";
 
   private static final String MINECRAFT_MAVEN = "https://libraries.minecraft.net";
   private static final String MAVEN_CENTRAL = "https://repo.maven.apache.org/maven2/";
-  private static final String FLINT_MAVEN = "https://dist.labymod.net/api/v1/maven/release/";
 
   private Project project;
 
@@ -64,7 +66,6 @@ public class FlintGradlePlugin implements Plugin<Project> {
   private MavenArtifactURLCache mavenArtifactURLCache;
 
   private FlintGradleExtension extension;
-  private FlintPatcherExtension patcherExtension;
   private JavaPluginInteraction interaction;
   private MinecraftRepository minecraftRepository;
   private SimpleMavenRepository internalRepository;
@@ -105,7 +106,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
       }
 
       this.extension = project.getExtensions().create(FlintGradleExtension.NAME, FlintGradleExtension.class, this);
-      this.patcherExtension = project.getExtensions().create(FlintPatcherExtension.NAME, FlintPatcherExtension.class, this);
+      project.getExtensions().create(FlintPatcherExtension.NAME, FlintPatcherExtension.class, this);
 
       Path flintGradlePath = gradle.getGradleUserHomeDir().toPath().resolve("caches/flint-gradle");
       Path minecraftCache = flintGradlePath.resolve("minecraft-cache");
@@ -139,6 +140,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
       } catch (IOException e) {
         throw new UncheckedIOException("Failed to setup artifact URL cache", e);
       }
+
     } else {
       this.httpClient = parentPlugin.httpClient;
       this.downloader = parentPlugin.downloader;
@@ -154,9 +156,25 @@ public class FlintGradlePlugin implements Plugin<Project> {
 
     this.manifestConfigurator = new ManifestConfigurator(this);
     interaction.setup();
-    project.afterEvaluate((p) -> {
-      extension.ensureConfigured();
-      FlintResolutionStrategy.getInstance().forceResolutionStrategy(p);
+    project.getTasks().getByName("clean").configure(
+        JavaClosure.of((Delete task) -> task.delete(Util.getProjectCacheDir(project))));
+
+    project.afterEvaluate((p) -> extension.ensureConfigured());
+
+    project.getRepositories().maven(repo -> {
+      repo.setName("Mojang");
+      repo.setUrl(MINECRAFT_MAVEN);
+    });
+
+    project.getRepositories().maven(repo -> {
+      repo.setName("Flint");
+      repo.setUrl(Util.getDistributorMavenURI(project));
+      Util.applyDistributorCredentials(project, repo, false);
+    });
+
+    project.getRepositories().maven((repo) -> {
+      repo.setName("Internal minecraft");
+      repo.setUrl(minecraftRepository.getBaseDir());
     });
   }
 
@@ -179,20 +197,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
       }
     }
 
-    project.getRepositories().maven(repo -> {
-      repo.setName("Mojang");
-      repo.setUrl(MINECRAFT_MAVEN);
-    });
-
-    project.getRepositories().maven(repo -> {
-      repo.setName("Flint");
-      repo.setUrl(FLINT_MAVEN);
-    });
-
-    project.getRepositories().maven((repo) -> {
-      repo.setName("Internal minecraft");
-      repo.setUrl(minecraftRepository.getBaseDir());
-    });
+    FlintResolutionStrategy.getInstance().forceResolutionStrategy(project, extension);
 
     for (Project subProject : project.getSubprojects()) {
       if (!extension.getProjectFilter().test(subProject)) {
@@ -298,10 +303,6 @@ public class FlintGradlePlugin implements Plugin<Project> {
    */
   public MavenArtifactURLCache getMavenArtifactURLCache() {
     return mavenArtifactURLCache;
-  }
-
-  public FlintPatcherExtension getPatcherExtension() {
-    return patcherExtension;
   }
 
   public Project getProject() {

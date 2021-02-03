@@ -27,7 +27,6 @@ import net.flintmc.gradle.manifest.data.ManifestRepositoryInput;
 import net.flintmc.gradle.manifest.data.ManifestStaticFileInput;
 import net.flintmc.gradle.manifest.tasks.*;
 import net.flintmc.gradle.maven.cache.MavenArtifactURLCache;
-import net.flintmc.gradle.minecraft.InstallStaticFilesTask;
 import net.flintmc.gradle.property.FlintPluginProperties;
 import net.flintmc.gradle.util.MaybeNull;
 import net.flintmc.gradle.util.Util;
@@ -61,7 +60,6 @@ public class ManifestConfigurator {
   }
 
   private URI projectPublishURI;
-  private URI distributorMavenURI;
   private URI projectMavenURI;
 
   /**
@@ -79,7 +77,7 @@ public class ManifestConfigurator {
       PublishingExtension publishingExtension = project.getExtensions().findByType(PublishingExtension.class);
 
       // Build the distributor URL in form of <host>/maven/<channel>
-      URI distributorUrl = getDistributorMavenURI(
+      URI distributorUrl = Util.getDistributorMavenURI(project,
           "Set enablePublishing to false in the flint extension",
           "Set shouldAutoConfigurePublishing to false in the flint extension");
 
@@ -100,18 +98,8 @@ public class ManifestConfigurator {
             publishingExtension.getRepositories().maven((repo) -> repo.setName("FlintDistributor"));
         repository.setUrl(distributorUrl);
 
-        // Try to retrieve authentication, it might not be available
-        HttpHeaderCredentials values = Util.getPublishCredentials(project, false);
-
-        if(values != null) {
-          // Gradle does not allow setting the credentials instance directly, so copy it
-          HttpHeaderCredentials credentials = repository.getCredentials(HttpHeaderCredentials.class);
-          credentials.setName(values.getName());
-          credentials.setValue(values.getValue());
-        }
-
-        // Set the authentication, no further configuration required
-        repository.getAuthentication().create("header", HttpHeaderAuthentication.class);
+        // Apply the access credentials if available
+        Util.applyDistributorCredentials(project, repository, false);
       }
     }
 
@@ -241,26 +229,6 @@ public class ManifestConfigurator {
   }
 
   /**
-   * Retrieves the base URI of the distributor repository.
-   *
-   * @param notAvailableSolution Messages to display as a solution in case URI can't be computed
-   * @return The base URI of the distributor repository
-   */
-  public URI getDistributorMavenURI(String... notAvailableSolution) {
-    if(distributorMavenURI == null) {
-      distributorMavenURI = Util.concatURI(
-          FlintPluginProperties.DISTRIBUTOR_URL
-              .require(project, notAvailableSolution),
-          "api/v1/maven",
-          FlintPluginProperties.DISTRIBUTOR_CHANNEL
-              .require(project, notAvailableSolution)
-      );
-    }
-
-    return distributorMavenURI;
-  }
-
-  /**
    * Retrieves the base URI of the distributor repository including the project namespace.
    *
    * @param notAvailableSolution Messages to display as a solution in case the URI can't be computed
@@ -268,7 +236,7 @@ public class ManifestConfigurator {
    */
   public URI getProjectMavenURI(String... notAvailableSolution) {
     if(projectMavenURI == null) {
-      URI distributorURI = getDistributorMavenURI(notAvailableSolution);
+      URI distributorURI = Util.getDistributorMavenURI(project, notAvailableSolution);
 
       projectMavenURI = Util.concatURI(
           distributorURI,

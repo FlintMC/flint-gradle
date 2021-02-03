@@ -19,11 +19,13 @@
 
 package net.flintmc.gradle.maven;
 
-import com.google.common.base.Objects;
-import java.util.ArrayList;
-import java.util.List;
+import net.flintmc.gradle.extension.FlintGradleExtension;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.ModuleVersionSelector;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
 
 public class FlintResolutionStrategy {
 
@@ -54,8 +56,8 @@ public class FlintResolutionStrategy {
   }
 
   /**
-   * Allows forcing certain versions of dependencies, including transitive dependencies. Appends new
-   * forced modules to be considered when resolving dependencies. It accepts following notations:
+   * Allows forcing certain versions of dependencies, including transitive dependencies. Appends new forced modules to
+   * be considered when resolving dependencies. It accepts following notations:
    *
    * <ul>
    *   <li>String in a format of: 'group:name:version', for example: 'org.gradle:gradle-core:1.0'
@@ -67,22 +69,22 @@ public class FlintResolutionStrategy {
   public void forceDependency(Object moduleVersionSelectorNotation) {
     ForcedDependency forcedDependency = this.createForcedDependency(moduleVersionSelectorNotation);
 
-    if (forcedDependency == null) {
+    if(forcedDependency == null) {
       return;
     }
 
-    for (int index = 0; index < this.forcedDependencies.size(); index++) {
+    for(int index = 0; index < this.forcedDependencies.size(); index++) {
       ForcedDependency dependency = this.createForcedDependency(this.forcedDependencies.get(index));
 
-      if (dependency == null) {
+      if(dependency == null) {
         return;
       }
 
-      if (dependency.equals(forcedDependency)) {
+      if(dependency.equals(forcedDependency)) {
         return;
       }
 
-      if (dependency.nonVersionEquals(forcedDependency)) {
+      if(dependency.nonVersionEquals(forcedDependency)) {
         this.forcedDependencies.set(index, moduleVersionSelectorNotation);
         return;
       }
@@ -92,8 +94,8 @@ public class FlintResolutionStrategy {
   }
 
   /**
-   * Allows forcing certain versions of dependencies, including transitive dependencies. Appends new
-   * forced modules to be considered when resolving dependencies. It accepts following notations:
+   * Allows forcing certain versions of dependencies, including transitive dependencies. Appends new forced modules to
+   * be considered when resolving dependencies. It accepts following notations:
    *
    * <ul>
    *   <li>String in a format of: 'group:name:version', for example: 'org.gradle:gradle-core:1.0'
@@ -104,7 +106,7 @@ public class FlintResolutionStrategy {
    * @param moduleVersionSelectorNotations Typically group:name:version notations to append.
    */
   public void forceDependencies(Object... moduleVersionSelectorNotations) {
-    for (Object moduleVersionSelectorNotation : moduleVersionSelectorNotations) {
+    for(Object moduleVersionSelectorNotation : moduleVersionSelectorNotations) {
       this.forceDependency(moduleVersionSelectorNotation);
     }
   }
@@ -112,9 +114,12 @@ public class FlintResolutionStrategy {
   /**
    * Forces a collection of dependencies on all configurations of the given {@code project}.
    *
-   * @param project The project for which the dependencies are to be enforced.
+   * @param project   The project for which the dependencies are to be enforced.
+   * @param extension The flint extension for the project
    */
-  public void forceResolutionStrategy(Project project) {
+  public void forceResolutionStrategy(Project project, FlintGradleExtension extension) {
+    String flintVersion = extension.getFlintVersion();
+
     project
         .getConfigurations()
         .forEach(
@@ -122,21 +127,34 @@ public class FlintResolutionStrategy {
                 configuration.resolutionStrategy(
                     resolutionStrategy -> {
                       forcedDependencies.forEach(resolutionStrategy::force);
+                      resolutionStrategy.eachDependency((details) -> {
+                        ModuleVersionSelector selector = details.getRequested();
+
+                        if(selector.getGroup().equals("net.flintmc") && !Objects.equals(selector.getVersion(), flintVersion)) {
+
+                          // Force the flint version to what is specified in the project
+                          details.useVersion(flintVersion);
+                          details.because(
+                              "Forcing net.flintmc dependency from " + selector.getVersion() + " to " +
+                                  flintVersion + " to ensure a consistent framework version " +
+                                  "[Automatically done by flint-gradle]");
+                        }
+                      });
                     }));
   }
 
   private ForcedDependency createForcedDependency(Object moduleVersionSelectorNotation) {
 
-    if (moduleVersionSelectorNotation instanceof String) {
+    if(moduleVersionSelectorNotation instanceof String) {
       String notation = (String) moduleVersionSelectorNotation;
 
-      if (!notation.contains(":")) {
+      if(!notation.contains(":")) {
         return null;
       }
 
       String[] split = notation.split(":");
 
-      if (split.length == 3) {
+      if(split.length == 3) {
 
         String group = split[0];
         String name = split[1];
@@ -144,7 +162,7 @@ public class FlintResolutionStrategy {
 
         return new ForcedDependency(group, name, version);
       }
-    } else if (moduleVersionSelectorNotation instanceof ModuleVersionSelector) {
+    } else if(moduleVersionSelectorNotation instanceof ModuleVersionSelector) {
       ModuleVersionSelector moduleVersionSelector =
           (ModuleVersionSelector) moduleVersionSelectorNotation;
       return new ForcedDependency(
@@ -180,25 +198,33 @@ public class FlintResolutionStrategy {
     }
 
     public boolean nonVersionEquals(Object o) {
-      if (this == o) return true;
-      if (o == null || getClass() != o.getClass()) return false;
+      if(this == o) {
+        return true;
+      }
+      if(o == null || getClass() != o.getClass()) {
+        return false;
+      }
       ForcedDependency that = (ForcedDependency) o;
-      return Objects.equal(group, that.group) && Objects.equal(name, that.name);
+      return Objects.equals(group, that.group) && Objects.equals(name, that.name);
     }
 
     @Override
     public boolean equals(Object o) {
-      if (this == o) return true;
-      if (o == null || getClass() != o.getClass()) return false;
+      if(this == o) {
+        return true;
+      }
+      if(o == null || getClass() != o.getClass()) {
+        return false;
+      }
       ForcedDependency that = (ForcedDependency) o;
-      return Objects.equal(group, that.group)
-          && Objects.equal(name, that.name)
-          && Objects.equal(version, that.version);
+      return Objects.equals(group, that.group)
+          && Objects.equals(name, that.name)
+          && Objects.equals(version, that.version);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hashCode(group, name, version);
+      return Objects.hash(group, name, version);
     }
   }
 }
