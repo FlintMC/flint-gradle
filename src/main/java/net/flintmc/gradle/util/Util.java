@@ -650,4 +650,21 @@ public class Util {
         ? System.getenv("ProgramFiles(x86)") != null
         : System.getProperty("os.arch").contains("64");
   }
+
+  /**
+   * Retrieves the base URI of the distributor repository.
+   *
+   * @param project The project to use for resolving the properties
+   * @param notAvailableSolution Messages to display as a solution in case URI can't be computed
+   * @return The base URI of the distributor repository
+   */
+  public static URI getDistributorMavenURI(Project project, String... notAvailableSolution) {
+    return concatURI(
+        FlintPluginProperties.DISTRIBUTOR_URL
+            .require(project, notAvailableSolution),
+        "api/v1/maven",
+        FlintPluginProperties.DISTRIBUTOR_CHANNEL
+            .require(project, notAvailableSolution)
+    );
+  }
 }

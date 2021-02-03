@@ -58,7 +58,6 @@ public class FlintGradlePlugin implements Plugin<Project> {
 
   private static final String MINECRAFT_MAVEN = "https://libraries.minecraft.net";
   private static final String MAVEN_CENTRAL = "https://repo.maven.apache.org/maven2/";
-  private static final String FLINT_MAVEN = "https://dist.labymod.net/api/v1/maven/release/";
 
   private Project project;
 
@@ -67,7 +66,6 @@ public class FlintGradlePlugin implements Plugin<Project> {
   private MavenArtifactURLCache mavenArtifactURLCache;
 
   private FlintGradleExtension extension;
-  private FlintPatcherExtension patcherExtension;
   private JavaPluginInteraction interaction;
   private MinecraftRepository minecraftRepository;
   private SimpleMavenRepository internalRepository;
@@ -108,7 +106,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
       }
 
       this.extension = project.getExtensions().create(FlintGradleExtension.NAME, FlintGradleExtension.class, this);
-      this.patcherExtension = project.getExtensions().create(FlintPatcherExtension.NAME, FlintPatcherExtension.class, this);
+      project.getExtensions().create(FlintPatcherExtension.NAME, FlintPatcherExtension.class, this);
 
       Path flintGradlePath = gradle.getGradleUserHomeDir().toPath().resolve("caches/flint-gradle");
       Path minecraftCache = flintGradlePath.resolve("minecraft-cache");
@@ -170,7 +168,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
 
     project.getRepositories().maven(repo -> {
       repo.setName("Flint");
-      repo.setUrl(FLINT_MAVEN);
+      repo.setUrl(Util.getDistributorMavenURI(project));
       Util.applyDistributorCredentials(project, repo, false);
     });
 
@@ -305,10 +303,6 @@ public class FlintGradlePlugin implements Plugin<Project> {
    */
   public MavenArtifactURLCache getMavenArtifactURLCache() {
     return mavenArtifactURLCache;
-  }
-
-  public FlintPatcherExtension getPatcherExtension() {
-    return patcherExtension;
   }
 
   public Project getProject() {

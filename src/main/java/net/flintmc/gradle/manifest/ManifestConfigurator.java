@@ -60,7 +60,6 @@ public class ManifestConfigurator {
   }
 
   private URI projectPublishURI;
-  private URI distributorMavenURI;
   private URI projectMavenURI;
 
   /**
@@ -78,7 +77,7 @@ public class ManifestConfigurator {
       PublishingExtension publishingExtension = project.getExtensions().findByType(PublishingExtension.class);
 
       // Build the distributor URL in form of <host>/maven/<channel>
-      URI distributorUrl = getDistributorMavenURI(
+      URI distributorUrl = Util.getDistributorMavenURI(project,
           "Set enablePublishing to false in the flint extension",
           "Set shouldAutoConfigurePublishing to false in the flint extension");
 
@@ -230,26 +229,6 @@ public class ManifestConfigurator {
   }
 
   /**
-   * Retrieves the base URI of the distributor repository.
-   *
-   * @param notAvailableSolution Messages to display as a solution in case URI can't be computed
-   * @return The base URI of the distributor repository
-   */
-  public URI getDistributorMavenURI(String... notAvailableSolution) {
-    if(distributorMavenURI == null) {
-      distributorMavenURI = Util.concatURI(
-          FlintPluginProperties.DISTRIBUTOR_URL
-              .require(project, notAvailableSolution),
-          "api/v1/maven",
-          FlintPluginProperties.DISTRIBUTOR_CHANNEL
-              .require(project, notAvailableSolution)
-      );
-    }
-
-    return distributorMavenURI;
-  }
-
-  /**
    * Retrieves the base URI of the distributor repository including the project namespace.
    *
    * @param notAvailableSolution Messages to display as a solution in case the URI can't be computed
@@ -257,7 +236,7 @@ public class ManifestConfigurator {
    */
   public URI getProjectMavenURI(String... notAvailableSolution) {
     if(projectMavenURI == null) {
-      URI distributorURI = getDistributorMavenURI(notAvailableSolution);
+      URI distributorURI = Util.getDistributorMavenURI(project, notAvailableSolution);
 
       projectMavenURI = Util.concatURI(
           distributorURI,
