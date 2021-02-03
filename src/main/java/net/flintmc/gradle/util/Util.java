@@ -388,7 +388,7 @@ public class Util {
    * @throws IOException If an I/O error occurs
    */
   public static boolean isPackageJar(File file) throws IOException {
-    if (file.getName().endsWith(".jar")) {
+    if (!file.getName().endsWith(".jar")) {
       // Needs to be a jar file
       return false;
     }
@@ -407,7 +407,7 @@ public class Util {
    * @throws JsonConverterException If the {@code manifest.json} can't be read as a {@link PackageModel}
    */
   public static PackageModel getPackageModelFromJar(File file) throws IOException, JsonConverterException {
-    if (file.getName().endsWith(".jar")) {
+    if (!file.getName().endsWith(".jar")) {
       // Needs to be a jar file
       return null;
     }
