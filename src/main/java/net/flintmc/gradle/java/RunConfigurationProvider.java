@@ -52,8 +52,11 @@ import org.gradle.api.Task;
 import org.gradle.api.tasks.SourceSet;
 import org.gradle.api.tasks.SourceSetContainer;
 
-/** Utility class for adding run configurations to the root project. */
+/**
+ * Utility class for adding run configurations to the root project.
+ */
 public class RunConfigurationProvider {
+
   private final Project project;
   private final MinecraftRepository minecraftRepository;
   private final Path runCacheDir;
@@ -66,12 +69,13 @@ public class RunConfigurationProvider {
   /**
    * Constructs a new {@link RunConfigurationProvider} for the given project.
    *
-   * @param project The project to generate configurations on
+   * @param project             The project to generate configurations on
    * @param minecraftRepository The repository to retrieve minecraft launch information from
-   * @param runCacheDir The directory certain thins such as natives and assets are cached in
-   * @param authenticator The {@link YggdrasilAuthenticator} passed to minecraft run tasks for
-   *     authentication
-   * @param httpClient The HTTP client to use for potential downloads
+   * @param runCacheDir         The directory certain thins such as natives and assets are cached
+   *                            in
+   * @param authenticator       The {@link YggdrasilAuthenticator} passed to minecraft run tasks for
+   *                            authentication
+   * @param httpClient          The HTTP client to use for potential downloads
    */
   public RunConfigurationProvider(
       Project project,
@@ -93,7 +97,7 @@ public class RunConfigurationProvider {
    * Installs the given source sets into the configurations
    *
    * @param sourceProject The project to use as a source for the source sets
-   * @param extension The extension to use as a configuration base
+   * @param extension     The extension to use as a configuration base
    */
   public void installSourceSets(Project sourceProject, FlintGradleExtension extension) {
     FlintRunsExtension runs = extension.getRuns();
@@ -116,9 +120,9 @@ public class RunConfigurationProvider {
         if (!excludedSourceSetsByConfiguration.containsKey(configuration)
             || !excludedSourceSetsByConfiguration.get(configuration).containsKey(sourceSet)
             || !sourceSet
-                .getName()
-                .equals(
-                    "test") // Exclude the test source set, it can be manually included if wanted
+            .getName()
+            .equals(
+                "test") // Exclude the test source set, it can be manually included if wanted
         ) {
           // The source set has not been excluded, add it
           PotentialMinecraftClasspath configurationSourceSets =
@@ -156,8 +160,8 @@ public class RunConfigurationProvider {
   /**
    * Ensures that all tasks are set up for the given versions and configuration name.
    *
-   * @param configuration The name of the configuration
-   * @param versions The versions to set runs up for
+   * @param configuration      The name of the configuration
+   * @param versions           The versions to set runs up for
    * @param potentialClasspath The classpath to set the tasks up for
    */
   private void ensureVersionedTasksSetup(
@@ -170,8 +174,8 @@ public class RunConfigurationProvider {
   /**
    * Ensures that a run task for the given configuration and version exists.
    *
-   * @param configuration The configuration run name
-   * @param version The minecraft version of the run task
+   * @param configuration      The configuration run name
+   * @param version            The minecraft version of the run task
    * @param potentialClasspath The potential classpath for the task
    */
   private void ensureRunTaskSetup(
@@ -201,6 +205,17 @@ public class RunConfigurationProvider {
 
       // Set up the authenticator
       runTask.setAuthenticator(authenticator);
+
+      if (!extension.getArguments().isEmpty()) {
+
+        extension.getArguments().forEach(
+            argument -> runTask.args(argument.getFirst(), argument.getSecond()));
+      }
+
+      if (!extension.getJvmArguments().isEmpty()) {
+        extension.getJvmArguments().forEach(
+            jvmArgument -> runTask.jvmArgs(jvmArgument.getFirst() + "=" + jvmArgument.getSecond()));
+      }
 
       // Set the potential classpath and index the task
       runTask.setPotentialClasspath(potentialClasspath);
@@ -241,7 +256,7 @@ public class RunConfigurationProvider {
   /**
    * Creates the minecraft run task with the given name for the given version.
    *
-   * @param name The name of the task
+   * @param name    The name of the task
    * @param version The minecraft version to create the task for
    * @return The created task
    */
@@ -357,8 +372,8 @@ public class RunConfigurationProvider {
   /**
    * Resolves the source set or version names to their respective source sets.
    *
-   * @param names The names to resolve
-   * @param sourceSets The source set container with all available source sets
+   * @param names         The names to resolve
+   * @param sourceSets    The source set container with all available source sets
    * @param sourceProject The project the source set originate from
    * @return The resolved source sets
    * @throws IllegalArgumentException If a name can't be resolved
