@@ -20,6 +20,7 @@
 package net.flintmc.gradle.extension;
 
 import groovy.lang.Closure;
+import net.flintmc.gradle.util.Pair;
 import org.gradle.util.Configurable;
 import org.gradle.util.ConfigureUtil;
 
@@ -31,6 +32,8 @@ public class FlintRunsExtension implements Configurable<FlintRunsExtension> {
   private final Map<String, Set<String>> includedSourceSets;
   private final Map<String, Set<String>> excludedSourceSets;
   private final Map<String, String> mainClassOverrides;
+  private final List<Pair<Object, Object>> arguments;
+  private final List<Pair<Object, Object>> jvmArguments;
   private String generalMainClassOverride;
 
   /**
@@ -42,6 +45,9 @@ public class FlintRunsExtension implements Configurable<FlintRunsExtension> {
     this.includedSourceSets = new HashMap<>();
     this.excludedSourceSets = new HashMap<>();
     this.mainClassOverrides = new HashMap<>();
+    this.arguments = new ArrayList<>();
+    this.jvmArguments = new ArrayList<>();
+
     this.generalMainClassOverride = null;
   }
 
@@ -54,6 +60,9 @@ public class FlintRunsExtension implements Configurable<FlintRunsExtension> {
     this.allIncludedConfigurations = new HashSet<>(parent.allIncludedConfigurations);
     this.includedSourceSets = new HashMap<>(parent.includedSourceSets);
     this.excludedSourceSets = new HashMap<>(parent.excludedSourceSets);
+
+    this.arguments = new ArrayList<>(parent.arguments);
+    this.jvmArguments = new ArrayList<>(parent.jvmArguments);
 
     // The following can only be configured in the root project
     this.mainClassOverrides = null;
@@ -146,6 +155,24 @@ public class FlintRunsExtension implements Configurable<FlintRunsExtension> {
   }
 
   /**
+   * Retrieves a collection of arguments.
+   *
+   * @return A collection of arguments.
+   */
+  public List<Pair<Object, Object>> getArguments() {
+    return arguments;
+  }
+
+  /**
+   * Retrieves a collection of jvm arguments.
+   *
+   * @return A collection of jvm arguments.
+   */
+  public List<Pair<Object, Object>> getJvmArguments() {
+    return jvmArguments;
+  }
+
+  /**
    * Overrides the main class of the given configuration.
    *
    * @param configuration The configuration to override the main class of
@@ -202,6 +229,21 @@ public class FlintRunsExtension implements Configurable<FlintRunsExtension> {
     }
 
     return generalMainClassOverride;
+  }
+
+  /**
+   * Adds an argument to use launch the JVM for the process.
+   */
+  public void jvmArg(Object key, Object value) {
+    this.jvmArguments.add(new Pair<>(key, value));
+  }
+
+  /**
+   * Adds argument for the main class to be executed.
+   *
+   */
+  public void arg(Object key, Object value) {
+    this.arguments.add(new Pair<>(key, value));
   }
 
   /**
