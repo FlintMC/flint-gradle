@@ -24,6 +24,7 @@ import net.flintmc.gradle.extension.FlintGradleExtension;
 import net.flintmc.gradle.extension.FlintSelfInstallerExtension;
 import net.flintmc.gradle.json.JsonConverter;
 import net.flintmc.gradle.manifest.dev.DevelopmentStaticFiles;
+import net.flintmc.gradle.util.Util;
 import net.flintmc.installer.frontend.gui.InstallBundle;
 import org.gradle.api.GradleException;
 import org.gradle.api.Project;
@@ -32,6 +33,7 @@ import org.gradle.api.plugins.ExtraPropertiesExtension;
 import org.gradle.api.plugins.JavaPluginConvention;
 import org.gradle.api.tasks.SourceSet;
 import org.gradle.api.tasks.bundling.Jar;
+import org.gradle.api.tasks.compile.JavaCompile;
 
 import java.io.*;
 import java.util.*;
@@ -57,7 +59,8 @@ public class JarTaskProvider {
         .stream()
         .filter(sourceSet -> sourceSetsToAdd.contains(sourceSet.getName()))
         .forEach(sourceSet -> {
-          this.addToMainJar(sourceSet, project);
+          this.addToMainJar(project, sourceSet);
+          this.configureAnnotationProcessor(project, sourceSet);
           if(!sourceSet.getName().equals("main")) {
             this.installCompileTask(sourceSet, project);
           }
@@ -67,13 +70,34 @@ public class JarTaskProvider {
   }
 
   /**
+   * Configures the annotation processor on the given source set and sets required arguments.
+   *
+   * @param project   The project the source set belongs to
+   * @param sourceSet The source set to configure
+   */
+  private void configureAnnotationProcessor(Project project, SourceSet sourceSet) {
+    project.getTasks().named(sourceSet.getCompileJavaTaskName(), JavaCompile.class, (task) -> {
+      String minecraftVersion = (String) sourceSet.getExtensions().findByName("minecraftVersion");
+
+      Map<String, String> annotationProcessorArgs = new HashMap<>();
+      if(minecraftVersion != null) {
+        annotationProcessorArgs.put("net.flintmc.minecraft.version", minecraftVersion);
+      }
+
+      // Collect the arguments from the map above into the form of "-Akey=value"
+      task.getOptions().getCompilerArgumentProviders().add(() ->
+          Util.zipMap(annotationProcessorArgs, (key, value) -> "-A" + key + "=" + value));
+    });
+  }
+
+  /**
    * Adds the outputs of other source sets to the main jar.
    *
-   * @param sourceSet The source set to add to the main jar
    * @param project   The project to source set belongs to
+   * @param sourceSet The source set to add to the main jar
    */
   @SuppressWarnings("unchecked")
-  public void addToMainJar(SourceSet sourceSet, Project project) {
+  public void addToMainJar(Project project, SourceSet sourceSet) {
     // Retrieve the jar task producing the fat, bundled jar which will be used
     // in the production environment
     Jar mainJarTask = (Jar) project.getTasks().getByName("jar");
