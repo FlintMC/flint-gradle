@@ -84,6 +84,11 @@ public class JarTaskProvider {
         annotationProcessorArgs.put("net.flintmc.minecraft.version", minecraftVersion);
       }
 
+      // Common package properties
+      annotationProcessorArgs.put("net.flintmc.package.group", project.getGroup().toString());
+      annotationProcessorArgs.put("net.flintmc.package.name", project.getName());
+      annotationProcessorArgs.put("net.flintmc.package.version", project.getVersion().toString());
+
       // Collect the arguments from the map above into the form of "-Akey=value"
       task.getOptions().getCompilerArgumentProviders().add(() ->
           Util.zipMap(annotationProcessorArgs, (key, value) -> "-A" + key + "=" + value));
