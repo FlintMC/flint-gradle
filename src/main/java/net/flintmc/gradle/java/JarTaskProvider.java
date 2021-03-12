@@ -88,6 +88,7 @@ public class JarTaskProvider {
       annotationProcessorArgs.put("net.flintmc.package.group", project.getGroup().toString());
       annotationProcessorArgs.put("net.flintmc.package.name", project.getName());
       annotationProcessorArgs.put("net.flintmc.package.version", project.getVersion().toString());
+      annotationProcessorArgs.put("net.flintmc.sourceSet", sourceSet.getName());
 
       // Collect the arguments from the map above into the form of "-Akey=value"
       task.getOptions().getCompilerArgumentProviders().add(() ->
