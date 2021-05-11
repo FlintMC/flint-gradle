@@ -24,7 +24,9 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import net.flintmc.installer.impl.repository.models.InternalModelSerializer;
+import com.google.inject.Guice;
+import net.flintmc.installer.impl.InstallerModule;
+import net.flintmc.installer.repository.ModelSerializer;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -38,7 +40,8 @@ public class JsonConverter {
    * all operations done with the {@link JsonConverter} class.
    */
   public static final ObjectMapper OBJECT_MAPPER;
-  public static final InternalModelSerializer PACKAGE_MODEL_SERIALIZER = new InternalModelSerializer();
+  public static final ModelSerializer PACKAGE_MODEL_SERIALIZER =
+      Guice.createInjector(new InstallerModule()).getInstance(ModelSerializer.class);
 
   static {
     OBJECT_MAPPER = new ObjectMapper();

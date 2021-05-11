@@ -19,6 +19,8 @@
 
 package net.flintmc.gradle.manifest.data;
 
+import net.flintmc.installer.util.OperatingSystem;
+
 import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
@@ -30,16 +32,18 @@ import java.net.URI;
  */
 public class ManifestStaticFile implements Externalizable {
   private URI uri;
+  private OperatingSystem operatingSystem;
   private String path;
 
   /**
    * Constructs a new {@link ManifestStaticFile}.
-   *
-   * @param uri  The URI where the file can be downloaded from
+   *  @param uri  The URI where the file can be downloaded from
+   * @param operatingSystem The operating system where the file needs to be downloaded
    * @param path The path to put the file at
    */
-  public ManifestStaticFile(URI uri, String path) {
+  public ManifestStaticFile(URI uri, OperatingSystem operatingSystem, String path) {
     this.uri = uri;
+    this.operatingSystem = operatingSystem;
     this.path = path;
   }
 
@@ -58,6 +62,10 @@ public class ManifestStaticFile implements Externalizable {
     return uri;
   }
 
+  public OperatingSystem getOperatingSystem() {
+    return this.operatingSystem;
+  }
+
   /**
    * Retrieves the path this file will be downloaded to
    *
@@ -70,12 +78,15 @@ public class ManifestStaticFile implements Externalizable {
   @Override
   public void writeExternal(ObjectOutput out) throws IOException {
     out.writeObject(uri);
+    out.writeByte(this.operatingSystem == null ? -1 : this.operatingSystem.ordinal());
     out.writeUTF(path);
   }
 
   @Override
   public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
     uri = (URI) in.readObject();
+    int osIndex = in.readByte();
+    this.operatingSystem = osIndex == -1 ? null : OperatingSystem.values()[osIndex];
     path = in.readUTF();
   }
 }

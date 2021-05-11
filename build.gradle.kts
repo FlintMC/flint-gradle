@@ -66,7 +66,7 @@ repositories {
     mavenCentral()
 }
 
-version = System.getenv().getOrDefault("VERSION", "2.9.1")
+version = System.getenv().getOrDefault("VERSION", "2.10.0")
 
 dependencies {
     implementation(group = "com.fasterxml.jackson.core", name = "jackson-core", version = "2.11.1")
@@ -76,11 +76,11 @@ dependencies {
     implementation(group = "io.github.java-diff-utils", name = "java-diff-utils", version = "4.7")
     implementation(group = "com.fasterxml.jackson.core", name = "jackson-core", version = "2.12.0-rc1")
 
-    implementation(group = "net.flintmc.installer", name = "logic-implementation", version = "1.1.10")
-    implementation(group = "net.flintmc.installer", name = "frontend-gui", version = "1.1.10")
-    implementation(group = "net.flintmc.installer", name = "logic", version = "1.1.10")
-    implementation(group = "net.flintmc.installer", name = "logic-implementation", version = "1.1.5")
-    implementation(group = "net.flintmc.installer", name = "logic", version = "1.1.5")
+    implementation(group = "net.flintmc.installer", name = "logic-implementation", version = "1.1.11")
+    implementation(group = "net.flintmc.installer", name = "frontend-gui", version = "1.1.11")
+    implementation(group = "net.flintmc.installer", name = "logic", version = "1.1.11")
+    implementation(group = "net.flintmc.installer", name = "logic-implementation", version = "1.1.11")
+    implementation(group = "net.flintmc.installer", name = "logic", version = "1.1.11")
 
     implementation(group = "com.cloudbees", name = "diff4j", version = "1.2")
 }

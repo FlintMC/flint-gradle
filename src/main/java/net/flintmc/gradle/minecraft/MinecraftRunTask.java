@@ -208,6 +208,7 @@ public class MinecraftRunTask extends JavaExec {
     jvmArgs("-Dlog4j.configurationFile=" + log4jConfiguration.toString());
     args(programArgs);
     args("--game-version", version);
+    args("--dev");
 
     // Add the classpath
     classpath(potentialClasspath.getRealClasspath(getProject(), version));
