@@ -149,7 +149,7 @@ public class FlintStaticFileDescription implements Named {
    * Sets the operating system where the static file should be installed. If no operating system is set,
    * it will be installed on every operating system.
    *
-   * @param operatingSystem The operating system where the file should be installed, null to be installed everywhere
+   * @param operatingSystem The operating system where the file should be installed, {@code null} to be installed everywhere
    */
   public void os(OperatingSystem operatingSystem) {
     this.operatingSystem = operatingSystem;
@@ -211,7 +211,7 @@ public class FlintStaticFileDescription implements Named {
    * Retrieves the operating system where the static file should be installed. If no operating system is set,
    * it will be installed on every operating system.
    *
-   * @return The operating system where the file should be installed, null to be installed everywhere
+   * @return The operating system where the file should be installed, {@code null} to be installed everywhere
    */
   public OperatingSystem getOperatingSystem() {
     return this.operatingSystem;

@@ -488,6 +488,11 @@ public class GenerateFlintManifestTask extends DefaultTask {
     return out;
   }
 
+  /**
+   * Builds the install instructions required by the json injections.
+   *
+   * @return The install instructions of the json injections
+   */
   private Set<InstallInstructionModel> buildJsonInjectionInstructions() {
     NamedDomainObjectContainer<FlintJsonInjectionDescription> descriptions = this.getProject().getExtensions()
         .getByType(FlintGradleExtension.class).getJsonInjections().getJsonInjectionDescriptions();

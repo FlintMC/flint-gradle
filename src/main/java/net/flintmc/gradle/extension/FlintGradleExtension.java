@@ -365,6 +365,11 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
     return this.staticFilesExtension;
   }
 
+  /**
+   * Retrieves the json injections extension of this extension.
+   *
+   * @return The json injections extension of this extension
+   */
   public FlintJsonInjectionsExtension getJsonInjections() {
     return this.jsonInjectionsExtension;
   }
@@ -381,6 +386,12 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
     return this.staticFilesExtension;
   }
 
+  /**
+   * Configures the json injections extension of this extension with the given action.
+   *
+   * @param action The action to use for configuration
+   * @return The configured json injections extension of this extension
+   */
   public FlintJsonInjectionsExtension jsonInjections(
           Action<NamedDomainObjectContainer<FlintJsonInjectionDescription>> action) {
     action.execute(this.jsonInjectionsExtension.getJsonInjectionDescriptions());
@@ -504,10 +515,20 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
     this.autoConfigurePublishing = autoConfigurePublishing;
   }
 
+  /**
+   * Retrieves whether the built jar of this project should be included when starting Flint through the installer.
+   *
+   * @return {@code true} if it should be included, {@code false} if it should just be ignored
+   */
   public boolean shouldInstallJar() {
     return this.installJar;
   }
 
+  /**
+   * Overwrites whether the built jar of this project should be included when starting Flint through the installer.
+   *
+   * @param installJar {@code true} if it should be included, {@code false} if it should just be ignored
+   */
   public void installJar(boolean installJar) {
     this.installJar = installJar;
   }
