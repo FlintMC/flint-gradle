@@ -31,6 +31,8 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import net.flintmc.gradle.FlintGradlePlugin;
+import net.flintmc.gradle.extension.json.FlintJsonInjectionDescription;
+import net.flintmc.gradle.extension.json.FlintJsonInjectionsExtension;
 import net.flintmc.gradle.minecraft.data.environment.EnvironmentType;
 import net.flintmc.gradle.minecraft.data.environment.MinecraftVersion;
 import net.flintmc.gradle.util.Util;
@@ -48,6 +50,7 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
   private final FlintRunsExtension runsExtension;
   private final FlintResolutionStrategyExtension resolutionStrategyExtension;
   private final FlintStaticFilesExtension staticFilesExtension;
+  private final FlintJsonInjectionsExtension jsonInjectionsExtension;
   private final FlintSelfInstallerExtension selfInstallerExtension;
 
   private boolean configured;
@@ -60,6 +63,7 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
   private String flintVersion;
   private boolean enablePublishing;
   private boolean autoConfigurePublishing;
+  private boolean installJar;
 
   /**
    * Creates a new {@link FlintGradleExtension} with default values.
@@ -74,11 +78,13 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
     this.runsExtension = new FlintRunsExtension();
     this.resolutionStrategyExtension = new FlintResolutionStrategyExtension();
     this.staticFilesExtension = new FlintStaticFilesExtension(plugin.getProject());
+    this.jsonInjectionsExtension = new FlintJsonInjectionsExtension(plugin.getProject());
     this.selfInstallerExtension = new FlintSelfInstallerExtension();
 
     this.enablePublishing = true;
     this.autoConfigurePublishing = true;
     this.minecraftVersions = new HashSet<>();
+    this.installJar = true;
   }
 
   /**
@@ -96,6 +102,7 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
     this.staticFilesExtension =
         new FlintStaticFilesExtension(
             plugin.getProject()); // TODO: Should static files be inherited too?
+    this.jsonInjectionsExtension = new FlintJsonInjectionsExtension(plugin.getProject());
     this.selfInstallerExtension = new FlintSelfInstallerExtension(parent.selfInstallerExtension);
 
     this.type = parent.type;
@@ -106,6 +113,7 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
     this.flintVersion = parent.flintVersion;
     this.enablePublishing = parent.enablePublishing;
     this.autoConfigurePublishing = parent.autoConfigurePublishing;
+    this.installJar = parent.installJar;
   }
 
   /**
@@ -358,6 +366,15 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
   }
 
   /**
+   * Retrieves the json injections extension of this extension.
+   *
+   * @return The json injections extension of this extension
+   */
+  public FlintJsonInjectionsExtension getJsonInjections() {
+    return this.jsonInjectionsExtension;
+  }
+
+  /**
    * Configures the static files extension of this extension with the given action.
    *
    * @param action The action to use for configuration
@@ -367,6 +384,18 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
       Action<NamedDomainObjectContainer<FlintStaticFileDescription>> action) {
     action.execute(this.staticFilesExtension.getStaticFileDescriptions());
     return this.staticFilesExtension;
+  }
+
+  /**
+   * Configures the json injections extension of this extension with the given action.
+   *
+   * @param action The action to use for configuration
+   * @return The configured json injections extension of this extension
+   */
+  public FlintJsonInjectionsExtension jsonInjections(
+          Action<NamedDomainObjectContainer<FlintJsonInjectionDescription>> action) {
+    action.execute(this.jsonInjectionsExtension.getJsonInjectionDescriptions());
+    return this.jsonInjectionsExtension;
   }
 
   /**
@@ -484,6 +513,24 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
    */
   public void autoConfigurePublishing(boolean autoConfigurePublishing) {
     this.autoConfigurePublishing = autoConfigurePublishing;
+  }
+
+  /**
+   * Retrieves whether the built jar of this project should be included when starting Flint through the installer.
+   *
+   * @return {@code true} if it should be included, {@code false} if it should just be ignored
+   */
+  public boolean shouldInstallJar() {
+    return this.installJar;
+  }
+
+  /**
+   * Overwrites whether the built jar of this project should be included when starting Flint through the installer.
+   *
+   * @param installJar {@code true} if it should be included, {@code false} if it should just be ignored
+   */
+  public void installJar(boolean installJar) {
+    this.installJar = installJar;
   }
 
   /**

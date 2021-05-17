@@ -19,25 +19,30 @@
 
 package net.flintmc.gradle.manifest.tasks;
 
-import java.util.concurrent.CopyOnWriteArraySet;
-import java.util.stream.Collectors;
 import net.flintmc.gradle.FlintGradleException;
 import net.flintmc.gradle.extension.FlintGradleExtension;
+import net.flintmc.gradle.extension.json.FlintJsonInjectionDescription;
+import net.flintmc.gradle.json.JsonConverter;
 import net.flintmc.gradle.manifest.cache.BoundMavenDependencies;
 import net.flintmc.gradle.manifest.cache.StaticFileChecksums;
 import net.flintmc.gradle.manifest.data.*;
-import net.flintmc.gradle.manifest.dev.DevelopmentStaticFiles;
 import net.flintmc.gradle.maven.pom.MavenArtifact;
 import net.flintmc.gradle.minecraft.data.environment.MinecraftVersion;
 import net.flintmc.gradle.property.FlintPluginProperties;
 import net.flintmc.installer.impl.repository.models.DependencyDescriptionModel;
-import net.flintmc.installer.impl.repository.models.InternalModelSerializer;
 import net.flintmc.installer.impl.repository.models.PackageModel;
-import net.flintmc.installer.impl.repository.models.install.DownloadFileDataModel;
-import net.flintmc.installer.impl.repository.models.install.DownloadMavenDependencyDataModel;
 import net.flintmc.installer.impl.repository.models.install.InstallInstructionModel;
 import net.flintmc.installer.impl.repository.models.install.InstallInstructionTypes;
+import net.flintmc.installer.impl.repository.models.install.data.DownloadFileDataModel;
+import net.flintmc.installer.impl.repository.models.install.data.DownloadMavenDependencyDataModel;
+import net.flintmc.installer.impl.repository.models.install.data.json.ModifyJsonFileDataModel;
+import net.flintmc.installer.impl.repository.models.install.data.json.injections.ModifyJsonArrayInjection;
+import net.flintmc.installer.impl.repository.models.install.data.json.injections.ModifyJsonObjectInjection;
+import net.flintmc.installer.install.json.JsonFileDataInjection;
+import net.flintmc.installer.install.json.JsonInjectionPath;
+import net.flintmc.installer.util.OperatingSystem;
 import org.gradle.api.DefaultTask;
+import org.gradle.api.NamedDomainObjectContainer;
 import org.gradle.api.tasks.*;
 
 import javax.inject.Inject;
@@ -47,6 +52,8 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.*;
+import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.stream.Collectors;
 
 /**
  * Task generating the flint manifest.json
@@ -239,7 +246,7 @@ public class GenerateFlintManifestTask extends DefaultTask {
    * @return The flint extension controlling this manifest
    */
   private FlintGradleExtension getExtension() {
-    if(extension == null) {
+    if (extension == null) {
       extension = getProject().getExtensions().getByType(FlintGradleExtension.class);
     }
 
@@ -248,9 +255,9 @@ public class GenerateFlintManifestTask extends DefaultTask {
 
   @TaskAction
   public void generate() {
-    if(!getArtifactURLsCacheFile().isFile()) {
+    if (!getArtifactURLsCacheFile().isFile()) {
       throw new IllegalStateException("Missing maven artifacts URLs cache file");
-    } else if(!getStaticFilesChecksumsCacheFile().isFile()) {
+    } else if (!getStaticFilesChecksumsCacheFile().isFile()) {
       throw new IllegalStateException("Missing static file checksum cache file");
     }
 
@@ -261,7 +268,7 @@ public class GenerateFlintManifestTask extends DefaultTask {
     Map<ManifestMavenDependency, URI> dependencyURIs;
     try {
       dependencyURIs = BoundMavenDependencies.load(artifactURLsCacheFile);
-    } catch(IOException e) {
+    } catch (IOException e) {
       throw new FlintGradleException("IOException while loading cached maven artifact URLs", e);
     }
 
@@ -269,13 +276,13 @@ public class GenerateFlintManifestTask extends DefaultTask {
     StaticFileChecksums checksums;
     try {
       checksums = StaticFileChecksums.load(staticFilesChecksumsCacheFile);
-    } catch(IOException e) {
+    } catch (IOException e) {
       throw new FlintGradleException("IOException while loading cached static files checksums", e);
     }
 
     // Build package dependencies
     Set<DependencyDescriptionModel> dependencyDescriptionModels = new HashSet<>();
-    for(ManifestPackageDependency dependency : packageDependencies.getDependencies()) {
+    for (ManifestPackageDependency dependency : packageDependencies.getDependencies()) {
       dependencyDescriptionModels.add(new DependencyDescriptionModel(
           dependency.getName(),
           dependency.getVersion(),
@@ -286,22 +293,24 @@ public class GenerateFlintManifestTask extends DefaultTask {
     // Build all install instructions
     Set<InstallInstructionModel> mavenInstallInstructions = buildMavenInstallInstructions(dependencyURIs);
     Set<InstallInstructionModel> staticFileInstallInstructions = buildStaticFileInstructions(checksums);
+    Set<InstallInstructionModel> modifyJsonInstallInstructions = buildJsonInjectionInstructions();
     InstallInstructionModel ownInstallInstruction = buildOwnInstallInstruction();
 
     // Build the runtime classpath
     Set<String> runtimeClasspath = new HashSet<>();
-    for(InstallInstructionModel mavenInstallInstruction : mavenInstallInstructions) {
+    for (InstallInstructionModel mavenInstallInstruction : mavenInstallInstructions) {
       // Add all maven dependencies to the runtime classpath
       DownloadMavenDependencyDataModel data = mavenInstallInstruction.getData();
-      if(!data.getPath().equals(ownInstallInstruction.<DownloadMavenDependencyDataModel>getData().getPath())) {
+      if (ownInstallInstruction == null
+          || !data.getPath().equals(ownInstallInstruction.<DownloadMavenDependencyDataModel>getData().getPath())) {
         // If the library does not equal ourself, add it
         runtimeClasspath.add(data.getPath());
       }
     }
 
-    for(InstallInstructionModel staticFileInstallInstruction : staticFileInstallInstructions) {
+    for (InstallInstructionModel staticFileInstallInstruction : staticFileInstallInstructions) {
       DownloadFileDataModel data = staticFileInstallInstruction.getData();
-      if(data.getPath().endsWith(".jar")) {
+      if (data.getPath().endsWith(".jar")) {
         // If the static file is a jar, add it to the classpath
         runtimeClasspath.add(data.getPath());
       }
@@ -309,9 +318,12 @@ public class GenerateFlintManifestTask extends DefaultTask {
 
     // Collect all install instructions
     List<InstallInstructionModel> allInstallInstructions = new ArrayList<>();
-    allInstallInstructions.add(ownInstallInstruction);
+    if (ownInstallInstruction != null) {
+      allInstallInstructions.add(ownInstallInstruction);
+    }
     allInstallInstructions.addAll(mavenInstallInstructions);
     allInstallInstructions.addAll(staticFileInstallInstructions);
+    allInstallInstructions.addAll(modifyJsonInstallInstructions);
 
     // Build package model
     PackageModel model = new PackageModel(
@@ -330,15 +342,15 @@ public class GenerateFlintManifestTask extends DefaultTask {
 
     // Ensure the manifest file is writeable
     File manifestParentDir = manifestFile.getParentFile();
-    if(!manifestParentDir.isDirectory() && !manifestParentDir.mkdirs()) {
+    if (!manifestParentDir.isDirectory() && !manifestParentDir.mkdirs()) {
       throw new FlintGradleException("Failed to create directory " + manifestParentDir.getAbsolutePath());
     }
 
     // Serialize and write the manifest file
-    String json = new InternalModelSerializer().toString(model);
+    String json = JsonConverter.PACKAGE_MODEL_SERIALIZER.toString(model);
     try {
       Files.write(manifestFile.toPath(), json.getBytes(StandardCharsets.UTF_8));
-    } catch(IOException e) {
+    } catch (IOException e) {
       throw new FlintGradleException("Failed to write manifest file", e);
     }
   }
@@ -353,7 +365,7 @@ public class GenerateFlintManifestTask extends DefaultTask {
       Map<ManifestMavenDependency, URI> mavenDependencyURIs) {
     Set<InstallInstructionModel> out = new HashSet<>();
 
-    for(Map.Entry<ManifestMavenDependency, URI> entry : mavenDependencyURIs.entrySet()) {
+    for (Map.Entry<ManifestMavenDependency, URI> entry : mavenDependencyURIs.entrySet()) {
       MavenArtifact artifact = entry.getKey().getArtifact();
 
       // Construct the path relative to the root of the libraries folder
@@ -370,6 +382,7 @@ public class GenerateFlintManifestTask extends DefaultTask {
       // Add the instruction
       out.add(new InstallInstructionModel(
           InstallInstructionTypes.DOWNLOAD_MAVEN_DEPENDENCY,
+          null,
           new DownloadMavenDependencyDataModel(
               artifact.getGroupId(),
               artifact.getArtifactId(),
@@ -390,9 +403,13 @@ public class GenerateFlintManifestTask extends DefaultTask {
    * @return The install instruction of the project jar
    */
   private InstallInstructionModel buildOwnInstallInstruction() {
+    if (!this.getExtension().shouldInstallJar()) {
+      return null;
+    }
+
     String targetPath;
 
-    if(getExtension().getType() == FlintGradleExtension.Type.LIBRARY) {
+    if (getExtension().getType() == FlintGradleExtension.Type.LIBRARY) {
       // If the jar is a library, put it into the libraries folder
       targetPath = "${FLINT_LIBRARY_DIR}/" +
           getProjectGroup().replace('.', '/') + "/" +
@@ -406,6 +423,7 @@ public class GenerateFlintManifestTask extends DefaultTask {
 
     return new InstallInstructionModel(
         InstallInstructionTypes.DOWNLOAD_MAVEN_DEPENDENCY,
+        null,
         new DownloadMavenDependencyDataModel(
             getProjectGroup(),
             getProjectName(),
@@ -427,11 +445,11 @@ public class GenerateFlintManifestTask extends DefaultTask {
     Set<InstallInstructionModel> out = new HashSet<>();
 
     // Process local files
-    for(Map.Entry<File, ManifestStaticFile> entry : staticFiles.getLocalFiles().entrySet()) {
+    for (Map.Entry<File, ManifestStaticFile> entry : staticFiles.getLocalFiles().entrySet()) {
       File file = entry.getKey();
       ManifestStaticFile data = entry.getValue();
 
-      if(!checksums.has(file)) {
+      if (!checksums.has(file)) {
         // Should not happen unless the user explicitly excluded the checksum calculation task
         throw new IllegalStateException("No cached checksum found for file " + file.getAbsolutePath());
       }
@@ -439,6 +457,7 @@ public class GenerateFlintManifestTask extends DefaultTask {
       // Add the instruction
       out.add(new InstallInstructionModel(
           InstallInstructionTypes.DOWNLOAD_FILE,
+          data.getOperatingSystem(),
           new DownloadFileDataModel(
               data.getURI().toASCIIString(),
               data.getPath(),
@@ -448,8 +467,8 @@ public class GenerateFlintManifestTask extends DefaultTask {
     }
 
     // Process remote files
-    for(ManifestStaticFile remoteFile : staticFiles.getRemoteFiles()) {
-      if(!checksums.has(remoteFile.getURI())) {
+    for (ManifestStaticFile remoteFile : staticFiles.getRemoteFiles()) {
+      if (!checksums.has(remoteFile.getURI())) {
         // Should not happen unless the user explicitly excluded the checksum calculation task
         throw new IllegalStateException("No cached checksum found for URI " + remoteFile.getURI().toASCIIString());
       }
@@ -457,6 +476,7 @@ public class GenerateFlintManifestTask extends DefaultTask {
       // Add the instruction
       out.add(new InstallInstructionModel(
           InstallInstructionTypes.DOWNLOAD_FILE,
+          remoteFile.getOperatingSystem(),
           new DownloadFileDataModel(
               remoteFile.getURI().toASCIIString(),
               remoteFile.getPath(),
@@ -466,5 +486,56 @@ public class GenerateFlintManifestTask extends DefaultTask {
     }
 
     return out;
+  }
+
+  /**
+   * Builds the install instructions required by the json injections.
+   *
+   * @return The install instructions of the json injections
+   */
+  private Set<InstallInstructionModel> buildJsonInjectionInstructions() {
+    NamedDomainObjectContainer<FlintJsonInjectionDescription> descriptions = this.getProject().getExtensions()
+        .getByType(FlintGradleExtension.class).getJsonInjections().getJsonInjectionDescriptions();
+
+    Map<String, ModifyJsonFileDataModel> models = new HashMap<>();
+    for (FlintJsonInjectionDescription description : descriptions) {
+      description.validate();
+
+      JsonFileDataInjection injection;
+      switch (description.getType()) {
+        case MODIFY_ARRAY:
+          injection = new ModifyJsonArrayInjection(
+              description.getOverrideType(),
+              new JsonInjectionPath(description.getPathEntries()),
+              description.getInjection());
+          break;
+
+        case MODIFY_OBJECT:
+          injection = new ModifyJsonObjectInjection(
+              description.getOverrideType(),
+              new JsonInjectionPath(description.getPathEntries()),
+              description.getInjectKey(),
+              description.getInjection());
+          break;
+        default:
+          throw new IllegalStateException("Unexpected value: " + description.getType());
+      }
+
+      String key = description.getPath() + description.isPrettyPrint();
+      if (models.containsKey(key)) {
+        models.get(key).getInjections().add(injection);
+        continue;
+      }
+
+      models.put(key, new ModifyJsonFileDataModel(
+          description.getPath(),
+          description.isPrettyPrint(),
+          new ArrayList<>(Collections.singletonList(injection))
+      ));
+    }
+
+    return models.values().stream()
+        .map(model -> new InstallInstructionModel(InstallInstructionTypes.MODIFY_JSON_FILE, OperatingSystem.UNKNOWN, model))
+        .collect(Collectors.toSet());
   }
 }

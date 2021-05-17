@@ -32,7 +32,7 @@ public class FlintSelfInstallerExtension implements Configurable<FlintSelfInstal
   /**
    * Default self installer dependency notation. Defaults to the in house provided installer solution.
    */
-  public static final String DEFAULT_SELF_INSTALLER_DEPENDENCY = "net.flintmc.installer:frontend-gui:1.1.10";
+  public static final String DEFAULT_SELF_INSTALLER_DEPENDENCY = "net.flintmc.installer:frontend-gui:1.1.12";
 
   /**
    * Default self installer dependency main class. Defaults to the main class of the in house provided solution.

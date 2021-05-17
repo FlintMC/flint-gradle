@@ -19,6 +19,7 @@
 
 package net.flintmc.gradle.extension;
 
+import net.flintmc.installer.util.OperatingSystem;
 import org.gradle.api.Named;
 import org.gradle.api.Project;
 import org.gradle.api.logging.Logger;
@@ -45,6 +46,7 @@ public class FlintStaticFileDescription implements Named {
 
   private URI sourceURI;
   private File sourceFile;
+  private OperatingSystem operatingSystem;
   private String target;
 
   /**
@@ -65,13 +67,13 @@ public class FlintStaticFileDescription implements Named {
    * @throws URISyntaxException If source is not a valid URL
    */
   public void from(Object source) throws URISyntaxException {
-    if(source instanceof URI) {
+    if (source instanceof URI) {
       from((URI) source);
     } else {
-      if(source instanceof String) {
+      if (source instanceof String) {
         String src = (String) source;
 
-        if(src.contains("://")) {
+        if (src.contains("://")) {
           from(new URI(src));
           return;
         }
@@ -87,7 +89,7 @@ public class FlintStaticFileDescription implements Named {
    * @param uri The source URI of this static file
    */
   public void from(URI uri) {
-    switch(uri.getScheme()) {
+    switch (uri.getScheme()) {
       case "http":
         LOGGER.warn("Static file {} uses unsafe http scheme", name);
         // fallthrough
@@ -103,13 +105,13 @@ public class FlintStaticFileDescription implements Named {
       case "jar":
         URI sourceURI = URI.create(uri.getSchemeSpecificPart());
 
-        if(sourceURI.getScheme().equals("http")) {
+        if (sourceURI.getScheme().equals("http")) {
           LOGGER.warn("Static file {} uses unsafe http scheme", name);
           this.sourceURI = uri;
           break;
         }
 
-        if(sourceURI.getScheme().equals("https")) {
+        if (sourceURI.getScheme().equals("https")) {
           this.sourceURI = uri;
           break;
         }
@@ -144,6 +146,16 @@ public class FlintStaticFileDescription implements Named {
   }
 
   /**
+   * Sets the operating system where the static file should be installed. If no operating system is set,
+   * it will be installed on every operating system.
+   *
+   * @param operatingSystem The operating system where the file should be installed, {@code null} to be installed everywhere
+   */
+  public void os(OperatingSystem operatingSystem) {
+    this.operatingSystem = operatingSystem;
+  }
+
+  /**
    * Determines if the file is a remote file.
    *
    * @return {@code true} if the file is a remote file, {@code false} otherwise
@@ -158,20 +170,20 @@ public class FlintStaticFileDescription implements Named {
    * @throws IllegalStateException If this description is not valid
    */
   public void validate() {
-    if(this.sourceFile == null && this.sourceURI == null) {
+    if (this.sourceFile == null && this.sourceURI == null) {
       throw new IllegalStateException("Missing source, from() has not been called");
     }
 
-    if(this.target == null) {
+    if (this.target == null) {
       throw new IllegalStateException("Missing target, to() or into() has not been called");
     }
 
     try {
       Path targetPath = Paths.get(this.target);
-      if(targetPath.isAbsolute()) {
+      if (targetPath.isAbsolute()) {
         throw new IllegalStateException("Expected the target path to be a relative path");
       }
-    } catch(InvalidPathException e) {
+    } catch (InvalidPathException e) {
       throw new IllegalStateException("Target path is invalid", e);
     }
   }
@@ -193,6 +205,16 @@ public class FlintStaticFileDescription implements Named {
    */
   public String getTarget() {
     return target;
+  }
+
+  /**
+   * Retrieves the operating system where the static file should be installed. If no operating system is set,
+   * it will be installed on every operating system.
+   *
+   * @return The operating system where the file should be installed, {@code null} to be installed everywhere
+   */
+  public OperatingSystem getOperatingSystem() {
+    return this.operatingSystem;
   }
 
   /**

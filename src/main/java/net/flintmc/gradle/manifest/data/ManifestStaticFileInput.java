@@ -81,12 +81,16 @@ public class ManifestStaticFileInput {
         // we assume remote files only change when their URL changes
         remoteFiles.add(new ManifestStaticFile(
             staticFileDescription.getSourceURI(),
+            staticFileDescription.getOperatingSystem(),
             targetPath
         ));
       } else {
         // Local file, generate an URL
         URI remoteURI = generateURIForLocalFile(staticFileDescription.getName(), configurator);
-        localFiles.put(staticFileDescription.getSourceFile(), new ManifestStaticFile(remoteURI, targetPath));
+        localFiles.put(
+            staticFileDescription.getSourceFile(),
+            new ManifestStaticFile(remoteURI, staticFileDescription.getOperatingSystem(), targetPath)
+        );
       }
     }
 
