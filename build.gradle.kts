@@ -24,8 +24,14 @@ fun RepositoryHandler.flintRepository() {
         distributorUrl = project.properties.getOrDefault(
             "net.flintmc.distributor.url",
             "https://dist.labymod.net"
-        ).toString() + "/api/v1/maven/release"
+        ).toString()
     }
+
+    if(distributorUrl.endsWith('/')) {
+        distributorUrl = distributorUrl.substringBeforeLast('/')
+    }
+
+    distributorUrl += "/api/v1/maven/release"
 
     var bearerToken = System.getenv("FLINT_DISTRIBUTOR_BEARER_TOKEN")
 
