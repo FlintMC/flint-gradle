@@ -60,8 +60,7 @@ plugins {
     id("java-gradle-plugin")
     `kotlin-dsl`
     id("maven-publish")
-    id("maven")
-    id("net.minecrell.licenser") version "0.4.1"
+    id("org.cadixdev.licenser") version "0.6.0"
 }
 
 group = "net.flintmc"
@@ -112,13 +111,13 @@ java {
 }
 
 license {
-    header = rootProject.file("LICENSE-HEADER")
+    header(rootProject.file("LICENSE-HEADER"))
     include("**/*.java")
     include("**/*.kts")
 
     tasks {
         create("gradle") {
-            files = project.files("build.gradle.kts", "settings.gradle.kts")
+            files(project.files("build.gradle.kts", "settings.gradle.kts"))
         }
     }
 }
