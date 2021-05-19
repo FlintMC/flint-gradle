@@ -29,6 +29,7 @@ import net.flintmc.installer.frontend.gui.InstallBundle;
 import org.gradle.api.GradleException;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.Configuration;
+import org.gradle.api.file.DuplicatesStrategy;
 import org.gradle.api.plugins.ExtraPropertiesExtension;
 import org.gradle.api.plugins.JavaPluginConvention;
 import org.gradle.api.tasks.SourceSet;
@@ -239,6 +240,7 @@ public class JarTaskProvider {
       bundledInstallerJarTask.getArchiveClassifier().set("bundled-installer");
       bundledInstallerJarTask.setGroup("build");
       bundledInstallerJarTask.dependsOn(mainJarTask);
+      bundledInstallerJarTask.setDuplicatesStrategy(DuplicatesStrategy.INCLUDE);
 
       Map<String, String> bundle = new HashMap<>();
 
