@@ -34,11 +34,10 @@ import okhttp3.OkHttpClient;
 import org.gradle.api.Project;
 import org.gradle.api.Task;
 import org.gradle.api.artifacts.repositories.MavenArtifactRepository;
-import org.gradle.api.credentials.HttpHeaderCredentials;
 import org.gradle.api.publish.PublishingExtension;
 import org.gradle.api.publish.maven.MavenPublication;
 import org.gradle.api.tasks.Copy;
-import org.gradle.authentication.http.HttpHeaderAuthentication;
+import org.gradle.jvm.tasks.Jar;
 
 import java.io.File;
 import java.net.URI;
@@ -47,6 +46,7 @@ public class ManifestConfigurator {
   private final Project project;
   private final OkHttpClient httpClient;
   private final MavenArtifactURLCache mavenArtifactURLCache;
+  private final FlintGradlePlugin flintGradlePlugin;
 
   /**
    * Constructs a new {@link ManifestConfigurator} for the given plugin.
@@ -54,6 +54,7 @@ public class ManifestConfigurator {
    * @param plugin The plugin to configure the manifest for
    */
   public ManifestConfigurator(FlintGradlePlugin plugin) {
+    this.flintGradlePlugin = plugin;
     this.project = plugin.getProject();
     this.httpClient = plugin.getHttpClient();
     this.mavenArtifactURLCache = plugin.getMavenArtifactURLCache();
@@ -66,13 +67,13 @@ public class ManifestConfigurator {
    * Installs the required gradle tasks to generate the flint manifests.
    */
   public void configure() {
-    if(!isValidProject(project)) {
+    if (!isValidProject(project)) {
       return;
     }
 
     FlintGradleExtension extension = project.getExtensions().getByType(FlintGradleExtension.class);
 
-    if(extension.shouldAutoConfigurePublishing() && extension.shouldEnablePublishing()) {
+    if (extension.shouldAutoConfigurePublishing() && extension.shouldEnablePublishing()) {
       // Auto configuration is enabled
       PublishingExtension publishingExtension = project.getExtensions().findByType(PublishingExtension.class);
 
@@ -81,7 +82,7 @@ public class ManifestConfigurator {
           "Set enablePublishing to false in the flint extension",
           "Set shouldAutoConfigurePublishing to false in the flint extension");
 
-      if(publishingExtension != null) {
+      if (publishingExtension != null) {
         // Found a publishing extension, automatically set the publish target
         MavenPublication publication = publishingExtension.getPublications().create("flint", MavenPublication.class);
 
@@ -130,29 +131,54 @@ public class ManifestConfigurator {
     generateStaticFileChecksumsTask.setGroup("publishing");
     generateStaticFileChecksumsTask.setDescription("Calculates the checksums of all static files and caches them");
 
-    File manifestFile = new File(Util.getProjectCacheDir(project), "manifest.json");
+    File manifestFileJar = new File(Util.getProjectCacheDir(project), "manifestJar.json");
 
-    GenerateFlintManifestTask generateFlintManifestTask = project.getTasks().create(
-        "generateFlintManifest",
+    GenerateFlintManifestTask generateFlintManifestJarTask = project.getTasks().create(
+        "generateFlintManifestJar",
         GenerateFlintManifestTask.class,
-        manifestFile,
+        this.flintGradlePlugin,
+        GenerateFlintManifestTask.ManifestType.JAR,
+        manifestFileJar,
         staticFileInput,
         packageDependencyInput,
         resolveArtifactURLsTask.getCacheFile(),
-        generateStaticFileChecksumsTask.getCacheFile()
+        generateStaticFileChecksumsTask.getCacheFile(),
+        repositoryInput
     );
-    generateFlintManifestTask.setGroup("publishing");
-    generateFlintManifestTask.setDescription("Generates the flint manifest.json and caches it");
-    generateFlintManifestTask.dependsOn(resolveArtifactURLsTask, generateStaticFileChecksumsTask);
+    generateFlintManifestJarTask.setGroup("publishing");
+    generateFlintManifestJarTask.setDescription("Generates the flint manifest.json to include in the jar file and caches it");
+    generateFlintManifestJarTask.dependsOn(resolveArtifactURLsTask, generateStaticFileChecksumsTask);
+
+    File manifestFileDistributor = new File(Util.getProjectCacheDir(project), "manifestDistributor.json");
+
+    GenerateFlintManifestTask generateFlintManifestDistributorTask = project.getTasks().create(
+        "generateFlintManifestDistributor",
+        GenerateFlintManifestTask.class,
+        this.flintGradlePlugin,
+        GenerateFlintManifestTask.ManifestType.DISTRIBUTOR,
+        manifestFileDistributor,
+        staticFileInput,
+        packageDependencyInput,
+        resolveArtifactURLsTask.getCacheFile(),
+        generateStaticFileChecksumsTask.getCacheFile(),
+        repositoryInput
+    );
+    Jar jar = (Jar) project.getTasks().getByName("jar");
+    generateFlintManifestDistributorTask.setGroup("publishing");
+    generateFlintManifestDistributorTask.setDescription("Generates the flint manifest.json to publish to the distributor and caches it");
+    generateFlintManifestDistributorTask.dependsOn(resolveArtifactURLsTask, generateStaticFileChecksumsTask, jar);
+
 
     // Retrieve the process resources task so we can include the manifest
     // The processResources task is a copy task, and as the ProcessResources class is marked unstable,
     // we cast it to a copy task
     Copy processResourcesTask = (Copy) project.getTasks().getByName("processResources");
-    processResourcesTask.from(manifestFile);
-    processResourcesTask.dependsOn(generateFlintManifestTask);
+    processResourcesTask
+        .from(manifestFileJar)
+        .rename("manifestJar.json", "manifest.json");
+    processResourcesTask.dependsOn(generateFlintManifestJarTask);
 
-    if(extension.shouldEnablePublishing()) {
+    if (extension.shouldEnablePublishing()) {
       // Generate the URI to publish the manifest to
       URI manifestURI = Util.concatURI(
           getProjectPublishURI("Set enablePublishing to false in the flint extension"),
@@ -165,12 +191,13 @@ public class ManifestConfigurator {
           PublishFileTask.class,
           this,
           new MaybeNull<>(httpClient),
-          manifestFile,
+          manifestFileDistributor,
           manifestURI
       );
       publishManifestTask.setGroup("publishing");
       publishManifestTask.setDescription("Publishes the flint manifest.json to the distributor");
-      publishManifestTask.dependsOn(generateFlintManifestTask);
+      publishManifestTask.dependsOn(generateFlintManifestJarTask);
+      publishManifestTask.dependsOn(generateFlintManifestDistributorTask);
 
       // Create the static files publish task
       PublishStaticFilesTask publishStaticFilesTask = project.getTasks().create(
@@ -214,7 +241,7 @@ public class ManifestConfigurator {
    * @return The base URI of the distributor publish endpoint including the project namespace
    */
   public URI getProjectPublishURI(String... notAvailableSolutions) {
-    if(projectPublishURI == null) {
+    if (projectPublishURI == null) {
       projectPublishURI = Util.concatURI(
           FlintPluginProperties.DISTRIBUTOR_URL.require(project, notAvailableSolutions),
           "api/v1/publish",
@@ -235,7 +262,7 @@ public class ManifestConfigurator {
    * @return The base URI of the distributor repository including the project namespace
    */
   public URI getProjectMavenURI(String... notAvailableSolution) {
-    if(projectMavenURI == null) {
+    if (projectMavenURI == null) {
       URI distributorURI = Util.getDistributorMavenURI(project, notAvailableSolution);
 
       projectMavenURI = Util.concatURI(

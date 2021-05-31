@@ -573,6 +573,36 @@ public class Util {
   }
 
   /**
+   * Hashes a given byte array and writes it as a hex string
+   *
+   * @param data the data to convert
+   * @return the sha1 hash as a hex string
+   */
+  public static String sha1Hex(byte[] data) {
+    try {
+      MessageDigest digest = MessageDigest.getInstance("SHA-1");
+      byte[] sha1Sum = digest.digest(data);
+
+      // Build a hexadecimal string from the sha1Sum
+      StringBuilder buffer = new StringBuilder();
+      for(byte b : sha1Sum) {
+        String hex = Integer.toHexString(b & 0xFF);
+
+        if(hex.length() < 2) {
+          // Insert a 0 if the string is too short
+          buffer.append('0');
+        }
+
+        buffer.append(hex);
+      }
+
+      return buffer.toString();
+    } catch(NoSuchAlgorithmException e) {
+      throw new IllegalStateException("MD5 digest not available");
+    }
+  }
+
+  /**
    * Zips the {@code input} to a zip file.
    *
    * @param input  The input which should be zipped.

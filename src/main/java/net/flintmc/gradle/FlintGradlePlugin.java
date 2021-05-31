@@ -248,6 +248,10 @@ public class FlintGradlePlugin implements Plugin<Project> {
     interaction.setupVersioned(compileArtifacts, runtimeArtifacts, version);
   }
 
+  public SimpleMavenRepository getInternalRepository() {
+    return internalRepository;
+  }
+
   /**
    * Retrieves the client artifact for the given version.
    *
@@ -307,5 +311,9 @@ public class FlintGradlePlugin implements Plugin<Project> {
 
   public Project getProject() {
     return project;
+  }
+
+  public MavenArtifactDownloader getDownloader() {
+    return this.downloader;
   }
 }

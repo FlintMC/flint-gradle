@@ -273,7 +273,7 @@ public class MavenArtifactDownloader {
    * @throws IOException If an I/O error occurs while installing the artifact
    */
   @SuppressWarnings("BooleanMethodIsAlwaysInverted")
-  private boolean installArtifact(MavenArtifact artifact, SimpleMavenRepository target) throws IOException {
+  public boolean installArtifact(MavenArtifact artifact, SimpleMavenRepository target) throws IOException {
     try(InputStream stream = findArtifactStream(artifact)) {
       // Try to find the given artifact
       if(stream != null) {
