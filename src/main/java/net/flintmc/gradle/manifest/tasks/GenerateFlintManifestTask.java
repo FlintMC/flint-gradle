@@ -61,8 +61,6 @@ import java.io.InputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.stream.Collectors;
@@ -97,7 +95,6 @@ public class GenerateFlintManifestTask extends DefaultTask {
    *
    * @param manifestFile                  The file to write the generated manifest to
    * @param staticFiles                   The static files to index in the manifest
-   * @param repositoryInput
    * @param packageDependencies           The packages the manifest lists as dependencies
    * @param artifactURLsCacheFile         The file to load the cached artifact URLs from
    * @param staticFilesChecksumsCacheFile The file to load the cached static checksums from
@@ -110,8 +107,7 @@ public class GenerateFlintManifestTask extends DefaultTask {
       ManifestStaticFileInput staticFiles,
       ManifestPackageDependencyInput packageDependencies,
       File artifactURLsCacheFile,
-      File staticFilesChecksumsCacheFile,
-      ManifestRepositoryInput repositoryInput
+      File staticFilesChecksumsCacheFile
   ) {
     this.flintGradlePlugin = flintGradlePlugin;
     this.manifestType = manifestType;
@@ -454,7 +450,7 @@ public class GenerateFlintManifestTask extends DefaultTask {
           // Install the artifact including dependencies
           downloader.installArtifact(artifact, internalRepository);
         } catch (IOException e) {
-          throw new RuntimeException("Failed to install execution artifact", e);
+          throw new FlintGradleException("Failed to install maven artifact", e);
         }
 
         if (setupSource) {
@@ -465,11 +461,10 @@ public class GenerateFlintManifestTask extends DefaultTask {
 
       if (!artifactChecksums.has(artifact)) {
         try (InputStream inputStream = internalRepository.getArtifactStream(artifact)) {
-          MessageDigest messageDigest = MessageDigest.getInstance("SHA-1");
-          String sha1Hex = Util.sha1Hex(messageDigest.digest(IOUtils.toByteArray(inputStream)));
+          String sha1Hex = Util.sha1Hex(IOUtils.toByteArray(inputStream));
           this.artifactChecksums.add(artifact, sha1Hex);
-        } catch (IOException | NoSuchAlgorithmException e) {
-          throw new RuntimeException(e);
+        } catch (IOException e) {
+          throw new FlintGradleException("Could not generate checksum of maven artifact", e);
         }
       }
 
@@ -517,15 +512,24 @@ public class GenerateFlintManifestTask extends DefaultTask {
     }
 
     String sha1Hex;
+
     if (manifestType == ManifestType.DISTRIBUTOR) {
       Jar jar = (Jar) getProject().getTasks().getByName("jar");
       File singleFile = jar.getOutputs().getFiles().getSingleFile();
+
       try (FileInputStream fileInputStream = new FileInputStream(singleFile)) {
         sha1Hex = Util.sha1Hex(IOUtils.toByteArray(fileInputStream));
       } catch (IOException e) {
-        throw new RuntimeException(e);
+        throw new FlintGradleException("Could not hash generated jar file", e);
       }
     } else {
+      /*
+       * No hash is required when generating the jar manifest because
+       * it does not contain any install instructions anymore.
+       *
+       * It would also not be possible to do that because the manifest would have to
+       * contain the hash of the jar in which it is embedded.
+       */
       sha1Hex = null;
     }
     return new InstallInstructionModel(
@@ -649,8 +653,25 @@ public class GenerateFlintManifestTask extends DefaultTask {
         .collect(Collectors.toSet());
   }
 
+  /**
+   * Used to define how to generate the manifest in {@link GenerateFlintManifestTask#generate()}.
+   *
+   * @see PackageModel
+   */
   public enum ManifestType {
+    /**
+     * When generating the manifest that will be written into the final jar file it will contain no install instructions.
+     *
+     * @see PackageModel#getInstallInstructions() ()
+     */
     JAR,
+
+    /**
+     * When generating the manifest that will be published separately to the distributor it will contain no information
+     * about the runtime classpath.
+     *
+     * @see PackageModel#getRuntimeClasspath()
+     */
     DISTRIBUTOR
   }
 

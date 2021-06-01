@@ -19,12 +19,6 @@
 
 package net.flintmc.gradle;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.net.URI;
-import java.nio.file.Path;
-import java.util.Collection;
-import javax.annotation.Nonnull;
 import net.flintmc.gradle.environment.DeobfuscationEnvironment;
 import net.flintmc.gradle.extension.FlintGradleExtension;
 import net.flintmc.gradle.extension.FlintPatcherExtension;
@@ -52,6 +46,13 @@ import org.gradle.api.Plugin;
 import org.gradle.api.Project;
 import org.gradle.api.invocation.Gradle;
 import org.gradle.api.tasks.Delete;
+
+import javax.annotation.Nonnull;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.net.URI;
+import java.nio.file.Path;
+import java.util.Collection;
 
 public class FlintGradlePlugin implements Plugin<Project> {
   public static final String MINECRAFT_TASK_GROUP = "minecraft";
@@ -221,7 +222,7 @@ public class FlintGradlePlugin implements Plugin<Project> {
    * Handles the given minecraft version and sets up all of the required steps for using it with gradle.
    *
    * @param version The minecraft version to handle
-   * @param type The environment type.
+   * @param type    The environment type.
    */
   private void handleVersion(String version, EnvironmentType type) {
     DeobfuscationEnvironment environment = minecraftRepository.defaultEnvironment(version, type);
@@ -248,6 +249,12 @@ public class FlintGradlePlugin implements Plugin<Project> {
     interaction.setupVersioned(compileArtifacts, runtimeArtifacts, version);
   }
 
+  /**
+   * Retrieves the singleton instance of the internal flint maven repository.
+   * Usually at ~/.gradle/caches/flint-gradle/internal-repository.
+   *
+   * @return The internal flint maven repository
+   */
   public SimpleMavenRepository getInternalRepository() {
     return internalRepository;
   }
@@ -313,6 +320,11 @@ public class FlintGradlePlugin implements Plugin<Project> {
     return project;
   }
 
+  /**
+   * Retrieves the singleton instance of the maven artifact downloader.
+   *
+   * @return The singleton instance of the maven artifact downloader or null if gradle is in offline mode
+   */
   public MavenArtifactDownloader getDownloader() {
     return this.downloader;
   }

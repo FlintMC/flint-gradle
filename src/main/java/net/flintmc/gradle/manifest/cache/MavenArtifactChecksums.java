@@ -39,7 +39,7 @@ public class MavenArtifactChecksums implements Externalizable {
     try (ObjectInputStream in = new ObjectInputStream(new FileInputStream(file))) {
       return Util.forceCast(in.readObject());
     } catch (ClassNotFoundException e) {
-      throw new IOException("Failed to read cached checksums of static files due to ClassNotFoundException", e);
+      throw new IOException("Failed to read cached checksums of maven artifacts due to ClassNotFoundException", e);
     }
   }
 
