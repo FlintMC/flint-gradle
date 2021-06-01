@@ -19,9 +19,10 @@
 
 package net.flintmc.gradle.maven.pom;
 
+import java.io.Serializable;
 import java.util.Objects;
 
-public class MavenArtifact {
+public class MavenArtifact implements Serializable {
   private String groupId;
   private String artifactId;
   private String version;

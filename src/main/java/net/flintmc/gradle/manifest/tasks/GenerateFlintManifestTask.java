@@ -20,15 +20,21 @@
 package net.flintmc.gradle.manifest.tasks;
 
 import net.flintmc.gradle.FlintGradleException;
+import net.flintmc.gradle.FlintGradlePlugin;
 import net.flintmc.gradle.extension.FlintGradleExtension;
 import net.flintmc.gradle.extension.json.FlintJsonInjectionDescription;
 import net.flintmc.gradle.json.JsonConverter;
 import net.flintmc.gradle.manifest.cache.BoundMavenDependencies;
+import net.flintmc.gradle.manifest.cache.MavenArtifactChecksums;
 import net.flintmc.gradle.manifest.cache.StaticFileChecksums;
 import net.flintmc.gradle.manifest.data.*;
+import net.flintmc.gradle.maven.MavenArtifactDownloader;
+import net.flintmc.gradle.maven.RemoteMavenRepository;
+import net.flintmc.gradle.maven.SimpleMavenRepository;
 import net.flintmc.gradle.maven.pom.MavenArtifact;
 import net.flintmc.gradle.minecraft.data.environment.MinecraftVersion;
 import net.flintmc.gradle.property.FlintPluginProperties;
+import net.flintmc.gradle.util.Util;
 import net.flintmc.installer.impl.repository.models.DependencyDescriptionModel;
 import net.flintmc.installer.impl.repository.models.PackageModel;
 import net.flintmc.installer.impl.repository.models.install.InstallInstructionModel;
@@ -41,13 +47,17 @@ import net.flintmc.installer.impl.repository.models.install.data.json.injections
 import net.flintmc.installer.install.json.JsonFileDataInjection;
 import net.flintmc.installer.install.json.JsonInjectionPath;
 import net.flintmc.installer.util.OperatingSystem;
+import org.apache.commons.io.IOUtils;
 import org.gradle.api.DefaultTask;
 import org.gradle.api.NamedDomainObjectContainer;
 import org.gradle.api.tasks.*;
+import org.gradle.jvm.tasks.Jar;
 
 import javax.inject.Inject;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -59,6 +69,10 @@ import java.util.stream.Collectors;
  * Task generating the flint manifest.json
  */
 public class GenerateFlintManifestTask extends DefaultTask {
+
+  private FlintGradlePlugin flintGradlePlugin;
+  private ManifestType manifestType;
+
   @OutputFile
   private final File manifestFile;
 
@@ -74,6 +88,7 @@ public class GenerateFlintManifestTask extends DefaultTask {
   private final File staticFilesChecksumsCacheFile;
 
   private FlintGradleExtension extension;
+  private MavenArtifactChecksums artifactChecksums;
 
   /**
    * Constructs a new {@link GenerateFlintManifestTask}.
@@ -86,12 +101,16 @@ public class GenerateFlintManifestTask extends DefaultTask {
    */
   @Inject
   public GenerateFlintManifestTask(
+      FlintGradlePlugin flintGradlePlugin,
+      ManifestType manifestType,
       File manifestFile,
       ManifestStaticFileInput staticFiles,
       ManifestPackageDependencyInput packageDependencies,
       File artifactURLsCacheFile,
       File staticFilesChecksumsCacheFile
   ) {
+    this.flintGradlePlugin = flintGradlePlugin;
+    this.manifestType = manifestType;
     this.manifestFile = manifestFile;
     this.staticFiles = staticFiles;
     this.packageDependencies = packageDependencies;
@@ -280,6 +299,20 @@ public class GenerateFlintManifestTask extends DefaultTask {
       throw new FlintGradleException("IOException while loading cached static files checksums", e);
     }
 
+    try {
+      File cacheFile = MavenArtifactChecksums.getCacheFile(getProject());
+      if (!cacheFile.exists()) {
+        cacheFile.getParentFile().mkdirs();
+        cacheFile.createNewFile();
+        artifactChecksums = new MavenArtifactChecksums();
+        artifactChecksums.save(cacheFile);
+      } else {
+        artifactChecksums = MavenArtifactChecksums.load(cacheFile);
+      }
+    } catch (IOException e) {
+      throw new FlintGradleException("IOException while loading cached artifacts checksums", e);
+    }
+
     // Build package dependencies
     Set<DependencyDescriptionModel> dependencyDescriptionModels = new HashSet<>();
     for (ManifestPackageDependency dependency : packageDependencies.getDependencies()) {
@@ -296,35 +329,39 @@ public class GenerateFlintManifestTask extends DefaultTask {
     Set<InstallInstructionModel> modifyJsonInstallInstructions = buildJsonInjectionInstructions();
     InstallInstructionModel ownInstallInstruction = buildOwnInstallInstruction();
 
-    // Build the runtime classpath
-    Set<String> runtimeClasspath = new HashSet<>();
-    for (InstallInstructionModel mavenInstallInstruction : mavenInstallInstructions) {
-      // Add all maven dependencies to the runtime classpath
-      DownloadMavenDependencyDataModel data = mavenInstallInstruction.getData();
-      if (ownInstallInstruction == null
-          || !data.getPath().equals(ownInstallInstruction.<DownloadMavenDependencyDataModel>getData().getPath())) {
-        // If the library does not equal ourself, add it
-        runtimeClasspath.add(data.getPath());
+    Set<String> runtimeClasspath = null;
+    List<InstallInstructionModel> allInstallInstructions = null;
+    if (manifestType == ManifestType.DISTRIBUTOR) {
+      // Collect all install instructions
+      allInstallInstructions = new ArrayList<>();
+      if (ownInstallInstruction != null) {
+        allInstallInstructions.add(ownInstallInstruction);
+      }
+      allInstallInstructions.addAll(mavenInstallInstructions);
+      allInstallInstructions.addAll(staticFileInstallInstructions);
+      allInstallInstructions.addAll(modifyJsonInstallInstructions);
+
+    } else if (manifestType == ManifestType.JAR) {
+      // Build the runtime classpath
+      runtimeClasspath = new HashSet<>();
+      for (InstallInstructionModel mavenInstallInstruction : mavenInstallInstructions) {
+        // Add all maven dependencies to the runtime classpath
+        DownloadMavenDependencyDataModel data = mavenInstallInstruction.getData();
+        if (ownInstallInstruction == null
+            || !data.getPath().equals(ownInstallInstruction.<DownloadMavenDependencyDataModel>getData().getPath())) {
+          // If the library does not equal ourself, add it
+          runtimeClasspath.add(data.getPath());
+        }
+      }
+
+      for (InstallInstructionModel staticFileInstallInstruction : staticFileInstallInstructions) {
+        DownloadFileDataModel data = staticFileInstallInstruction.getData();
+        if (data.getPath().endsWith(".jar")) {
+          // If the static file is a jar, add it to the classpath
+          runtimeClasspath.add(data.getPath());
+        }
       }
     }
-
-    for (InstallInstructionModel staticFileInstallInstruction : staticFileInstallInstructions) {
-      DownloadFileDataModel data = staticFileInstallInstruction.getData();
-      if (data.getPath().endsWith(".jar")) {
-        // If the static file is a jar, add it to the classpath
-        runtimeClasspath.add(data.getPath());
-      }
-    }
-
-    // Collect all install instructions
-    List<InstallInstructionModel> allInstallInstructions = new ArrayList<>();
-    if (ownInstallInstruction != null) {
-      allInstallInstructions.add(ownInstallInstruction);
-    }
-    allInstallInstructions.addAll(mavenInstallInstructions);
-    allInstallInstructions.addAll(staticFileInstallInstructions);
-    allInstallInstructions.addAll(modifyJsonInstallInstructions);
-
     // Build package model
     PackageModel model = new PackageModel(
         getProjectGroup(),
@@ -353,6 +390,12 @@ public class GenerateFlintManifestTask extends DefaultTask {
     } catch (IOException e) {
       throw new FlintGradleException("Failed to write manifest file", e);
     }
+
+    try {
+      artifactChecksums.save(MavenArtifactChecksums.getCacheFile(getProject()));
+    } catch (IOException e) {
+      throw new FlintGradleException("Failed to write maven artifact cache file", e);
+    }
   }
 
   /**
@@ -379,6 +422,52 @@ public class GenerateFlintManifestTask extends DefaultTask {
           artifact.getClassifier() == null ? "" : "-" + artifact.getClassifier()
       );
 
+      SimpleMavenRepository internalRepository = this.flintGradlePlugin.getInternalRepository();
+      MavenArtifactDownloader downloader = this.flintGradlePlugin.getDownloader();
+
+      RemoteMavenRepository remoteMavenRepository;
+      if (flintGradlePlugin.getHttpClient() == null) {
+        remoteMavenRepository = null;
+      } else {
+        remoteMavenRepository = new RemoteMavenRepository(flintGradlePlugin.getHttpClient(), entry.getValue());
+      }
+
+      if (!internalRepository.isInstalled(artifact)) {
+        // The artifact is not installed already, install it
+        if (remoteMavenRepository == null) {
+          // Can't download anything in offline mode
+          throw new RuntimeException("Missing artifact " + artifact + " in local repository, " +
+              "but working in offline mode");
+        }
+
+        boolean setupSource = !downloader.hasSource(remoteMavenRepository);
+        if (setupSource) {
+          // The download has the source not set already, add it now
+          downloader.addSource(remoteMavenRepository);
+        }
+
+        try {
+          // Install the artifact including dependencies
+          downloader.installArtifact(artifact, internalRepository);
+        } catch (IOException e) {
+          throw new FlintGradleException("Failed to install maven artifact", e);
+        }
+
+        if (setupSource) {
+          // We added the source, clean up afterwards
+          downloader.removeSource(remoteMavenRepository);
+        }
+      }
+
+      if (!artifactChecksums.has(artifact)) {
+        try (InputStream inputStream = internalRepository.getArtifactStream(artifact)) {
+          String sha1Hex = Util.sha1Hex(IOUtils.toByteArray(inputStream));
+          this.artifactChecksums.add(artifact, sha1Hex);
+        } catch (IOException e) {
+          throw new FlintGradleException("Could not generate checksum of maven artifact", e);
+        }
+      }
+
       // Add the instruction
       out.add(new InstallInstructionModel(
           InstallInstructionTypes.DOWNLOAD_MAVEN_DEPENDENCY,
@@ -389,7 +478,8 @@ public class GenerateFlintManifestTask extends DefaultTask {
               artifact.getVersion(),
               artifact.getClassifier(),
               entry.getValue().toASCIIString(),
-              localPath
+              localPath,
+              artifactChecksums.get(artifact)
           )
       ));
     }
@@ -421,6 +511,27 @@ public class GenerateFlintManifestTask extends DefaultTask {
       targetPath = "${FLINT_PACKAGE_DIR}/" + getProjectName() + ".jar";
     }
 
+    String sha1Hex;
+
+    if (manifestType == ManifestType.DISTRIBUTOR) {
+      Jar jar = (Jar) getProject().getTasks().getByName("jar");
+      File singleFile = jar.getOutputs().getFiles().getSingleFile();
+
+      try (FileInputStream fileInputStream = new FileInputStream(singleFile)) {
+        sha1Hex = Util.sha1Hex(IOUtils.toByteArray(fileInputStream));
+      } catch (IOException e) {
+        throw new FlintGradleException("Could not hash generated jar file", e);
+      }
+    } else {
+      /*
+       * No hash is required when generating the jar manifest because
+       * it does not contain any install instructions anymore.
+       *
+       * It would also not be possible to do that because the manifest would have to
+       * contain the hash of the jar in which it is embedded.
+       */
+      sha1Hex = null;
+    }
     return new InstallInstructionModel(
         InstallInstructionTypes.DOWNLOAD_MAVEN_DEPENDENCY,
         null,
@@ -430,9 +541,12 @@ public class GenerateFlintManifestTask extends DefaultTask {
             getProjectVersion(),
             null,
             "${FLINT_DISTRIBUTOR_URL}" + getChannel(),
-            targetPath
+            targetPath,
+            sha1Hex
         )
     );
+
+
   }
 
   /**
@@ -538,4 +652,27 @@ public class GenerateFlintManifestTask extends DefaultTask {
         .map(model -> new InstallInstructionModel(InstallInstructionTypes.MODIFY_JSON_FILE, OperatingSystem.UNKNOWN, model))
         .collect(Collectors.toSet());
   }
+
+  /**
+   * Used to define how to generate the manifest in {@link GenerateFlintManifestTask#generate()}.
+   *
+   * @see PackageModel
+   */
+  public enum ManifestType {
+    /**
+     * When generating the manifest that will be written into the final jar file it will contain no install instructions.
+     *
+     * @see PackageModel#getInstallInstructions() ()
+     */
+    JAR,
+
+    /**
+     * When generating the manifest that will be published separately to the distributor it will contain no information
+     * about the runtime classpath.
+     *
+     * @see PackageModel#getRuntimeClasspath()
+     */
+    DISTRIBUTOR
+  }
+
 }
