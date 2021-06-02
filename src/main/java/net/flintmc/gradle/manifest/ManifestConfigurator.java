@@ -142,8 +142,7 @@ public class ManifestConfigurator {
         staticFileInput,
         packageDependencyInput,
         resolveArtifactURLsTask.getCacheFile(),
-        generateStaticFileChecksumsTask.getCacheFile(),
-        repositoryInput
+        generateStaticFileChecksumsTask.getCacheFile()
     );
     generateFlintManifestJarTask.setGroup("publishing");
     generateFlintManifestJarTask.setDescription("Generates the flint manifest.json to include in the jar file and caches it");
@@ -160,8 +159,7 @@ public class ManifestConfigurator {
         staticFileInput,
         packageDependencyInput,
         resolveArtifactURLsTask.getCacheFile(),
-        generateStaticFileChecksumsTask.getCacheFile(),
-        repositoryInput
+        generateStaticFileChecksumsTask.getCacheFile()
     );
     Jar jar = (Jar) project.getTasks().getByName("jar");
     generateFlintManifestDistributorTask.setGroup("publishing");
