@@ -71,7 +71,7 @@ repositories {
     mavenCentral()
 }
 
-version = System.getenv().getOrDefault("VERSION", "2.10.1")
+version = System.getenv().getOrDefault("VERSION", "2.11.0")
 
 dependencies {
     implementation(group = "com.fasterxml.jackson.core", name = "jackson-core", version = "2.11.1")
@@ -86,6 +86,10 @@ dependencies {
     implementation(group = "net.flintmc.installer", name = "logic", version = "1.1.11")
     implementation(group = "net.flintmc.installer", name = "logic-implementation", version = "1.1.11")
     implementation(group = "net.flintmc.installer", name = "logic", version = "1.1.11")
+
+    implementation(group = "org.ow2.asm", name = "asm", version = "9.1")
+    implementation(group = "org.ow2.asm",name = "asm-tree", version = "9.1")
+    implementation(group = "org.ow2.asm", name ="asm-commons", version = "9.1")
 
     implementation(group = "com.cloudbees", name = "diff4j", version = "1.2")
 }
