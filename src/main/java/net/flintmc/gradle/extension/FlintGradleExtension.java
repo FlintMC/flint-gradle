@@ -52,6 +52,7 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
   private final FlintStaticFilesExtension staticFilesExtension;
   private final FlintJsonInjectionsExtension jsonInjectionsExtension;
   private final FlintSelfInstallerExtension selfInstallerExtension;
+  private final FlintMetaExtension metaExtension;
 
   private boolean configured;
 
@@ -80,6 +81,7 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
     this.staticFilesExtension = new FlintStaticFilesExtension(plugin.getProject());
     this.jsonInjectionsExtension = new FlintJsonInjectionsExtension(plugin.getProject());
     this.selfInstallerExtension = new FlintSelfInstallerExtension();
+    this.metaExtension = new FlintMetaExtension();
 
     this.enablePublishing = true;
     this.autoConfigurePublishing = true;
@@ -104,6 +106,7 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
             plugin.getProject()); // TODO: Should static files be inherited too?
     this.jsonInjectionsExtension = new FlintJsonInjectionsExtension(plugin.getProject());
     this.selfInstallerExtension = new FlintSelfInstallerExtension(parent.selfInstallerExtension);
+    this.metaExtension = new FlintMetaExtension(parent.metaExtension);
 
     this.type = parent.type;
     this.authors =
@@ -416,6 +419,26 @@ public class FlintGradleExtension implements Configurable<FlintGradleExtension> 
   public FlintSelfInstallerExtension selfInstaller(Action<FlintSelfInstallerExtension> action) {
     action.execute(this.selfInstallerExtension);
     return this.selfInstallerExtension;
+  }
+
+  /**
+   * Retrieves the meta extension of this extension.
+   *
+   * @return The meta extension of this extension
+   */
+  public FlintMetaExtension getMeta() {
+    return this.metaExtension;
+  }
+
+  /**
+   * Configures the meta extension of this extension with the given action.
+   *
+   * @param action The action to use for configuration
+   * @return The configured meta extension of this extension
+   */
+  public FlintMetaExtension meta(Action<FlintMetaExtension> action) {
+    action.execute(this.metaExtension);
+    return this.metaExtension;
   }
 
   /**

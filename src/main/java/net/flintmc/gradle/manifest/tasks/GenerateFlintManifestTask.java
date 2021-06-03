@@ -22,6 +22,7 @@ package net.flintmc.gradle.manifest.tasks;
 import net.flintmc.gradle.FlintGradleException;
 import net.flintmc.gradle.FlintGradlePlugin;
 import net.flintmc.gradle.extension.FlintGradleExtension;
+import net.flintmc.gradle.extension.FlintMetaExtension;
 import net.flintmc.gradle.extension.json.FlintJsonInjectionDescription;
 import net.flintmc.gradle.json.JsonConverter;
 import net.flintmc.gradle.manifest.cache.BoundMavenDependencies;
@@ -50,7 +51,9 @@ import net.flintmc.installer.util.OperatingSystem;
 import org.apache.commons.io.IOUtils;
 import org.gradle.api.DefaultTask;
 import org.gradle.api.NamedDomainObjectContainer;
+import org.gradle.api.Project;
 import org.gradle.api.tasks.*;
+import org.gradle.api.tasks.Optional;
 import org.gradle.jvm.tasks.Jar;
 
 import javax.inject.Inject;
@@ -249,6 +252,55 @@ public class GenerateFlintManifestTask extends DefaultTask {
   }
 
   /**
+   * Retrieves whether this package is a meta package.
+   *
+   * @return {@code true} if this package is meta package, {@code false} otherwise
+   */
+  @Input
+  public boolean isMetaPackage() {
+    return getExtension().getMeta().isMetaPackage();
+  }
+
+  /**
+   * Retrieves the parent package of this package.
+   *
+   * @return The name of the parent package of this package, or {@code null}, if none
+   */
+  @Optional
+  @Input
+  public String getParent() {
+    String explicitParent = getExtension().getMeta().getParent();
+    if(explicitParent != null) {
+      return explicitParent;
+    }
+
+    if(getExtension().getMeta().shouldInheritParent()) {
+      Project currentSearch = getProject();
+
+      while(currentSearch.getParent() != currentSearch) {
+        currentSearch = currentSearch.getParent();
+        if(currentSearch == null) {
+          break;
+        }
+
+        FlintGradleExtension parentExtension = currentSearch.getExtensions().findByType(FlintGradleExtension.class);
+        if(parentExtension == null) {
+          continue;
+        }
+
+        FlintMetaExtension parentMeta = parentExtension.getMeta();
+        if(parentMeta.getParent() != null) {
+          return parentMeta.getParent();
+        } else if(!parentMeta.shouldInheritParent() || currentSearch.getParent() == null) {
+          return currentSearch.getName();
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
    * Retrieves the authors for this manifest.
    *
    * @return The authors for this manifest
@@ -369,6 +421,8 @@ public class GenerateFlintManifestTask extends DefaultTask {
         getProjectDescription(),
         getProjectVersion(),
         getChannel(),
+        isMetaPackage(),
+        getParent(),
         String.join(",", getMinecraftVersions()),
         getFlintVersion(),
         getAuthors(),
@@ -408,80 +462,82 @@ public class GenerateFlintManifestTask extends DefaultTask {
       Map<ManifestMavenDependency, URI> mavenDependencyURIs) {
     Set<InstallInstructionModel> out = new HashSet<>();
 
-    for (Map.Entry<ManifestMavenDependency, URI> entry : mavenDependencyURIs.entrySet()) {
-      MavenArtifact artifact = entry.getKey().getArtifact();
+    SimpleMavenRepository internalRepository = this.flintGradlePlugin.getInternalRepository();
+    MavenArtifactDownloader downloader = this.flintGradlePlugin.getDownloader();
 
-      // Construct the path relative to the root of the libraries folder
-      String localPath = String.format(
-          "${FLINT_LIBRARY_DIR}/%s/%s/%s/%s-%s%s.jar",
-          artifact.getGroupId().replace('.', '/'),
-          artifact.getArtifactId(),
-          artifact.getVersion(),
-          artifact.getArtifactId(),
-          artifact.getVersion(),
-          artifact.getClassifier() == null ? "" : "-" + artifact.getClassifier()
-      );
+    synchronized(downloader) {
+      for (Map.Entry<ManifestMavenDependency, URI> entry : mavenDependencyURIs.entrySet()) {
+        MavenArtifact artifact = entry.getKey().getArtifact();
 
-      SimpleMavenRepository internalRepository = this.flintGradlePlugin.getInternalRepository();
-      MavenArtifactDownloader downloader = this.flintGradlePlugin.getDownloader();
+        // Construct the path relative to the root of the libraries folder
+        String localPath = String.format(
+                "${FLINT_LIBRARY_DIR}/%s/%s/%s/%s-%s%s.jar",
+                artifact.getGroupId().replace('.', '/'),
+                artifact.getArtifactId(),
+                artifact.getVersion(),
+                artifact.getArtifactId(),
+                artifact.getVersion(),
+                artifact.getClassifier() == null ? "" : "-" + artifact.getClassifier()
+        );
 
-      RemoteMavenRepository remoteMavenRepository;
-      if (flintGradlePlugin.getHttpClient() == null) {
-        remoteMavenRepository = null;
-      } else {
-        remoteMavenRepository = new RemoteMavenRepository(flintGradlePlugin.getHttpClient(), entry.getValue());
+        RemoteMavenRepository remoteMavenRepository;
+        if (flintGradlePlugin.getHttpClient() == null) {
+          remoteMavenRepository = null;
+        } else {
+          remoteMavenRepository = new RemoteMavenRepository(flintGradlePlugin.getHttpClient(), entry.getValue());
+        }
+
+        if (!internalRepository.isInstalled(artifact)) {
+          // The artifact is not installed already, install it
+          if (remoteMavenRepository == null) {
+            // Can't download anything in offline mode
+            throw new RuntimeException("Missing artifact " + artifact + " in local repository, " +
+                    "but working in offline mode");
+          }
+
+          boolean setupSource = !downloader.hasSource(remoteMavenRepository);
+          if (setupSource) {
+            // The download has the source not set already, add it now
+            downloader.addSource(remoteMavenRepository);
+          }
+
+          try {
+            // Install the artifact including dependencies
+            downloader.installArtifact(artifact, internalRepository);
+          } catch(IOException e) {
+            throw new FlintGradleException("Failed to install maven artifact", e);
+          }
+
+          if (setupSource) {
+            // We added the source, clean up afterwards
+            downloader.removeSource(remoteMavenRepository);
+          }
+        }
+
+        if (!artifactChecksums.has(artifact)) {
+          try (InputStream inputStream = internalRepository.getArtifactStream(artifact)) {
+            String sha1Hex = Util.sha1Hex(IOUtils.toByteArray(inputStream));
+            this.artifactChecksums.add(artifact, sha1Hex);
+          } catch(IOException e) {
+            throw new FlintGradleException("Could not generate checksum of maven artifact", e);
+          }
+        }
+
+        // Add the instruction
+        out.add(new InstallInstructionModel(
+                InstallInstructionTypes.DOWNLOAD_MAVEN_DEPENDENCY,
+                null,
+                new DownloadMavenDependencyDataModel(
+                        artifact.getGroupId(),
+                        artifact.getArtifactId(),
+                        artifact.getVersion(),
+                        artifact.getClassifier(),
+                        entry.getValue().toASCIIString(),
+                        localPath,
+                        artifactChecksums.get(artifact)
+                )
+        ));
       }
-
-      if (!internalRepository.isInstalled(artifact)) {
-        // The artifact is not installed already, install it
-        if (remoteMavenRepository == null) {
-          // Can't download anything in offline mode
-          throw new RuntimeException("Missing artifact " + artifact + " in local repository, " +
-              "but working in offline mode");
-        }
-
-        boolean setupSource = !downloader.hasSource(remoteMavenRepository);
-        if (setupSource) {
-          // The download has the source not set already, add it now
-          downloader.addSource(remoteMavenRepository);
-        }
-
-        try {
-          // Install the artifact including dependencies
-          downloader.installArtifact(artifact, internalRepository);
-        } catch (IOException e) {
-          throw new FlintGradleException("Failed to install maven artifact", e);
-        }
-
-        if (setupSource) {
-          // We added the source, clean up afterwards
-          downloader.removeSource(remoteMavenRepository);
-        }
-      }
-
-      if (!artifactChecksums.has(artifact)) {
-        try (InputStream inputStream = internalRepository.getArtifactStream(artifact)) {
-          String sha1Hex = Util.sha1Hex(IOUtils.toByteArray(inputStream));
-          this.artifactChecksums.add(artifact, sha1Hex);
-        } catch (IOException e) {
-          throw new FlintGradleException("Could not generate checksum of maven artifact", e);
-        }
-      }
-
-      // Add the instruction
-      out.add(new InstallInstructionModel(
-          InstallInstructionTypes.DOWNLOAD_MAVEN_DEPENDENCY,
-          null,
-          new DownloadMavenDependencyDataModel(
-              artifact.getGroupId(),
-              artifact.getArtifactId(),
-              artifact.getVersion(),
-              artifact.getClassifier(),
-              entry.getValue().toASCIIString(),
-              localPath,
-              artifactChecksums.get(artifact)
-          )
-      ));
     }
 
     return out;
