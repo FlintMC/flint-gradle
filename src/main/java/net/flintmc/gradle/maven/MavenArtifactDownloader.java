@@ -119,10 +119,12 @@ public class MavenArtifactDownloader {
     }
 
     if (installIfNotExists) {
-      // If the artifact is not installed locally, try to install it
-      if (!target.isInstalled(artifact) && !installArtifact(artifact, target) && artifactPom == null) {
-        // The artifact failed to install and there was also no POM for it
-        throw new MavenResolveException("Could not resolve " + artifact);
+      synchronized (target) {
+        // If the artifact is not installed locally, try to install it
+        if (!target.isInstalled(artifact) && !installArtifact(artifact, target) && artifactPom == null) {
+          // The artifact failed to install and there was also no POM for it
+          throw new MavenResolveException("Could not resolve " + artifact);
+        }
       }
     }
   }
@@ -185,10 +187,12 @@ public class MavenArtifactDownloader {
           }
         }
 
-        // Try to install the dependency locally
-        if (!target.isInstalled(dependency) && !installArtifact(dependency, target) && dependencyPom == null) {
-          // The dependency had no artifact and also no POM
-          throw new MavenResolveException("Could not resolve " + dependency);
+        synchronized (target) {
+          // Try to install the dependency locally
+          if (!target.isInstalled(dependency) && !installArtifact(dependency, target) && dependencyPom == null) {
+            // The dependency had no artifact and also no POM
+            throw new MavenResolveException("Could not resolve " + dependency);
+          }
         }
       }
     }
