@@ -34,6 +34,7 @@ import java.io.InputStream;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -59,10 +60,8 @@ public class MavenArtifactDownloader {
    *
    * @param source The repository to add
    */
-  public void addSource(ReadableMavenRepository source) {
-    synchronized (this.sources) {
-      this.sources.add(source);
-    }
+  public synchronized void addSource(ReadableMavenRepository source) {
+    this.sources.add(source);
   }
 
   /**
@@ -71,10 +70,8 @@ public class MavenArtifactDownloader {
    * @param source The repository to check if it exists as a source
    * @return {@code true} if this downloader has the give repository as a source, {@code false} otherwise
    */
-  public boolean hasSource(ReadableMavenRepository source) {
-    synchronized (this.sources) {
-      return this.sources.contains(source);
-    }
+  public synchronized boolean hasSource(ReadableMavenRepository source) {
+    return this.sources.contains(source);
   }
 
   /**
@@ -82,10 +79,8 @@ public class MavenArtifactDownloader {
    *
    * @param source The repository to remove
    */
-  public void removeSource(ReadableMavenRepository source) {
-    synchronized (this.sources) {
-      this.sources.remove(source);
-  }
+  public synchronized void removeSource(ReadableMavenRepository source) {
+    this.sources.remove(source);
   }
 
   /**
@@ -97,7 +92,7 @@ public class MavenArtifactDownloader {
    * @throws IOException           If an I/O error occurs while installing the artifact or one if its dependencies
    * @throws MavenResolveException If the artifact  or one of its dependencies can't be resolved
    */
-  public void installAll(MavenArtifact artifact, SimpleMavenRepository target, boolean installIfNotExists)
+  public synchronized void installAll(MavenArtifact artifact, SimpleMavenRepository target, boolean installIfNotExists)
       throws IOException, MavenResolveException {
     // Get the local POM path
     Path localPomPath = target.getPomPath(artifact);
@@ -124,10 +119,12 @@ public class MavenArtifactDownloader {
     }
 
     if (installIfNotExists) {
-      // If the artifact is not installed locally, try to install it
-      if (!target.isInstalled(artifact) && !installArtifact(artifact, target) && artifactPom == null) {
-        // The artifact failed to install and there was also no POM for it
-        throw new MavenResolveException("Could not resolve " + artifact);
+      synchronized (target) {
+        // If the artifact is not installed locally, try to install it
+        if (!target.isInstalled(artifact) && !installArtifact(artifact, target) && artifactPom == null) {
+          // The artifact failed to install and there was also no POM for it
+          throw new MavenResolveException("Could not resolve " + artifact);
+        }
       }
     }
   }
@@ -190,10 +187,12 @@ public class MavenArtifactDownloader {
           }
         }
 
-        // Try to install the dependency locally
-        if (!target.isInstalled(dependency) && !installArtifact(dependency, target) && dependencyPom == null) {
-          // The dependency had no artifact and also no POM
-          throw new MavenResolveException("Could not resolve " + dependency);
+        synchronized (target) {
+          // Try to install the dependency locally
+          if (!target.isInstalled(dependency) && !installArtifact(dependency, target) && dependencyPom == null) {
+            // The dependency had no artifact and also no POM
+            throw new MavenResolveException("Could not resolve " + dependency);
+          }
         }
       }
     }
@@ -218,19 +217,17 @@ public class MavenArtifactDownloader {
    * @return An input stream from which the artifact can be read, or {@code null} if not found in the sources
    * @throws IOException If an I/O error occurs while opening the stream
    */
-  public InputStream findArtifactStream(MavenArtifact artifact) throws IOException {
-    synchronized (this.sources) {
-      for (ReadableMavenRepository source : sources) {
-        InputStream stream;
-        if ((stream = source.getArtifactStream(artifact)) != null) {
-          // Found the requested artifact
-          return stream;
-        }
+  public synchronized InputStream findArtifactStream(MavenArtifact artifact) throws IOException {
+    for (ReadableMavenRepository source : sources) {
+      InputStream stream;
+      if ((stream = source.getArtifactStream(artifact)) != null) {
+        // Found the requested artifact
+        return stream;
       }
-
-      // Artifact has not been found in any source
-      return null;
     }
+
+    // Artifact has not been found in any source
+    return null;
   }
 
   /**
@@ -240,18 +237,16 @@ public class MavenArtifactDownloader {
    * @return The found URI, or {@code null}, if not found in the sources
    * @throws IOException If an I/O error occurs while checking for the artifact
    */
-  public Pair<ReadableMavenRepository, URI> findArtifactURI(MavenArtifact artifact) throws IOException {
-    synchronized (this.sources) {
-      for (ReadableMavenRepository source : sources) {
-        URI uri = source.getArtifactURI(artifact);
-        if (uri != null) {
-          return new Pair<>(source, uri);
-        }
+  public synchronized Pair<ReadableMavenRepository, URI> findArtifactURI(MavenArtifact artifact) throws IOException {
+    for (ReadableMavenRepository source : sources) {
+      URI uri = source.getArtifactURI(artifact);
+      if (uri != null) {
+        return new Pair<>(source, uri);
       }
-
-      // Artifact has not been found in any source
-      return null;
     }
+
+    // Artifact has not been found in any source
+    return null;
   }
 
   /**
@@ -262,13 +257,11 @@ public class MavenArtifactDownloader {
    * @throws IOException If an I/O error occurs while trying to read a POM
    */
   private MavenPom findPom(MavenArtifact artifact) throws IOException {
-    synchronized (this.sources) {
-      for (ReadableMavenRepository source : sources) {
-        MavenPom pom;
-        if ((pom = source.getArtifactPom(artifact)) != null) {
-          // Found the requested POM
-          return pom;
-        }
+    for (ReadableMavenRepository source : sources) {
+      MavenPom pom;
+      if ((pom = source.getArtifactPom(artifact)) != null) {
+        // Found the requested POM
+        return pom;
       }
     }
 
@@ -285,7 +278,7 @@ public class MavenArtifactDownloader {
    * @throws IOException If an I/O error occurs while installing the artifact
    */
   @SuppressWarnings("BooleanMethodIsAlwaysInverted")
-  public boolean installArtifact(MavenArtifact artifact, SimpleMavenRepository target) throws IOException {
+  public synchronized boolean installArtifact(MavenArtifact artifact, SimpleMavenRepository target) throws IOException {
     try (InputStream stream = findArtifactStream(artifact)) {
       // Try to find the given artifact
       if (stream != null) {
@@ -299,7 +292,7 @@ public class MavenArtifactDownloader {
         LOGGER.lifecycle("Installing artifact {}", formatArtifact(artifact));
 
         // Copy the artifact to the local path
-        Files.copy(stream, targetPath);
+        Files.copy(stream, targetPath, StandardCopyOption.REPLACE_EXISTING);
         return true;
       } else {
         return false;

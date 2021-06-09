@@ -432,30 +432,32 @@ public class GenerateFlintManifestTask extends DefaultTask {
         remoteMavenRepository = new RemoteMavenRepository(flintGradlePlugin.getHttpClient(), entry.getValue());
       }
 
-      if (!internalRepository.isInstalled(artifact)) {
-        // The artifact is not installed already, install it
-        if (remoteMavenRepository == null) {
-          // Can't download anything in offline mode
-          throw new RuntimeException("Missing artifact " + artifact + " in local repository, " +
-              "but working in offline mode");
-        }
+      synchronized (internalRepository) {
+        if (!internalRepository.isInstalled(artifact)) {
+          // The artifact is not installed already, install it
+          if (remoteMavenRepository == null) {
+            // Can't download anything in offline mode
+            throw new RuntimeException("Missing artifact " + artifact + " in local repository, " +
+                "but working in offline mode");
+          }
 
-        boolean setupSource = !downloader.hasSource(remoteMavenRepository);
-        if (setupSource) {
-          // The download has the source not set already, add it now
-          downloader.addSource(remoteMavenRepository);
-        }
+          boolean setupSource = !downloader.hasSource(remoteMavenRepository);
+          if (setupSource) {
+            // The download has the source not set already, add it now
+            downloader.addSource(remoteMavenRepository);
+          }
 
-        try {
-          // Install the artifact including dependencies
-          downloader.installArtifact(artifact, internalRepository);
-        } catch (IOException e) {
-          throw new FlintGradleException("Failed to install maven artifact", e);
-        }
+          try {
+            // Install the artifact including dependencies
+            downloader.installArtifact(artifact, internalRepository);
+          } catch (IOException e) {
+            throw new FlintGradleException("Failed to install maven artifact", e);
+          }
 
-        if (setupSource) {
-          // We added the source, clean up afterwards
-          downloader.removeSource(remoteMavenRepository);
+          if (setupSource) {
+            // We added the source, clean up afterwards
+            downloader.removeSource(remoteMavenRepository);
+          }
         }
       }
 
