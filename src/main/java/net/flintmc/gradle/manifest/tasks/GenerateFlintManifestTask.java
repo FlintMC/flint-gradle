@@ -369,6 +369,9 @@ public class GenerateFlintManifestTask extends DefaultTask {
         getProjectDescription(),
         getProjectVersion(),
         getChannel(),
+        //todo implement meta packages: https://github.com/FlintMC/flint-gradle/issues/30
+        false,
+        null,
         String.join(",", getMinecraftVersions()),
         getFlintVersion(),
         getAuthors(),
