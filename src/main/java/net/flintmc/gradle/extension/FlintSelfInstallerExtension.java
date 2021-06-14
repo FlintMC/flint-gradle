@@ -30,9 +30,9 @@ import javax.annotation.Nonnull;
  */
 public class FlintSelfInstallerExtension implements Configurable<FlintSelfInstallerExtension> {
   /**
-   * Default self installer dependency notation. Defaults to the in house provided installer solution.
+   * Default self installer dependency notation. Defaults to the in house provided installer solution.1
    */
-  public static final String DEFAULT_SELF_INSTALLER_DEPENDENCY = "net.flintmc.installer:frontend-gui:1.1.12";
+  public static final String DEFAULT_SELF_INSTALLER_DEPENDENCY = "net.flintmc.installer:frontend-gui:2.0.2";
 
   /**
    * Default self installer dependency main class. Defaults to the main class of the in house provided solution.
