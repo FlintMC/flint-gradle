@@ -603,8 +603,6 @@ public class GenerateFlintManifestTask extends DefaultTask {
             sha1Hex
         )
     );
-
-
   }
 
   /**
@@ -720,7 +718,7 @@ public class GenerateFlintManifestTask extends DefaultTask {
     /**
      * When generating the manifest that will be written into the final jar file it will contain no install instructions.
      *
-     * @see PackageModel#getInstallInstructions() ()
+     * @see PackageModel#getInstallInstructions()
      */
     JAR,
 
