@@ -53,6 +53,7 @@ import org.gradle.api.DefaultTask;
 import org.gradle.api.NamedDomainObjectContainer;
 import org.gradle.api.Project;
 import org.gradle.api.tasks.*;
+import org.gradle.api.tasks.Optional;
 import org.gradle.jvm.tasks.Jar;
 
 import javax.inject.Inject;
@@ -465,78 +466,79 @@ public class GenerateFlintManifestTask extends DefaultTask {
     MavenArtifactDownloader downloader = this.flintGradlePlugin.getDownloader();
 
     synchronized(downloader) {
-      for (Map.Entry<ManifestMavenDependency, URI> entry : mavenDependencyURIs.entrySet()) {
+      for(Map.Entry<ManifestMavenDependency, URI> entry : mavenDependencyURIs.entrySet()) {
         MavenArtifact artifact = entry.getKey().getArtifact();
 
         // Construct the path relative to the root of the libraries folder
         String localPath = String.format(
-                "${FLINT_LIBRARY_DIR}/%s/%s/%s/%s-%s%s.jar",
-                artifact.getGroupId().replace('.', '/'),
-                artifact.getArtifactId(),
-                artifact.getVersion(),
-                artifact.getArtifactId(),
-                artifact.getVersion(),
-                artifact.getClassifier() == null ? "" : "-" + artifact.getClassifier()
+            "${FLINT_LIBRARY_DIR}/%s/%s/%s/%s-%s%s.jar",
+            artifact.getGroupId().replace('.', '/'),
+            artifact.getArtifactId(),
+            artifact.getVersion(),
+            artifact.getArtifactId(),
+            artifact.getVersion(),
+            artifact.getClassifier() == null ? "" : "-" + artifact.getClassifier()
         );
 
         RemoteMavenRepository remoteMavenRepository;
-        if (flintGradlePlugin.getHttpClient() == null) {
+        if(flintGradlePlugin.getHttpClient() == null) {
           remoteMavenRepository = null;
         } else {
           remoteMavenRepository = new RemoteMavenRepository(flintGradlePlugin.getHttpClient(), entry.getValue());
         }
 
-      synchronized (internalRepository) {
-        if (!internalRepository.isInstalled(artifact)) {
-          // The artifact is not installed already, install it
-          if (remoteMavenRepository == null) {
-            // Can't download anything in offline mode
-            throw new RuntimeException("Missing artifact " + artifact + " in local repository, " +
-                "but working in offline mode");
+        synchronized(internalRepository) {
+          if(!internalRepository.isInstalled(artifact)) {
+            // The artifact is not installed already, install it
+            if(remoteMavenRepository == null) {
+              // Can't download anything in offline mode
+              throw new RuntimeException("Missing artifact " + artifact + " in local repository, " +
+                  "but working in offline mode");
+            }
+
+            boolean setupSource = !downloader.hasSource(remoteMavenRepository);
+            if(setupSource) {
+              // The download has the source not set already, add it now
+              downloader.addSource(remoteMavenRepository);
+            }
+
+            try {
+              // Install the artifact including dependencies
+              downloader.installArtifact(artifact, internalRepository);
+            } catch(IOException e) {
+              throw new FlintGradleException("Failed to install maven artifact", e);
+            }
+
+            if(setupSource) {
+              // We added the source, clean up afterwards
+              downloader.removeSource(remoteMavenRepository);
+            }
           }
 
-          boolean setupSource = !downloader.hasSource(remoteMavenRepository);
-          if (setupSource) {
-            // The download has the source not set already, add it now
-            downloader.addSource(remoteMavenRepository);
+          if(!artifactChecksums.has(artifact)) {
+            try(InputStream inputStream = internalRepository.getArtifactStream(artifact)) {
+              String sha1Hex = Util.sha1Hex(IOUtils.toByteArray(inputStream));
+              this.artifactChecksums.add(artifact, sha1Hex);
+            } catch(IOException e) {
+              throw new FlintGradleException("Could not generate checksum of maven artifact", e);
+            }
           }
 
-          try {
-            // Install the artifact including dependencies
-            downloader.installArtifact(artifact, internalRepository);
-          } catch (IOException e) {
-            throw new FlintGradleException("Failed to install maven artifact", e);
-          }
-
-          if (setupSource) {
-            // We added the source, clean up afterwards
-            downloader.removeSource(remoteMavenRepository);
-          }
+          // Add the instruction
+          out.add(new InstallInstructionModel(
+              InstallInstructionTypes.DOWNLOAD_MAVEN_DEPENDENCY,
+              null,
+              new DownloadMavenDependencyDataModel(
+                  artifact.getGroupId(),
+                  artifact.getArtifactId(),
+                  artifact.getVersion(),
+                  artifact.getClassifier(),
+                  entry.getValue().toASCIIString(),
+                  localPath,
+                  artifactChecksums.get(artifact)
+              )
+          ));
         }
-
-        if (!artifactChecksums.has(artifact)) {
-          try (InputStream inputStream = internalRepository.getArtifactStream(artifact)) {
-            String sha1Hex = Util.sha1Hex(IOUtils.toByteArray(inputStream));
-            this.artifactChecksums.add(artifact, sha1Hex);
-          } catch(IOException e) {
-            throw new FlintGradleException("Could not generate checksum of maven artifact", e);
-          }
-        }
-
-        // Add the instruction
-        out.add(new InstallInstructionModel(
-                InstallInstructionTypes.DOWNLOAD_MAVEN_DEPENDENCY,
-                null,
-                new DownloadMavenDependencyDataModel(
-                        artifact.getGroupId(),
-                        artifact.getArtifactId(),
-                        artifact.getVersion(),
-                        artifact.getClassifier(),
-                        entry.getValue().toASCIIString(),
-                        localPath,
-                        artifactChecksums.get(artifact)
-                )
-        ));
       }
     }
 
