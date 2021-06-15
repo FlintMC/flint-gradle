@@ -53,7 +53,6 @@ import org.gradle.api.DefaultTask;
 import org.gradle.api.NamedDomainObjectContainer;
 import org.gradle.api.Project;
 import org.gradle.api.tasks.*;
-import org.gradle.api.tasks.Optional;
 import org.gradle.jvm.tasks.Jar;
 
 import javax.inject.Inject;
@@ -487,12 +486,13 @@ public class GenerateFlintManifestTask extends DefaultTask {
           remoteMavenRepository = new RemoteMavenRepository(flintGradlePlugin.getHttpClient(), entry.getValue());
         }
 
+      synchronized (internalRepository) {
         if (!internalRepository.isInstalled(artifact)) {
           // The artifact is not installed already, install it
           if (remoteMavenRepository == null) {
             // Can't download anything in offline mode
             throw new RuntimeException("Missing artifact " + artifact + " in local repository, " +
-                    "but working in offline mode");
+                "but working in offline mode");
           }
 
           boolean setupSource = !downloader.hasSource(remoteMavenRepository);
@@ -504,7 +504,7 @@ public class GenerateFlintManifestTask extends DefaultTask {
           try {
             // Install the artifact including dependencies
             downloader.installArtifact(artifact, internalRepository);
-          } catch(IOException e) {
+          } catch (IOException e) {
             throw new FlintGradleException("Failed to install maven artifact", e);
           }
 
