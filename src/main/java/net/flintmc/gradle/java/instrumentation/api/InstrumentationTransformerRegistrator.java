@@ -19,8 +19,22 @@
 
 package net.flintmc.gradle.java.instrumentation.api;
 
+/**
+ * Entry point of an instrumentation.
+ * Requires a Java Service to be registered and findable via a {@link java.util.ServiceLoader}.
+ * This class exists only to make it possible to use things like dependency injection in a {@link net.flintmc.gradle.java.instrumentation.api.transformer.InstrumentationTransformer}.
+ * If the {@link java.util.ServiceLoader} would look for {@link net.flintmc.gradle.java.instrumentation.api.transformer.InstrumentationTransformer} this would not be possible to do.
+ * Furthermore, it is possible to specify more details about the {@link net.flintmc.gradle.java.instrumentation.api.transformer.InstrumentationTransformer} to register.
+ *
+ * @see InstrumentationTransformerRegistry
+ */
 public interface InstrumentationTransformerRegistrator {
 
+  /**
+   * Initialize the instrumentation chain.
+   *
+   * @param registry the transformer registry to register all transformers on and retrieve information about the current transformation
+   */
   void initialize(InstrumentationTransformerRegistry registry);
 
 }

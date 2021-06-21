@@ -27,16 +27,41 @@ import org.gradle.api.tasks.SourceSet;
 import java.util.Map;
 import java.util.function.Predicate;
 
+/**
+ * Util class to provide context between {@link InstrumentationTransformerRegistrator} and {@link InstrumentationTransformerContext}.
+ */
 public interface InstrumentationTransformerRegistry {
 
+  /**
+   * Register a given {@link InstrumentationTransformer} for all outputs of the current {@link SourceSet}.
+   *
+   * @param instrumentationTransformer the transformer to register
+   * @return this
+   */
   InstrumentationTransformerRegistry registerTransformer(InstrumentationTransformer instrumentationTransformer);
 
+  /**
+   * Register a given {@link InstrumentationTransformer} for all outputs of the current {@link SourceSet} matching a given {@link Predicate}.
+   *
+   * @param instrumentationTransformer the transformer to register
+   * @param predicate                  the predicate to check if the current resource should be transformed
+   * @return this
+   */
   InstrumentationTransformerRegistry registerTransformer(InstrumentationTransformer instrumentationTransformer, Predicate<InstrumentationTransformerContext> predicate);
 
+  /**
+   * @return all registered transformers
+   */
   Map<InstrumentationTransformer, Predicate<InstrumentationTransformerContext>> getTransformers();
 
+  /**
+   * @return the source set of the current instrumentation round
+   */
   SourceSet getSourceSet();
 
+  /**
+   * @return the singleton instance of the flint gradle plugin
+   */
   FlintGradlePlugin getGradlePlugin();
 
 }

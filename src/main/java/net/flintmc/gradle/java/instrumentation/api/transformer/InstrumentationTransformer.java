@@ -21,7 +21,15 @@ package net.flintmc.gradle.java.instrumentation.api.transformer;
 
 import net.flintmc.gradle.java.instrumentation.api.context.InstrumentationTransformerContext;
 
+/**
+ * Interface to specify a post compile transformations of resources and classes of the compilation artifact.
+ */
 public interface InstrumentationTransformer {
 
+  /**
+   * Transform the content of a given resource.
+   *
+   * @param instrumentationTransformerContext the context to retrieve all informations about the transform from
+   */
   void transform(InstrumentationTransformerContext instrumentationTransformerContext);
 }

@@ -30,20 +30,33 @@ import java.io.File;
  */
 public interface InstrumentationTransformerContext {
 
+  /**
+   * @return the SourceSet of the current instrumentation round
+   */
   SourceSet getSourceSet();
 
+  /**
+   * @return all class folders of the current SourceSet
+   */
   FileCollection getOriginalClassDirectories();
 
+  /**
+   * @return the resource folder of the current SourceSet
+   */
   File getOriginalResourceDirectory();
 
+  /**
+   * @return the instrumentation class folder of the current SourceSet
+   */
   File getInstrumentedClassDirectory();
 
   /**
-   * Should only be used to read from.
+   * Should only be used to read metadata from.
    * Directly writing to this file might break gradle caching.
    * Use {@link InstrumentationTransformerContext#setData(byte[])} for modification.
    *
    * @return the unmodified file
+   * @see InstrumentationTransformerContext#getData()
    */
   File getOriginalFile();
 
