@@ -19,6 +19,7 @@
 
 package net.flintmc.gradle.environment.yarn;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -55,6 +56,11 @@ public class YarnEnvironment extends DefaultDeobfuscationEnvironment {
   public YarnEnvironment(DefaultInput input) {
     super(input, "yarn", EnvironmentType.YARN);
     this.input = input;
+  }
+
+  @Override
+  public Map<String, File> getDownloadedMappingFiles(OkHttpClient httpClient, EnvironmentCacheFileProvider environmentCacheFileProvider) throws DeobfuscationException {
+    return null;
   }
 
   /** {@inheritDoc} */

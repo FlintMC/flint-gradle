@@ -19,12 +19,8 @@
 
 package net.flintmc.gradle.java.instrumentation.api;
 
-import org.gradle.api.file.FileCollection;
-import org.gradle.api.tasks.SourceSet;
+public interface InstrumentationTransformerRegistrator {
 
-@FunctionalInterface
-public interface InstrumentationTransformer {
-
-  void transform(final SourceSet sourceSet, final FileCollection originalClassDirectories);
+  void initialize(InstrumentationTransformerRegistry registry);
 
 }

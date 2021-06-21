@@ -19,13 +19,18 @@
 
 package net.flintmc.gradle.environment;
 
+import java.io.File;
 import java.util.Collection;
+import java.util.Map;
+
 import net.flintmc.gradle.environment.mcp.ModCoderPackEnvironment;
 import net.flintmc.gradle.environment.yarn.YarnEnvironment;
 import net.flintmc.gradle.maven.pom.MavenArtifact;
 import net.flintmc.gradle.maven.pom.MavenPom;
+import net.flintmc.gradle.minecraft.data.environment.DefaultInput;
 import net.flintmc.gradle.minecraft.data.environment.EnvironmentInput;
 import net.flintmc.gradle.minecraft.data.environment.EnvironmentType;
+import okhttp3.OkHttpClient;
 
 /** Represents a deobfuscation environment which can be used to obtain the minecraft source. */
 public interface DeobfuscationEnvironment {
@@ -42,6 +47,8 @@ public interface DeobfuscationEnvironment {
    * @return The name of the environment
    */
   String name();
+
+  Map<String, File> getDownloadedMappingFiles(OkHttpClient httpClient, EnvironmentCacheFileProvider environmentCacheFileProvider) throws DeobfuscationException;
 
   /**
    * Runs the deobfuscation on the given client and server artifacts. One of the 2 artifacts may be null, but never both
