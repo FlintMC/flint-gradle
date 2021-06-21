@@ -17,18 +17,20 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-package net.flintmc.gradle.java.instrumentation.api.context;
+package net.flintmc.gradle.java.instrumentation.api;
 
-import org.gradle.api.file.FileCollection;
-import org.gradle.api.tasks.SourceSet;
+import net.flintmc.gradle.FlintGradleException;
 
-import java.io.File;
+public class InstrumentationException extends FlintGradleException {
 
-public interface InstrumentationRawTransformerContext {
+  public InstrumentationException() {
+  }
 
-  SourceSet getSourceSet();
+  public InstrumentationException(String message) {
+    super(message);
+  }
 
-  FileCollection getOriginalClassDirectories();
-
-  File getOriginalResourceDirectory();
+  public InstrumentationException(String message, Throwable cause) {
+    super(message, cause);
+  }
 }

@@ -19,15 +19,14 @@
 
 package net.flintmc.gradle.java.instrumentation.tasks;
 
-import net.flintmc.gradle.FlintGradleException;
 import net.flintmc.gradle.FlintGradlePlugin;
+import net.flintmc.gradle.java.instrumentation.api.InstrumentationException;
 import net.flintmc.gradle.java.instrumentation.api.InstrumentationTransformerRegistrator;
 import net.flintmc.gradle.java.instrumentation.api.InstrumentationTransformerRegistry;
-import net.flintmc.gradle.java.instrumentation.api.context.InstrumentationClassTransformerContext;
-import net.flintmc.gradle.java.instrumentation.api.transformer.InstrumentationClassTransformer;
+import net.flintmc.gradle.java.instrumentation.api.context.InstrumentationTransformerContext;
+import net.flintmc.gradle.java.instrumentation.api.transformer.InstrumentationTransformer;
 import net.flintmc.gradle.java.instrumentation.impl.DefaultInstrumentationTransformerRegistry;
-import net.flintmc.gradle.java.instrumentation.impl.context.DefaultInstrumentationClassTransformerContext;
-import net.flintmc.gradle.minecraft.data.environment.MinecraftVersion;
+import net.flintmc.gradle.java.instrumentation.impl.context.DefaultInstrumentationTransformerContext;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
 import org.gradle.api.DefaultTask;
@@ -35,6 +34,7 @@ import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.file.FileCollection;
 import org.gradle.api.tasks.Internal;
 import org.gradle.api.tasks.SourceSet;
+import org.gradle.api.tasks.SourceSetOutput;
 import org.gradle.api.tasks.TaskAction;
 
 import javax.inject.Inject;
@@ -50,6 +50,9 @@ import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.function.Predicate;
 
+/**
+ * Gradle task to execute post compile class and resource instrumentations.
+ */
 public class InstrumentationTask extends DefaultTask {
 
   @Internal
@@ -61,21 +64,63 @@ public class InstrumentationTask extends DefaultTask {
   public InstrumentationTask() {
   }
 
-  public SourceSet getSourceSet() {
-    return sourceSet;
-  }
-
-  public Configuration getConfiguration() {
-    return configuration;
-  }
-
+  /**
+   * Set the gradle SourceSet that should be transformed.
+   *
+   * @param sourceSet the SourceSet to transform
+   */
   public void setSourceSet(final SourceSet sourceSet) {
     this.sourceSet = sourceSet;
   }
 
+  /**
+   * Set the gradle dependency configuration from which all transformers are retrieved from.
+   *
+   * @param configuration the dependency configuration to transform
+   */
+  public void setConfiguration(Configuration configuration) {
+    this.configuration = configuration;
+  }
+
+  /**
+   * @return the SourceSet that should be transformed
+   */
+  public SourceSet getSourceSet() {
+    return sourceSet;
+  }
+
+  /**
+   * @return the dependency configuration from which all transformers are retrieved from
+   */
+  public Configuration getConfiguration() {
+    return configuration;
+  }
+
+  /**
+   * @return a collection of all class directories of the current SourceSet.
+   * @see InstrumentationTask#getSourceSet()
+   * @see SourceSetOutput#getClassesDirs()
+   */
+  private FileCollection getOriginalClassesDirectories() {
+    return this.sourceSet.getOutput().getClassesDirs();
+  }
+
+  /**
+   * @return the single resource directory of the current SourceSet.
+   * @see InstrumentationTask#getSourceSet()
+   * @see SourceSetOutput#getResourcesDir()
+   */
+  private File getOriginalResourcesDirectory() {
+    return this.sourceSet.getOutput().getResourcesDir();
+  }
+
+  /**
+   * Performs the transformation
+   */
   @TaskAction
   public void executeInstrumentation() {
 
+    //Find classpath for all transformers
     Set<File> files = this.configuration.resolve();
     URL[] urls = new URL[files.size()];
 
@@ -84,99 +129,81 @@ public class InstrumentationTask extends DefaultTask {
       try {
         urls[i++] = f.toURI().toURL();
       } catch (MalformedURLException e) {
-        throw new FlintGradleException("Failed to convert file to URL", e);
+        throw new InstrumentationException("Failed to convert file to URL", e);
       }
     }
 
     InstrumentationTransformerRegistry registry = new DefaultInstrumentationTransformerRegistry(sourceSet, this.getProject().getPlugins().getPlugin(FlintGradlePlugin.class));
+    //Create transformer classpath
     ClassLoader loader = new URLClassLoader(urls, getClass().getClassLoader());
 
+    //load all transformer registrators from created classpath
+    //this will be done seperately for every sourceset, so no state will be accidently shared between transformations
     ServiceLoader<InstrumentationTransformerRegistrator> serviceLoader =
         ServiceLoader.load(InstrumentationTransformerRegistrator.class, loader);
 
+    //register all transformers
     for (InstrumentationTransformerRegistrator instrumentationTransformerRegistrator : serviceLoader) {
       instrumentationTransformerRegistrator.initialize(registry);
     }
 
 
+    //find files to transform
     File originalClassesDir = this.getOriginalClassesDirectories().getSingleFile();
     File instrumentedClassesDir = this.getOutputs().getFiles().getSingleFile();
 
     for (File file : this.getProject().fileTree(originalClassesDir)) {
+      //create relative path from root directory to the transforming file
       String relativePath = file.getAbsolutePath().replaceFirst(originalClassesDir.getAbsolutePath() + "/", "");
       File newFile = new File(instrumentedClassesDir, relativePath);
       try {
         try (FileInputStream fileInputStream = new FileInputStream(file)) {
           byte[] bytes = IOUtils.toByteArray(fileInputStream);
-          bytes = transformClass(file, originalClassesDir, bytes, registry);
 
+          //transform if file is a class
+          bytes = transformClassMaybe(file, bytes, registry);
+          //TODO: resources are not handled yet. implement that
+
+          //if the transformer returns null bytes, the transformed file will be removed from final compilation
           if (bytes == null) {
             continue;
           }
+
+          //create file in instrumented output directory
           newFile.getParentFile().mkdirs();
           newFile.createNewFile();
           Files.write(newFile.toPath(), bytes);
         }
       } catch (IOException e) {
-        e.printStackTrace();
+        throw new InstrumentationException(String.format("Could not instrument file %s in project %s", file, this.getProject().getPath()), e);
       }
     }
-   /* for (String jarPath : this.configuration.getAsPath().split(":")) {
-      if (!FilenameUtils.getExtension(jarPath).equalsIgnoreCase("jar")) continue;
-      File file = new File(jarPath);
-      try {
-        ServiceLoader<InstrumentationTransformerRegistrator> serviceLoader = ServiceLoader.load(InstrumentationTransformerRegistrator.class, new URLClassLoader(new URL[]{file.toURI().toURL()}));
-
-        for (InstrumentationTransformerRegistrator instrumentationTransformerRegistrator : serviceLoader) {
-          instrumentationTransformerRegistrator.initialize(registry);
-        }
-        for (File classesDirectory : this.getOriginalClassesDirectories().getFiles()) {
-          for (File search : this
-              .getOriginalClassesDirectories()
-              .getAsFileTree()
-              .filter(search -> FilenameUtils.getExtension(search.getName()).equals("class"))) {
-            if (search.getPath().startsWith(classesDirectory.getPath())) {
-
-
-              System.out.println();
-            }
-          }
-        }
-
-      } catch (IOException e) {
-        e.printStackTrace();
-      }
-    }*/
   }
 
-  private byte[] transformClass(File file, File classesDirectory, byte[] bytes, InstrumentationTransformerRegistry registry) {
+  private byte[] transformClassMaybe(File file, byte[] bytes, InstrumentationTransformerRegistry registry) {
     if (!FilenameUtils.getExtension(file.getName()).equals("class")) {
+      //not a class, do not touch content
       return bytes;
     }
-    String relativePath = file.getPath().replaceFirst(classesDirectory.getPath() + "/", "");
-    String name = FilenameUtils.removeExtension(file.getName());
-    String packageName = FilenameUtils.removeExtension(relativePath).replace('/', '.');
-    packageName = packageName.substring(0, packageName.lastIndexOf(name) - 1);
 
-    DefaultInstrumentationClassTransformerContext context = new DefaultInstrumentationClassTransformerContext(this.sourceSet, this.getOriginalClassesDirectories(), this.getOriginalResourcesDirectory(), name, packageName, file, bytes);
 
-    for (Map.Entry<InstrumentationClassTransformer, Predicate<InstrumentationClassTransformerContext>> entry : registry.getClassTransformers().entrySet()) {
+    //create transformation context that will be used by all transformers in this instrumentation round
+    DefaultInstrumentationTransformerContext context = new DefaultInstrumentationTransformerContext(
+        this.sourceSet,
+        this.getOriginalClassesDirectories(),
+        this.getOriginalResourcesDirectory(),
+        this.getOutputs().getFiles().getSingleFile(),
+        file,
+        bytes
+    );
+
+    for (Map.Entry<InstrumentationTransformer, Predicate<InstrumentationTransformerContext>> entry : registry.getTransformers().entrySet()) {
+      //check if transformer should handle the context
       if (entry.getValue().test(context)) {
+        //perform the transformation
         entry.getKey().transform(context);
       }
     }
-    return context.getClassData();
-  }
-
-  private FileCollection getOriginalClassesDirectories() {
-    return this.sourceSet.getOutput().getClassesDirs();
-  }
-
-  private File getOriginalResourcesDirectory() {
-    return this.sourceSet.getOutput().getResourcesDir();
-  }
-
-  public void setConfiguration(Configuration configuration) {
-    this.configuration = configuration;
+    return context.getData();
   }
 }

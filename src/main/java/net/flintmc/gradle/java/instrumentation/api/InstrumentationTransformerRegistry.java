@@ -20,29 +20,23 @@
 package net.flintmc.gradle.java.instrumentation.api;
 
 import net.flintmc.gradle.FlintGradlePlugin;
-import net.flintmc.gradle.environment.DeobfuscationEnvironment;
-import net.flintmc.gradle.java.instrumentation.api.context.InstrumentationClassTransformerContext;
-import net.flintmc.gradle.java.instrumentation.api.transformer.InstrumentationClassTransformer;
-import net.flintmc.gradle.java.instrumentation.api.transformer.InstrumentationRawTransformer;
+import net.flintmc.gradle.java.instrumentation.api.context.InstrumentationTransformerContext;
+import net.flintmc.gradle.java.instrumentation.api.transformer.InstrumentationTransformer;
 import org.gradle.api.tasks.SourceSet;
 
 import java.util.Map;
-import java.util.Set;
 import java.util.function.Predicate;
 
 public interface InstrumentationTransformerRegistry {
 
-//  InstrumentationTransformerRegistry registerRawTransformer(InstrumentationRawTransformer instrumentationTransformer);
+  InstrumentationTransformerRegistry registerTransformer(InstrumentationTransformer instrumentationTransformer);
 
-  InstrumentationTransformerRegistry registerClassTransformer(InstrumentationClassTransformer instrumentationTransformer);
+  InstrumentationTransformerRegistry registerTransformer(InstrumentationTransformer instrumentationTransformer, Predicate<InstrumentationTransformerContext> predicate);
 
-  InstrumentationTransformerRegistry registerClassTransformer(InstrumentationClassTransformer instrumentationTransformer, Predicate<InstrumentationClassTransformerContext> transformPredicate);
-
-  Map<InstrumentationClassTransformer, Predicate<InstrumentationClassTransformerContext>> getClassTransformers();
+  Map<InstrumentationTransformer, Predicate<InstrumentationTransformerContext>> getTransformers();
 
   SourceSet getSourceSet();
 
   FlintGradlePlugin getGradlePlugin();
 
-//  Set<InstrumentationRawTransformer> getRawTransformers();
 }

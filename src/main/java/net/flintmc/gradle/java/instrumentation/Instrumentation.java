@@ -33,6 +33,11 @@ public class Instrumentation {
 
   private static final String GROUP = "flint-instrumentation";
 
+  /**
+   * Applies post compile instrumentation capabilities to a given project.
+   *
+   * @param project the project to apply the instrumentation to
+   */
   public void apply(final Project project) {
     // Whether the project has applied the java base plugin
     if (!project.getPlugins().hasPlugin(JavaBasePlugin.class)) {

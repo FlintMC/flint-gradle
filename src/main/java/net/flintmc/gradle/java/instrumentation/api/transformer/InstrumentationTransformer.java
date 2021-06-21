@@ -19,9 +19,9 @@
 
 package net.flintmc.gradle.java.instrumentation.api.transformer;
 
-import net.flintmc.gradle.java.instrumentation.api.context.InstrumentationClassTransformerContext;
+import net.flintmc.gradle.java.instrumentation.api.context.InstrumentationTransformerContext;
 
-public interface InstrumentationClassTransformer {
+public interface InstrumentationTransformer {
 
-  void transform(InstrumentationClassTransformerContext instrumentationTransformerContext);
+  void transform(InstrumentationTransformerContext instrumentationTransformerContext);
 }

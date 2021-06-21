@@ -21,9 +21,8 @@ package net.flintmc.gradle.java.instrumentation.impl;
 
 import net.flintmc.gradle.FlintGradlePlugin;
 import net.flintmc.gradle.java.instrumentation.api.InstrumentationTransformerRegistry;
-import net.flintmc.gradle.java.instrumentation.api.context.InstrumentationClassTransformerContext;
-import net.flintmc.gradle.java.instrumentation.api.transformer.InstrumentationClassTransformer;
-import net.flintmc.gradle.java.instrumentation.api.transformer.InstrumentationRawTransformer;
+import net.flintmc.gradle.java.instrumentation.api.context.InstrumentationTransformerContext;
+import net.flintmc.gradle.java.instrumentation.api.transformer.InstrumentationTransformer;
 import org.gradle.api.tasks.SourceSet;
 
 import java.util.*;
@@ -31,8 +30,7 @@ import java.util.function.Predicate;
 
 public class DefaultInstrumentationTransformerRegistry implements InstrumentationTransformerRegistry {
 
-  private final Set<InstrumentationRawTransformer> rawTransformers = new HashSet<>();
-  private final Map<InstrumentationClassTransformer, Predicate<InstrumentationClassTransformerContext>> classTransformers = new HashMap<>();
+  private final Map<InstrumentationTransformer, Predicate<InstrumentationTransformerContext>> transformers = new HashMap<>();
   private final SourceSet sourceSet;
   private final FlintGradlePlugin flintGradlePlugin;
 
@@ -41,29 +39,23 @@ public class DefaultInstrumentationTransformerRegistry implements Instrumentatio
     this.flintGradlePlugin = flintGradlePlugin;
   }
 
-  //  @Override
-  public InstrumentationTransformerRegistry registerRawTransformer(InstrumentationRawTransformer instrumentationTransformer) {
-    this.rawTransformers.add(instrumentationTransformer);
-    return this;
+  @Override
+  public InstrumentationTransformerRegistry registerTransformer(InstrumentationTransformer instrumentationTransformer) {
+    return this.registerTransformer(instrumentationTransformer, instrumentationTransformerContext -> true);
   }
 
   @Override
-  public InstrumentationTransformerRegistry registerClassTransformer(InstrumentationClassTransformer instrumentationTransformer) {
-    return this.registerClassTransformer(instrumentationTransformer, instrumentationClassTransformerContext -> true);
-  }
-
-  @Override
-  public InstrumentationTransformerRegistry registerClassTransformer(InstrumentationClassTransformer instrumentationTransformer, Predicate<InstrumentationClassTransformerContext> transformerPredicate) {
-    if (this.classTransformers.containsKey(instrumentationTransformer)) {
+  public InstrumentationTransformerRegistry registerTransformer(InstrumentationTransformer instrumentationTransformer, Predicate<InstrumentationTransformerContext> transformerPredicate) {
+    if (this.transformers.containsKey(instrumentationTransformer)) {
       throw new IllegalStateException("Class Transformer got registered multiple times");
     }
-    this.classTransformers.put(instrumentationTransformer, transformerPredicate);
+    this.transformers.put(instrumentationTransformer, transformerPredicate);
     return this;
   }
 
   @Override
-  public Map<InstrumentationClassTransformer, Predicate<InstrumentationClassTransformerContext>> getClassTransformers() {
-    return Collections.unmodifiableMap(classTransformers);
+  public Map<InstrumentationTransformer, Predicate<InstrumentationTransformerContext>> getTransformers() {
+    return Collections.unmodifiableMap(transformers);
   }
 
   @Override
@@ -76,8 +68,4 @@ public class DefaultInstrumentationTransformerRegistry implements Instrumentatio
     return this.flintGradlePlugin;
   }
 
-  //  @Override
-  public Set<InstrumentationRawTransformer> getRawTransformers() {
-    return Collections.unmodifiableSet(rawTransformers);
-  }
 }

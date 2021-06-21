@@ -19,57 +19,70 @@
 
 package net.flintmc.gradle.java.instrumentation.impl.context;
 
-import net.flintmc.gradle.java.instrumentation.api.context.InstrumentationClassTransformerContext;
+import net.flintmc.gradle.java.instrumentation.api.context.InstrumentationTransformerContext;
 import org.gradle.api.file.FileCollection;
 import org.gradle.api.tasks.SourceSet;
 
 import java.io.File;
 
-public class DefaultInstrumentationClassTransformerContext extends DefaultInstrumentationRawTransformerContext implements InstrumentationClassTransformerContext {
+public class DefaultInstrumentationTransformerContext implements InstrumentationTransformerContext {
 
-  private final String className;
-  private final String packageName;
-  private final File originalClassFile;
+
+  private final SourceSet sourceSet;
+  private final FileCollection originalClassDirectories;
+  private final File originalResourceDirectory;
+  private final File instrumentedClassDirectory;
+  private final File originalFile;
   private byte[] classData;
 
-  public DefaultInstrumentationClassTransformerContext(
+  public DefaultInstrumentationTransformerContext(
       SourceSet sourceSet,
       FileCollection originalClassDirectories,
       File originalResourceDirectory,
-      String className,
-      String packageName,
+      File instrumentedClassDirectory,
       File originalClassFile,
-      byte[] classData) {
-    super(sourceSet, originalClassDirectories, originalResourceDirectory);
-    this.className = className;
-    this.packageName = packageName;
-    this.originalClassFile = originalClassFile;
+      byte[] classData
+  ) {
+    this.sourceSet = sourceSet;
+    this.originalClassDirectories = originalClassDirectories;
+    this.originalResourceDirectory = originalResourceDirectory;
+    this.instrumentedClassDirectory = instrumentedClassDirectory;
+    this.originalFile = originalClassFile;
     this.classData = classData;
   }
 
   @Override
-  public String getClassName() {
-    return this.className;
+  public SourceSet getSourceSet() {
+    return this.sourceSet;
   }
 
   @Override
-  public String getPackageName() {
-    return this.packageName;
+  public FileCollection getOriginalClassDirectories() {
+    return this.originalClassDirectories;
   }
 
   @Override
-  public File getOriginalClassFile() {
-    return this.originalClassFile;
+  public File getOriginalResourceDirectory() {
+    return this.originalResourceDirectory;
   }
 
   @Override
-  public byte[] getClassData() {
+  public File getInstrumentedClassDirectory() {
+    return this.instrumentedClassDirectory;
+  }
+
+  @Override
+  public File getOriginalFile() {
+    return this.originalFile;
+  }
+
+  @Override
+  public byte[] getData() {
     return this.classData;
   }
 
   @Override
-  public void setClassData(byte[] classData) {
+  public void setData(byte[] classData) {
     this.classData = classData;
   }
-
 }
