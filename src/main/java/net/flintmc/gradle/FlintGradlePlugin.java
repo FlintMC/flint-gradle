@@ -26,6 +26,7 @@ import net.flintmc.gradle.extension.FlintStaticFileDescription;
 import net.flintmc.gradle.java.JarTaskProvider;
 import net.flintmc.gradle.java.JavaPluginInteraction;
 import net.flintmc.gradle.java.RunConfigurationProvider;
+import net.flintmc.gradle.java.instrumentation.Instrumentation;
 import net.flintmc.gradle.manifest.ManifestConfigurator;
 import net.flintmc.gradle.manifest.dev.DevelopmentStaticFiles;
 import net.flintmc.gradle.maven.FlintResolutionStrategy;
@@ -76,6 +77,8 @@ public class FlintGradlePlugin implements Plugin<Project> {
   private ManifestConfigurator manifestConfigurator;
 
   private FlintGradlePlugin parentPlugin;
+
+  private Instrumentation instrumentation;
 
   @Override
   public void apply(@Nonnull Project project) {
@@ -132,6 +135,9 @@ public class FlintGradlePlugin implements Plugin<Project> {
         throw new UncheckedIOException("Failed to create Yggdrasil authenticator", e);
       }
 
+      this.instrumentation = new Instrumentation();
+      this.instrumentation.apply(project);
+
       this.runConfigurationProvider = new RunConfigurationProvider(
           project, minecraftRepository, minecraftCache.resolve("run"), authenticator, httpClient);
       this.jarTaskProvider = new JarTaskProvider();
@@ -153,6 +159,8 @@ public class FlintGradlePlugin implements Plugin<Project> {
       this.runConfigurationProvider = parentPlugin.runConfigurationProvider;
       this.jarTaskProvider = parentPlugin.jarTaskProvider;
       this.mavenArtifactURLCache = parentPlugin.mavenArtifactURLCache;
+      this.instrumentation = parentPlugin.instrumentation;
+      this.instrumentation.apply(project);
     }
 
     this.manifestConfigurator = new ManifestConfigurator(this);
@@ -327,5 +335,13 @@ public class FlintGradlePlugin implements Plugin<Project> {
    */
   public MavenArtifactDownloader getDownloader() {
     return this.downloader;
+  }
+
+  public FlintGradleExtension getExtension() {
+    return extension;
+  }
+
+  public MinecraftRepository getMinecraftRepository() {
+    return this.minecraftRepository;
   }
 }

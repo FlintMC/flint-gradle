@@ -19,19 +19,8 @@
 
 package net.flintmc.gradle.environment.mcp;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import net.flintmc.gradle.environment.DefaultDeobfuscationEnvironment;
-import net.flintmc.gradle.environment.DeobfuscationException;
-import net.flintmc.gradle.environment.DeobfuscationUtilities;
-import net.flintmc.gradle.environment.EnvironmentCacheFileProvider;
-import net.flintmc.gradle.environment.SourceJarProcessor;
+import com.google.common.collect.ImmutableMap;
+import net.flintmc.gradle.environment.*;
 import net.flintmc.gradle.java.exec.JavaExecutionResult;
 import net.flintmc.gradle.maven.SimpleMavenRepository;
 import net.flintmc.gradle.maven.pom.MavenArtifact;
@@ -45,7 +34,19 @@ import okhttp3.OkHttpClient;
 import org.gradle.api.logging.Logger;
 import org.gradle.api.logging.Logging;
 
-/** Implementation of the MCP as a deobfuscation environment. */
+import java.io.File;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Implementation of the MCP as a deobfuscation environment.
+ */
 public class ModCoderPackEnvironment extends DefaultDeobfuscationEnvironment {
   private static final Logger LOGGER = Logging.getLogger(ModCoderPackEnvironment.class);
 
@@ -61,7 +62,31 @@ public class ModCoderPackEnvironment extends DefaultDeobfuscationEnvironment {
     this.input = input;
   }
 
-  /** {@inheritDoc} */
+  @Override
+  public Map<String, File> getDownloadedMappingFiles(OkHttpClient httpClient, EnvironmentCacheFileProvider cacheFileProvider) throws DeobfuscationException {
+
+    return ImmutableMap.of(
+        "mcp-config",
+        this.downloadAndExtractZip(
+            LOGGER,
+            cacheFileProvider,
+            httpClient,
+            input.getConfigDownload().toExternalForm(),
+            "mcp-config_" + input.getConfigVersion()).toFile(),
+        "mcp-mappings",
+        this.downloadAndExtractZip(
+                LOGGER,
+                cacheFileProvider,
+                httpClient,
+                input.getMappingsDownload().toExternalForm(),
+                "mcp-mappings_" + input.getMappingsVersion())
+            .toFile()
+    );
+  }
+
+  /**
+   * {@inheritDoc}
+   */
   @Override
   public void runDeobfuscation(
       MavenPom clientPom, MavenPom serverPom, DeobfuscationUtilities utilities)

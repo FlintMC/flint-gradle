@@ -19,21 +19,20 @@
 
 package net.flintmc.gradle.environment;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Enumeration;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.JarInputStream;
 import java.util.jar.JarOutputStream;
+
+import com.google.common.collect.ImmutableMap;
 import net.flintmc.gradle.maven.pom.MavenArtifact;
 import net.flintmc.gradle.minecraft.data.environment.DefaultInput;
 import net.flintmc.gradle.minecraft.data.environment.EnvironmentType;

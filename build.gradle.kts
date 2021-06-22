@@ -87,6 +87,10 @@ dependencies {
     implementation(group = "net.flintmc.installer", name = "logic-implementation", version = "2.0.2")
     implementation(group = "net.flintmc.installer", name = "logic", version = "2.0.2")
 
+    implementation(group = "org.ow2.asm", name = "asm", version = "9.1")
+    implementation(group = "org.ow2.asm",name = "asm-tree", version = "9.1")
+    implementation(group = "org.ow2.asm", name ="asm-commons", version = "9.1")
+
     implementation(group = "com.cloudbees", name = "diff4j", version = "1.2")
 }
 

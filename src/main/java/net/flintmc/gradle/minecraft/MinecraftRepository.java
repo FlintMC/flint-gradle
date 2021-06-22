@@ -392,4 +392,8 @@ public class MinecraftRepository extends SimpleMavenRepository {
       throw new IOException("Failed to convert version manifest from json", e);
     }
   }
+
+  public Path getEnvironmentBasePath() {
+    return environmentBasePath;
+  }
 }
