@@ -130,7 +130,9 @@ public class FlintResolutionStrategy {
                       resolutionStrategy.eachDependency((details) -> {
                         ModuleVersionSelector selector = details.getRequested();
 
-                        if(selector.getGroup().equals("net.flintmc") && !Objects.equals(selector.getVersion(), flintVersion)) {
+                        if(selector.getGroup().equals("net.flintmc")
+                            && !Objects.equals(selector.getVersion(), flintVersion)
+                            && !selector.getName().equals("flint-gradle")) {
 
                           // Force the flint version to what is specified in the project
                           details.useVersion(flintVersion);
